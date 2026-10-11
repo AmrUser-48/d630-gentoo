@@ -18,24 +18,24 @@ Compile for Core 2 (-march=core2 -mtune=core2, kernel CONFIG_MCORE2=y). Build re
 
 Required built-in functionality includes the selected boot-device path, block layer, SATA/AHCI and ATAPI, USB host controller and USB storage, ISO9660, devtmpfs, tmpfs, procfs, sysfs, ext4/VFAT/NTFS3/Btrfs, i915, the iwl3945 stack, HDA codec path, USB HID, and USB RNDIS host networking. Verify exact Kconfig symbols against the pinned source with scripts/config, olddefconfig, and a final .config audit.
 
-## Chosen first image: no external initramfs
+## Chosen first image: kernel-embedded initramfs
 
-The current preference is to avoid both an external initramfs and runtime kernel modules from disk. The most direct design to test is:
+The requirement is that GRUB can load a **single kernel image** and the machine reaches a practical rescue shell without needing a separate initramfs, root partition, or kernel-module directory. The correct design is to build an initramfs archive into the kernel itself. This is still an initramfs mechanism; it is simply embedded rather than supplied as a second GRUB-loaded file.
 
-1. Build a complete, minimal Gentoo runtime root tree in CI. Keep Portage, compilers, development headers, source trees and caches outside the runtime tree.
-2. Install only runtime packages and required firmware into the runtime tree. Do not install a /lib/modules/<kernel-release>/ tree for the first image; ensure every needed driver is built in.
-3. Place the complete runtime tree directly on an ISO9660 filesystem. Do not put it inside a separate SquashFS file for this no-initramfs variant.
-4. Build a legacy-BIOS El Torito ISO with GRUB and the kernel. The GRUB menu must pass the correct root device and rootfstype=iso9660 options; prove the exact device path for optical boot and for the intended hybrid-USB boot method.
-5. Use a read-only ISO9660 root. Mount /run and /tmp as tmpfs through normal init/service setup; identify and handle other runtime paths that need writes. A read-only root is a deliberate initial limitation, not a persistent writable desktop.
-6. Validate the image in a VM, inspect the ISO with xorriso/isoinfo, and boot it on the D630 from optical media and USB before further pruning.
+1. Build a dedicated initramfs staging tree in CI. Keep Portage, compilers, development headers, source trees and package caches outside it.
+2. Include an executable `/init` as PID 1. It mounts devtmpfs, procfs and sysfs, initializes device discovery and console setup, prints a clear banner, and starts an interactive Bash rescue shell with a sensible PATH and usable terminal settings.
+3. Include **Bash as the primary shell**, with maintained `/etc/profile`, the Gentoo-appropriate global Bash rc file, `/root/.bashrc`, `/root/.profile`, and `/etc/inputrc`. Configure a useful prompt, sane history behavior, completion if packaged, aliases, safe defaults and readable error handling. A bare BusyBox-only shell is not the target.
+4. Include GNU coreutils, findutils, grep, sed and gawk, plus `lf` as a terminal file manager with a real configuration and sensible preview/opening behavior. Include `less`, `file`, `util-linux` mount tools and the filesystem utilities needed for rescue. BusyBox may supplement missing applets but must not replace the requested Bash/GNU environment.
+5. Build storage and filesystem drivers into the kernel. Include ext4, Btrfs, NTFS3, FAT/VFAT, partition-table parsing, AHCI/ATA/ATAPI, SCSI disk and USB storage as built-in options. No `/lib/modules/<kernel-release>` directory is required for the boot/mount path.
+6. Set `CONFIG_BLK_DEV_INITRD=y` and point `CONFIG_INITRAMFS_SOURCE` at the staged tree or generated cpio archive. Verify that the final kernel contains the expected `/init` and utilities; do not rely on a separate initrd file in GRUB.
+7. Assemble a legacy-BIOS ISO with GRUB and the self-contained kernel. The embedded rescue shell must work independently of any additional files or full desktop root on the ISO.
+8. Test in a VM and on the D630. From the embedded shell, identify partitions and mount disposable ext4, Btrfs, NTFS3 and FAT test volumes read-only first; test writes only on disposable volumes. Verify GRUB loads only the kernel, with no separate initramfs and no `root=` partition supplied.
 
-The kernel can mount ISO9660 as root without an initramfs only if it can already access the root device: the required storage controller, block/ATAPI/USB path and ISO9660 support must be built in. A hybrid ISO written to USB may expose a different device layout than an optical disc, so test it rather than assuming.
+This keeps the first rescue environment self-contained while leaving room for a richer ISO. The embedded initramfs increases the kernel file size; its dynamically linked programs need their loader and shared libraries inside the archive. Built-in Wi-Fi drivers still need firmware files, which must also be embedded if Wi-Fi should work before mounting an external filesystem.
 
-### Important incompatibility
+### Why an embedded initramfs is required
 
-A conventional **SquashFS + RAM-backed OverlayFS live root requires early userspace** to locate the SquashFS image and assemble the overlay. That early userspace is normally provided by an initramfs. Embedding an initramfs in the kernel still uses the initramfs mechanism; it only removes the separate initramfs file.
-
-Therefore, do not combine all three requirements—no initramfs, SquashFS root, and RAM OverlayFS—without implementing and testing an alternative early-root mechanism. For the first build, prioritize the no-external-initramfs requirement and use a direct ISO9660 root. If compression and OverlayFS later become more important than eliminating early userspace, change the design deliberately.
+Without an initramfs or an embedded initramfs, Linux does not automatically start a shell when root mounting fails; it normally panics. For the requested “load only the kernel file and get a shell” behavior, the embedded archive needs a working `/init`, its interpreter and libraries, and the rescue tools—not just shell binaries.
 
 ## Required network functions
 
