@@ -1,0 +1,19 @@
+name: Validate d630-gentoo sources
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source scaffold
+        run: |
+          chmod +x scripts/validate-sources.sh
+          ./scripts/validate-sources.sh
