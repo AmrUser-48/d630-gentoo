@@ -1,0 +1,9 @@
+# Packages/binaries for the kernel-embedded initramfs only.
+# Keep this staging root separate from the full Gentoo root to avoid copying
+# Bash/GNU/lf and their dependency closure into the kernel image.
+#
+# sys-apps/msr-tools provides wrmsr. Check whether it can be built static;
+# otherwise include and audit its exact shared-library dependency closure.
+# The early MSR hook must not guess register numbers or values.
+sys-apps/busybox
+sys-apps/msr-tools
