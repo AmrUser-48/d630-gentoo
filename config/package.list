@@ -1,0 +1,47 @@
+# Initial runtime package candidates for d630-gentoo.
+# This is not a resolved dependency closure. Validate atoms and USE flags
+# against the selected Gentoo profile before starting the full build.
+
+# Base userspace and rescue utilities
+sys-apps/busybox
+sys-apps/dbus
+sys-apps/openrc
+sys-apps/util-linux
+sys-apps/pciutils
+sys-apps/usbutils
+sys-apps/kmod
+sys-fs/squashfs-tools
+sys-fs/dosfstools
+sys-fs/ntfs3g
+sys-fs/btrfs-progs
+sys-block/parted
+sys-boot/grub
+app-editors/nano
+app-misc/mc
+app-misc/tmux
+net-misc/openssh
+net-misc/rsync
+
+# Network and radio
+net-misc/dhcpcd
+net-wireless/iw
+net-wireless/wpa_supplicant
+net-wireless/bluez
+
+# Xorg desktop
+x11-base/xorg-server
+x11-apps/xinit
+x11-apps/xterm
+x11-apps/xrandr
+x11-apps/xset
+x11-apps/xsetroot
+x11-apps/xinput
+x11-wm/openbox
+x11-wm/dwm
+x11-wm/herbstluftwm
+x11-terms/alacritty
+media-fonts/dejavu
+media-libs/mesa
+
+# Firmware candidate; confirm exact firmware needs and redistribution terms.
+sys-kernel/linux-firmware
