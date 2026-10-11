@@ -96,7 +96,8 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 ## Repository map
 
 - `README.md`: project requirements, contributor/AI instructions and implementation plan.
-- `config/package.list`: initial runtime package candidates.
+- `config/package.list`: main Gentoo root package candidates.
+- `config/initramfs-package.list`: separate minimal early-boot package candidates (`busybox`, `msr-tools`).
 - `config/make.conf`: starting compiler settings and USE flags; must be validated against the selected Gentoo profile.
 - `config/kernel-notes.md`: confirmed kernel/device requirements and built-in driver priorities.
 - `docs/custom-iso-design.md`: Gentoo Handbook references, kernel baseline, direct ISO9660-root strategy and initramfs trade-offs.
@@ -131,7 +132,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Pin Linux 6.18.y LTS and keep 6.12.y LTS as a fallback.
 - Build and audit the Core 2 kernel with required drivers built in, including i915, iwl3945, USB RNDIS host, HDA and MSR.
 - Define the minimal embedded initramfs tree and `/init`; add a configurable early MSR hook and verify its timing, prerequisites and exact MSR values before enabling it by default.
-- Keep Bash/GNU/`lf` configuration in the main Gentoo root, with only a minimal emergency shell in the initramfs.
+- Keep Bash/GNU/`lf` configuration in the main Gentoo root, with only a minimal emergency shell and the early `wrmsr` hook in the initramfs.
 - Add checks for missing files, invalid package entries and required target settings.
 
 ### Stage 2 — Build a minimal runtime root
