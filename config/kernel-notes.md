@@ -19,16 +19,19 @@ This is a reasoned starting choice, not a claim that 6.18 has been tested on thi
 - Host bridge Intel PM965/GM965/GL960 `8086:2a00`; ICH8M LPC `8086:2815`.
 - Compile for Core 2 (`-march=core2 -mtune=core2`); never `-march=native` in CI.
 
-## Boot architecture: no external initramfs
+## Boot architecture: embedded initramfs, no external initramfs file
 
-The user's preference is **no external initramfs and no runtime kernel modules from disk**. That requirement changes the image layout.
+The requirement is to load only the kernel file from GRUB2, without a separate initramfs file, external root partition or kernel modules on disk, and reach a practical rescue shell. Achieve this with a **kernel-embedded initramfs**.
 
-- For the first no-initramfs ISO, use the **ISO9660 filesystem itself as the read-only root**, with the complete runtime tree on the ISO and a bootloader/kernel command line that points `root=` at the ISO9660 device. The kernel must have the optical/USB storage path, ISO9660, and all required root-device drivers built in. Validate both optical boot and the intended USB boot method; device naming differs by boot path.
-- This avoids a separate SquashFS root image and avoids OverlayFS in the initial design. The ISO root is read-only. Put mutable runtime paths such as `/run` and `/tmp` on tmpfs using normal init scripts, and explicitly test any other paths that applications need to write.
-- **SquashFS + RAM OverlayFS cannot be assembled by the kernel alone from a normal ISO layout.** It needs early userspace to locate/mount the compressed root and construct the overlay. If SquashFS + OverlayFS remains a requirement, an initramfs (external or built into the kernel) or an equivalent early-root mechanism is required. Do not claim both “no initramfs/early userspace” and “SquashFS + OverlayFS” without implementing and testing that mechanism.
-- Do not use an initramfs for the first build unless the direct ISO9660-root approach proves unworkable. Document the exact GRUB menu entry and kernel command line, then test it in a VM and on the D630.
-- Required built-in root path includes the relevant block layer, SCSI disk support for USB mass storage, libata/AHCI, ATAPI/optical drive support, USB host controllers, ISO9660, devtmpfs, procfs, sysfs, tmpfs, and the root device's driver. The exact options depend on whether booting from optical media or a hybrid USB image.
-- First boot can keep `CONFIG_MODULES=y` while all required drivers are built in and no `.ko` files are installed. Only consider `CONFIG_MODULES=n` after the complete configuration has booted successfully and no userspace component expects module loading. This prevents an early configuration mistake from making diagnosis harder.
+- Set `CONFIG_BLK_DEV_INITRD=y` and configure `CONFIG_INITRAMFS_SOURCE` to the generated cpio archive or staging tree. Confirm the archive is embedded in the final kernel; GRUB must not need an `initrd` command for this boot entry.
+- Include an executable `/init` as PID 1. It mounts devtmpfs, procfs and sysfs, initializes device discovery and launches the console shell. Handle failures visibly rather than silently dropping to a non-interactive state.
+- The shell environment must be more than BusyBox: include Bash and maintained startup/configuration files, GNU coreutils/findutils/grep/sed/gawk, `less`, `file`, `lf` and its configuration, `util-linux` mount tools, plus filesystem-specific utilities where useful. BusyBox is supplemental.
+- Include the dynamic linker and shared libraries for every dynamically linked binary, or deliberately build a tested static rescue subset. Copying binaries alone does not make the embedded environment runnable.
+- Build all storage and filesystem drivers into the kernel: block layer, SATA/AHCI, IDE/ATAPI, SCSI disk, USB host and mass storage, partition parsing, ext4, Btrfs, NTFS3 and FAT/VFAT. Include device-discovery support.
+- No `/lib/modules/<kernel-release>` tree is needed for the required boot and mount operations. Keep `CONFIG_MODULES=y` during initial bring-up if useful for diagnostics, but the final image must not depend on external modules.
+- Wi-Fi firmware is separate from driver code. Include `iwlwifi-3945-2.ucode` and the regulatory database in the embedded archive if Wi-Fi must work before any external filesystem is mounted.
+- Test with GRUB loading only the kernel: no external initramfs and no `root=` partition. Verify it reaches Bash, lists disks, and mounts disposable ext4, Btrfs, NTFS3 and FAT test volumes. Test reads before writes.
+- A full desktop and richer live root can be layered into the ISO later. First prove the embedded rescue environment works independently.
 
 ## Confirmed devices and driver priorities
 
