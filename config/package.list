@@ -2,7 +2,17 @@
 # This is not a resolved dependency closure. Validate atoms and USE flags
 # against the selected Gentoo profile before starting the full build.
 
-# Base userspace and rescue utilities
+# Embedded rescue shell and GNU userland. The initramfs must include all
+# runtime shared libraries and config files needed by these programs.
+app-shells/bash
+sys-apps/coreutils
+sys-apps/findutils
+sys-apps/grep
+sys-apps/sed
+sys-apps/gawk
+sys-apps/less
+sys-apps/file
+app-misc/lf
 sys-apps/busybox
 sys-apps/dbus
 sys-apps/openrc
