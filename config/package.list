@@ -2,8 +2,7 @@
 # This is not a resolved dependency closure. Validate atoms and USE flags
 # against the selected Gentoo profile before starting the full build.
 
-# Embedded rescue shell and GNU userland. The initramfs must include all
-# runtime shared libraries and config files needed by these programs.
+# Main Gentoo root: full interactive shell and userland.
 app-shells/bash
 sys-apps/coreutils
 sys-apps/findutils
@@ -13,7 +12,12 @@ sys-apps/gawk
 sys-apps/less
 sys-apps/file
 app-misc/lf
+
+# Minimal embedded initramfs: BusyBox is only the early/emergency toolbox.
+# Keep this separate from the main-root package staging list in the build.
 sys-apps/busybox
+# Verify the current Gentoo atom and static-build options before use.
+sys-apps/msr-tools
 sys-apps/dbus
 sys-apps/openrc
 sys-apps/util-linux
