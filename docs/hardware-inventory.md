@@ -21,25 +21,34 @@ Status labels: **Known** means explicitly established for this target; **identif
 
 | Component | Current knowledge | Kernel / userspace plan |
 |---|---|---|
-| CPU | **Known:** Intel Core 2 Duo T7250 (Merom), x86_64 | Build for `CONFIG_MCORE2` where available; use Core 2 compatible compiler flags. Do not assume the CI CPU matches the target. |
+| CPU | **Confirmed:** Intel Core 2 Duo T7250, family 6/model 15/stepping 13, 2 cores, x86_64; VT-x present | Current running kernel reports `CONFIG_MCORE2=y`. Keep Core 2-compatible compiler flags; never use `-march=native` in CI. |
 | Firmware boot | **Known:** legacy BIOS | BIOS boot path and GRUB PC target; no UEFI dependency. |
-| Integrated GPU | **Known:** Intel GM965 / GMA X3100, Intel Gen4 | Keep `CONFIG_DRM`, `CONFIG_DRM_I915`, KMS, framebuffer console and Xorg modesetting support. Mesa must retain Intel Gen4 support; see the dedicated section below. |
-| Wi-Fi | **Known:** Intel PRO/Wireless 3945ABG | Keep `CONFIG_IWL3945` and its dependencies; include the matching `iwl3945` firmware from `sys-kernel/linux-firmware`. Verify exact PCI ID and firmware load in logs. |
-| Ethernet | **Identify exact controller** | Keep the module matching the actual PCI ID; do not guess between the Ethernet options offered across D630 configurations. |
-| Audio | **Known:** Intel HD Audio platform; exact codec/controller IDs not yet recorded | Keep HDA controller and codec support; identify the codec with PCI/ALSA output before pruning codec modules. Do not retain every sound driver. |
-| Bluetooth | **Required**; exact Bluetooth device/bus ID not recorded | Keep Bluetooth core and the transport driver that matches the detected adapter; check whether it is USB-attached. |
-| USB | **Required** for storage, keyboard/mouse, joystick, and Android devices | Keep xHCI only if hardware/needs require it; preserve the actual EHCI/OHCI controllers, USB HID, USB storage, USB serial and RNDIS support as applicable. D630-era hardware normally uses USB 2.0 controllers; confirm IDs. |
+| Integrated GPU | **Confirmed:** PCI `8086:2a02` (primary VGA), secondary display function `8086:2a03`, Dell subsystem `1028:01f9`; `i915` is active | Running system has `CONFIG_DRM_I915=m`; `dmesg` shows `i915drmfb` framebuffer. Mesa 22.3.6 reports `Mesa Intel(R) 965GM (CL)`, accelerated=yes, OpenGL 2.1. Keep the tested classic Intel Gen4 path; validate Crocus separately rather than replacing a known-working driver blindly. |
+| Wi-Fi | **Confirmed:** PCI `8086:4222`, subsystem `8086:1021`; `iwl3945` is active and firmware `iwlwifi-3945-2.ucode` version `15.32.2.9` loaded | Keep `CONFIG_IWL3945` and required dependencies; include matching firmware and regulatory database. Current kernel has `CONFIG_IWL3945=m`. |
+| Ethernet | **Not present in supplied `lspci -nnk` output** | No PCI Ethernet controller was listed. Confirm whether this particular unit has wired Ethernet disabled/missing or whether output was truncated; do not add a guessed driver. |
+| Audio | **Confirmed:** controller PCI `8086:284b`; SigmaTel/IDT STAC9205 codec vendor ID `8384:76a0`, subsystem `1028:01f9`; `snd_hda_intel` active | Keep HDA core and IDT/Sigmatel codec support (`snd-hda-codec-idt` family as configured by kernel). Test speaker, headphone, internal mic and digital output before pruning. |
+| Bluetooth | Required; Dell rfkill platform exposes `dell-bluetooth`, but no Bluetooth device appeared in `lsusb` or `bluetoothctl list`; software-blocked, not hardware-blocked | Keep Bluetooth core and likely USB transport support, but identify the actual adapter with Bluetooth enabled and `lsusb` before selecting its device-specific driver. Do not assume a working adapter is currently enumerated. |
+| USB | **Confirmed:** Intel ICH8 UHCI controllers `8086:2830`, `2831`, `2832`, `2834`, `2835`; EHCI controllers `8086:2836`, `283a` | Keep `uhci_hcd`, `ehci-pci`, USB core, HID and mass-storage support. No xHCI controller appears in this inventory. Keep USB networking/RNDIS and Android interfaces only as required by runtime use. |
 | USB joystick | **Known requirement** | Keep input/joystick and USB HID support; no special userspace driver unless the device needs one. |
 | Android | **Known requirement:** ADB, fastboot and USB RNDIS | Include `dev-util/android-tools` or the validated Gentoo package providing ADB/fastboot; retain USB networking/RNDIS kernel support when needed. |
-| Storage controller | **Identify exact SATA/AHCI or compatibility mode** | Keep libata/AHCI and SCSI disk dependencies if exposed by the controller; preserve USB mass storage. Confirm BIOS SATA setting and PCI ID. |
+| Storage controller | **Confirmed:** SATA AHCI PCI `8086:2829`, driver `ahci`; IDE controller `8086:2850`, driver `ata_piix`; SATA SSD `HFS064G38MNB-2200A` (~59.6 GiB); ATAPI optical drive `TSSTcorpCD-RW/DVD-ROM TSL462C` | Keep AHCI/libata/SCSI disk and `ata_piix`/ATAPI support if retaining the optical drive. Preserve USB mass storage. Current root is ext4; disk also contains NTFS partitions. |
 | Filesystems | **Known:** Btrfs and NTFS are required | Keep Btrfs support and NTFS read/write support suitable for the chosen kernel; retain FAT/VFAT and ISO9660 for boot media. Add ext filesystems commonly encountered on rescue jobs. |
-| Optical drive | D630 may have an internal optical drive; **confirm use** | SATA/ATAPI support if present; not a reason to keep unrelated drivers. |
+| Optical drive | **Confirmed:** `TSSTcorpCD-RW/DVD-ROM TSL462C`, detected as `/dev/sr0` | Retain ATAPI/SATA optical-drive support if the live environment must boot/read optical media or access this drive. |
 | Card reader | Exact controller and requirement **unknown** | Identify from `lspci -nnk`; enable only if the user intends to use SD/MMC cards. |
 | PC Card / ExpressCard | Exact controller and requirement **unknown** | Identify from PCI inventory; include only if needed for rescue peripherals. |
 | FireWire / modem / WWAN / webcam | **Not confirmed** | Do not include by default without inventory evidence or an explicit requirement. |
-| Display, keyboard, touchpad, pointing stick | Laptop internal devices; exact input bus IDs not recorded | Keep i8042/serio, AT keyboard, evdev/libinput and generic HID as required; verify touchpad/pointing-stick behavior. |
+| Display, keyboard, touchpad, pointing stick | **Confirmed:** AT keyboard via i8042/serio; AlpsPS/2 ALPS DualPoint Stick and DualPoint TouchPad; external USB mouse `0000:3821` | Keep `i8042`, serio, `atkbd`, `psmouse`, evdev/libinput and USB HID. Keep ACPI video/hotkey input support. |
 | Power management | ACPI laptop | Keep ACPI, battery, thermal and fan-related platform support; validate suspend/resume and thermal reporting on real hardware. |
-| Memory compression | **Known preference:** built-in ZRAM | Keep ZRAM and select a compressor supported by the target kernel; test availability of LZO, LZ4, LZ4HC and Zstd before choosing the final set. |
+| Memory compression | **Confirmed:** current kernel has `CONFIG_ZRAM=y`; system has `zram0` 1.5 GiB | Keep ZRAM built in; select one or a small set of supported fast compressors after checking the target kernel's config and runtime availability. |
+
+## Confirmed platform details
+
+- DMI identifies `Dell Inc. Latitude D630`, motherboard `0KU184`, BIOS Dell A19.
+- Host bridge is Intel Mobile PM965/GM965/GL960 `8086:2a00`; ICH8M LPC interface `8086:2815`; SMBus controller `8086:283e` with `i2c_i801`.
+- O2 Micro smart-card reader hub is present over USB: `0b97:7761` hub and `0b97:7772` CCID reader. Keep CCID/PCSC userspace only if smart-card access is desired; retain USB support regardless.
+- Current attached Android phone is Huawei `12d1:107d` (MTP). This identifies the current peripheral, not a permanent laptop component. ADB/fastboot/RNDIS need separate mode-specific verification.
+- Current block layout: 59.6 GiB SATA disk, two NTFS partitions (579 MiB and 54.3 GiB), 4.7 GiB ext4 system partition, and 1.5 GiB zram. These sizes can change and should not be treated as fixed hardware requirements.
+- The supplied `dmesg` confirms `iwlwifi-3945-2.ucode` and regulatory database load. It also records an `i915` CPU pipe B FIFO underrun at startup; graphics nevertheless initializes, framebuffer becomes primary, and Mesa reports accelerated rendering. Treat the underrun as a test observation, not proof of a fatal GPU fault.
 
 ## Intel GM965 / GMA X3100 graphics: kernel, Mesa and Xorg
 
@@ -47,7 +56,7 @@ GMA X3100 is the Gen4 graphics core used by the GM965 family. Treat this as lega
 
 ### Kernel requirements
 
-- Enable DRM and Intel `i915` (`CONFIG_DRM_I915`), preferably as built-in for reliable early graphics on this live image.
+- Enable DRM and Intel `i915` (`CONFIG_DRM_I915`). The current working kernel has it modular (`CONFIG_DRM_I915=m`) and initializes graphics successfully; therefore, do not force it built-in without a specific early-boot requirement. Load the module after the live root is available, or include it in the initramfs if early graphics is required.
 - Keep kernel mode setting (KMS), framebuffer emulation and framebuffer console so boot output does not depend on a proprietary driver.
 - Keep AGP support if required by the selected kernel configuration and platform dependencies.
 - Do not add AMD or NVIDIA DRM drivers without hardware evidence.
@@ -74,6 +83,13 @@ glxinfo -B
 ```
 
 Expected results: the PCI device binds to `i915`; Xorg uses modesetting or a deliberately tested Intel DDX; OpenGL reports a hardware Intel/Mesa renderer rather than `llvmpipe`. If `glxinfo` is unavailable in the image, temporarily include the package that provides it in a test image, not necessarily the final runtime.
+
+## Still to identify
+
+- Wired Ethernet: no Ethernet PCI function appears in the supplied full `lspci -nnk` output. Verify whether the D630's onboard wired NIC is disabled in BIOS or the output came from an unusual hardware configuration. Check BIOS device settings and run `lspci -nnk` again; do not select a NIC driver from assumptions.
+- Bluetooth: the Dell platform rfkill switch exists but Bluetooth is software-blocked and no adapter appears in `lsusb`/`bluetoothctl`. Unblock it (`rfkill unblock bluetooth`) and inspect `lsusb`, `dmesg` and `bluetoothctl list` before concluding which transport/device driver is needed.
+- Card reader: the O2 Micro device shown is a USB CCID smart-card reader, not evidence of an SD/MMC reader. No SD/MMC controller was shown.
+- GPU Mesa alternative: `glxinfo -B` on Debian 12 reports `Mesa Intel(R) 965GM (CL)`, OpenGL 2.1, `Accelerated: yes`, Mesa 22.3.6. Preserve this as a known-good baseline when testing the current Gentoo Mesa/Crocus configuration.
 
 ## Collect the exact hardware IDs
 
