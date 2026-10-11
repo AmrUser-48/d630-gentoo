@@ -17,11 +17,14 @@ A small Gentoo-based live rescue and installation system, primarily designed for
 ## Primary target hardware
 
 - **Laptop:** Dell Latitude D630.
-- **CPU:** Intel Core 2 Duo T7250, 2.00 GHz; use Core 2-compatible compiler options.
-- **Graphics:** Intel GM965 / GMA X3100. Keep the required i915 kernel support and a usable framebuffer fallback.
-- **Wi-Fi:** Intel PRO/Wireless 3945ABG. Include the matching kernel driver and required firmware for the selected kernel.
-- **Audio:** Intel HDA; retain the required ALSA and `snd-hda-intel` support.
-- **Other:** USB storage and input devices, USB joystick where practical, Bluetooth, Ethernet, and Android ADB/fastboot and USB RNDIS support if their dependencies fit the size budget.
+- **CPU:** Intel Core 2 Duo T7250, 2.00 GHz, 2 cores; current kernel reports `CONFIG_MCORE2=y`.
+- **Graphics:** Intel GM965 / GMA X3100, PCI `8086:2a02` (secondary function `8086:2a03`). `i915` works and Mesa 22.3.6 reports accelerated `Mesa Intel(R) 965GM (CL)`, OpenGL 2.1.
+- **Wi-Fi:** Intel PRO/Wireless 3945ABG, PCI `8086:4222`; firmware `iwlwifi-3945-2.ucode` version `15.32.2.9` loads successfully.
+- **Audio:** Intel HDA `8086:284b` with IDT/SigmaTel STAC9205 codec `8384:76a0`; retain the matching HDA codec path, not every sound driver.
+- **Storage and USB:** SATA AHCI `8086:2829`, IDE/ATAPI `8086:2850`, ICH8 UHCI/EHCI controllers; a SATA SSD and ATAPI CD-RW/DVD-ROM are detected.
+- **Input and peripherals:** i8042 keyboard, AlpsPS/2 DualPoint touchpad/stick, USB mouse, O2 Micro USB CCID smart-card reader, and Huawei Android device currently in MTP mode.
+- **Still unresolved:** no Ethernet PCI function appeared in the supplied inventory; Bluetooth is exposed by the Dell rfkill platform but was software-blocked and no Bluetooth adapter enumerated. Verify before choosing drivers.
+- **Other requirements:** USB storage and joystick, Bluetooth, wired networking if available, Android ADB/fastboot and RNDIS, NTFS and Btrfs support.
 - **Disks and filesystems:** partition-table tools, ext-family filesystems, VFAT, NTFS and Btrfs. The live environment must be able to access and repair common installed systems.
 - **Boot:** legacy BIOS. Do not make UEFI or Secure Boot a prerequisite.
 
@@ -29,9 +32,9 @@ The first release should prioritize the D630. Broader hardware compatibility is 
 
 ## Hardware inventory and graphics compatibility
 
-The detailed hardware inventory, confirmed requirements, unknown device IDs, kernel-driver priorities, and hardware collection commands live in [`docs/hardware-inventory.md`](docs/hardware-inventory.md). Treat that document as the source of truth when pruning kernel modules or setting Gentoo package flags. Do not guess Ethernet, audio codec, Bluetooth, storage-controller, or optional-device models; collect the D630's `lspci -nnk` and `lsusb` output first.
+The detailed hardware inventory, confirmed PCI/USB IDs, codec details, kernel-driver priorities, and outstanding questions live in [`docs/hardware-inventory.md`](docs/hardware-inventory.md). Treat it as the source of truth when pruning kernel modules or setting Gentoo package flags. The wired Ethernet function and Bluetooth adapter are still unconfirmed; do not guess their drivers.
 
-**GMA X3100 / GM965 is Intel Gen4 graphics.** The initial Gentoo graphics configuration to validate is `VIDEO_CARDS="intel"`, with kernel `i915` KMS and Mesa Crocus support. The Gentoo `video_cards_i915` USE flag is not the same thing as the Linux kernel's `CONFIG_DRM_I915`; do not enable it just because the kernel module is called `i915`. Prefer Xorg's modesetting driver initially. Do not assume Vulkan, modern Intel graphics firmware, or hardware video acceleration is supported. Confirm the chosen Mesa ebuild and renderer on the real D630 before finalizing the runtime package set.
+**GMA X3100 / GM965 is Intel Gen4 graphics.** The existing Debian 12 baseline is known-good: `glxinfo -B` reports Mesa 22.3.6, renderer `Mesa Intel(R) 965GM (CL)`, accelerated rendering, and OpenGL 2.1. Keep this as the comparison point while validating Gentoo's `VIDEO_CARDS="intel"` and Mesa Crocus support. The Gentoo `video_cards_i915` USE flag is not the same as kernel `CONFIG_DRM_I915`; do not enable it just because the kernel module is named `i915`. Prefer Xorg modesetting initially. Do not assume Vulkan, modern Intel firmware, or hardware video acceleration is supported.
 
 ## Desktop and utilities
 
@@ -62,7 +65,7 @@ Rescue utilities should focus on storage inspection, mounting, partitioning, fil
 The intended first image design is:
 
 1. A custom or carefully selected Linux kernel suitable for the D630.
-2. An initramfs that initializes devices, locates the live medium, loads the compressed root and starts the live system.
+2. A small initramfs that initializes devices, locates the live medium, loads the compressed root and starts the live system. Do not remove it until the ISO boot flow works; a separate initramfs can be avoided only by building equivalent early-root logic into the kernel or changing the root-image design.
 3. A SquashFS-compressed, read-only runtime root.
 4. A RAM-backed OverlayFS writable layer so the base image remains unchanged during a session.
 5. A legacy-BIOS bootloader and a straightforward boot menu.
@@ -92,7 +95,8 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 - `README.md`: project requirements, contributor/AI instructions and implementation plan.
 - `config/package.list`: initial runtime package candidates.
 - `config/make.conf`: starting compiler settings and USE flags; must be validated against the selected Gentoo profile.
-- `config/kernel-notes.md`: kernel and D630 hardware checklist.
+- `config/kernel-notes.md`: confirmed kernel/device requirements and live-boot strategy.
+- `docs/hardware-inventory.md`: PCI/USB IDs, codec details, Mesa baseline, outstanding device identification and hardware collection notes.
 - `scripts/validate-sources.sh`: basic scaffold checks.
 - `.github/workflows/validate.yml`: source validation only, not a Gentoo build.
 
