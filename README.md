@@ -66,9 +66,10 @@ The intended first image design is:
 
 1. A pinned Linux 6.18.y LTS kernel baseline (with 6.12.y LTS as a fallback test), compiled for Core 2.
 2. Required D630 drivers built into the kernel; no runtime kernel modules installed in the final image.
-3. A legacy-BIOS bootable ISO whose complete runtime tree is directly on ISO9660, allowing a no-external-initramfs first design.
-4. A read-only root with `/run` and `/tmp` mounted on tmpfs; writable paths must be audited and tested.
-5. A legacy-BIOS bootloader and a straightforward boot menu.
+3. A legacy-BIOS bootable ISO, with a **kernel-embedded initramfs** so GRUB needs to load only the kernel file to reach the rescue shell.
+4. A useful embedded rescue userspace: Bash with maintained startup configuration, GNU core utilities and text-processing tools, `lf` file manager, mount/filesystem tools, and BusyBox only as a supplementary toolbox.
+5. Filesystem and storage drivers built into the kernel so the embedded shell can discover and mount ext4, Btrfs, NTFS3 and FAT volumes without external modules.
+6. A legacy-BIOS bootloader and a straightforward boot menu.
 
 Persistence is a later feature, not a prerequisite for the first working ISO. A raw `.img` target may be added after the ISO boots reliably. Do not claim the system is bootable until the image has been generated and tested.
 
@@ -76,7 +77,9 @@ Persistence is a later feature, not a prerequisite for the first working ISO. A 
 
 Keep the kernel features needed for live boot, disk access and the target laptop:
 
-- direct ISO9660-root support, devtmpfs, procfs, sysfs and tmpfs
+- embedded initramfs support (`CONFIG_BLK_DEV_INITRD=y` and a configured `CONFIG_INITRAMFS_SOURCE`); the archive is built into the kernel image, so GRUB loads one kernel file
+- an executable `/init` that mounts devtmpfs, procfs and sysfs, initializes device discovery, then opens a usable interactive rescue shell on the console
+- Bash, intentional Bash startup files, GNU coreutils/findutils/grep/sed/gawk, `lf`, and filesystem utilities in the embedded archive
 - SATA/AHCI, libata, ATAPI, SCSI disk and USB mass storage
 - ext4, VFAT, NTFS3 and Btrfs rescue filesystem support
 - built-in Intel i915 graphics for GM965/GMA X3100, with framebuffer console support
@@ -126,6 +129,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Validate the initial package list, USE flags and firmware requirements.
 - Pin Linux 6.18.y LTS and keep 6.12.y LTS as a fallback.
 - Build and audit the Core 2 kernel with required drivers built in, including i915, iwl3945, USB RNDIS host, HDA and MSR.
+- Define the embedded initramfs tree, `/init`, Bash profile/startup files and `lf` configuration; test it independently before ISO assembly.
 - Add checks for missing files, invalid package entries and required target settings.
 
 ### Stage 2 — Build a minimal runtime root
@@ -136,9 +140,10 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 
 ### Stage 3 — Make the live image
 - Build the kernel with required drivers built in and install no runtime kernel modules.
-- Assemble a legacy-BIOS ISO with the complete runtime tree directly on ISO9660 and no external initramfs.
-- Use a read-only root with tmpfs for `/run` and `/tmp`; audit other writable paths.
-- Publish the ISO as an artifact only after file-integrity checks pass.
+- Package the embedded rescue userspace as a cpio initramfs and compile it into the kernel via `CONFIG_INITRAMFS_SOURCE`; do not publish or require a separate initramfs file.
+- Ensure the kernel can boot directly to `/init`, establish device nodes and reach Bash with no external root filesystem mounted.
+- From the shell, test mounting ext4, Btrfs, NTFS3 and FAT volumes using the built-in kernel drivers and userspace tools.
+- Assemble a legacy-BIOS ISO with GRUB and the self-contained kernel; publish only after integrity checks and boot tests pass.
 
 ### Stage 4 — Test and reduce
 - Test boot in an automated VM where available.
