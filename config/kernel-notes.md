@@ -69,7 +69,7 @@ All required hardware drivers should be built into the kernel (`=y`) for the int
 ## Image-size and reliability rules
 
 - No Portage, compiler, headers, source trees or build cache in the final runtime root.
-- No external initramfs in the target design; use direct ISO9660 root unless that boot method is proven unworkable.
+- No external initramfs file in the target design; embed the cpio initramfs in the kernel and test that GRUB can load the kernel alone.
 - No runtime kernel modules installed in the final image. Firmware is still included where hardware requires it.
 - Strip unrelated drivers only after checking dependencies and the resulting kernel config.
 - Document measured kernel and ISO sizes; do not guess or promise size targets before a build.
