@@ -19,19 +19,19 @@ This is a reasoned starting choice, not a claim that 6.18 has been tested on thi
 - Host bridge Intel PM965/GM965/GL960 `8086:2a00`; ICH8M LPC `8086:2815`.
 - Compile for Core 2 (`-march=core2 -mtune=core2`); never `-march=native` in CI.
 
-## Boot architecture: embedded initramfs, no external initramfs file
+## Boot architecture: minimal embedded initramfs, no external initramfs file
 
-The requirement is to load only the kernel file from GRUB2, without a separate initramfs file, external root partition or kernel modules on disk, and reach a practical rescue shell. Achieve this with a **kernel-embedded initramfs**.
+GRUB must load only the kernel image; the kernel embeds a small initramfs to run early userspace. Do **not** duplicate the full Gentoo shell environment in the embedded archive.
 
-- Set `CONFIG_BLK_DEV_INITRD=y` and configure `CONFIG_INITRAMFS_SOURCE` to the generated cpio archive or staging tree. Confirm the archive is embedded in the final kernel; GRUB must not need an `initrd` command for this boot entry.
-- Include an executable `/init` as PID 1. It mounts devtmpfs, procfs and sysfs, initializes device discovery and launches the console shell. Handle failures visibly rather than silently dropping to a non-interactive state.
-- The shell environment must be more than BusyBox: include Bash and maintained startup/configuration files, GNU coreutils/findutils/grep/sed/gawk, `less`, `file`, `lf` and its configuration, `util-linux` mount tools, plus filesystem-specific utilities where useful. BusyBox is supplemental.
-- Include the dynamic linker and shared libraries for every dynamically linked binary, or deliberately build a tested static rescue subset. Copying binaries alone does not make the embedded environment runnable.
-- Build all storage and filesystem drivers into the kernel: block layer, SATA/AHCI, IDE/ATAPI, SCSI disk, USB host and mass storage, partition parsing, ext4, Btrfs, NTFS3 and FAT/VFAT. Include device-discovery support.
-- No `/lib/modules/<kernel-release>` tree is needed for the required boot and mount operations. Keep `CONFIG_MODULES=y` during initial bring-up if useful for diagnostics, but the final image must not depend on external modules.
-- Wi-Fi firmware is separate from driver code. Include `iwlwifi-3945-2.ucode` and the regulatory database in the embedded archive if Wi-Fi must work before any external filesystem is mounted.
-- Test with GRUB loading only the kernel: no external initramfs and no `root=` partition. Verify it reaches Bash, lists disks, and mounts disposable ext4, Btrfs, NTFS3 and FAT test volumes. Test reads before writes.
-- A full desktop and richer live root can be layered into the ISO later. First prove the embedded rescue environment works independently.
+- Set `CONFIG_BLK_DEV_INITRD=y` and `CONFIG_INITRAMFS_SOURCE` to the generated minimal cpio archive or staging tree. Verify the archive is embedded; the GRUB entry must not need an `initrd` command.
+- Include an executable `/init` and a tiny shell/toolbox, preferably statically linked BusyBox. It mounts devtmpfs, procfs and sysfs, initializes the console, runs configured early tasks, locates/mounts the main root, and hands off with `switch_root` or equivalent. If root handoff fails, show the error and provide an emergency shell.
+- The **main Gentoo root** contains Bash and its startup files, GNU coreutils/findutils/grep/sed/gawk, `less`, `file`, `lf` and its configuration, mount tools and filesystem-specific utilities. Do not put these in the initramfs merely for completeness.
+- Include `wrmsr` from msr-tools in the initramfs only if needed for the early CPU-throttling workaround. Ensure `CONFIG_X86_MSR=y`, device-node setup, and the binary's runtime dependencies (or a tested static build).
+- Make the early MSR hook explicit and configurable. It can run after kernel CPU initialization and after `/dev/cpu/<N>/msr` becomes accessible, before main-root handoff. Do not guess the MSR number, mask or value; a wrong write may destabilize or hang the laptop. Keep it disabled by default until the exact D630-specific operation has been verified and tested with a recovery path.
+- Build all needed storage/filesystem drivers into the kernel: block layer, SATA/AHCI, IDE/ATAPI, SCSI disk, USB host and mass storage, partition parsing, ext4, Btrfs, NTFS3 and FAT/VFAT.
+- No `/lib/modules/<kernel-release>` tree is needed for the boot and mount path. Firmware needed before the main root is mounted must be embedded in the initramfs or otherwise made available to the built-in driver; Wi-Fi firmware is separate from driver code.
+- Test GRUB loading only the kernel, without external initramfs or a preexisting root partition argument. Verify the early init executes, the main root handoff succeeds, and the emergency shell works when the main root is intentionally unavailable.
+- Test reads from disposable ext4, Btrfs, NTFS3 and FAT volumes before testing writes.
 
 ## Confirmed devices and driver priorities
 
