@@ -76,15 +76,14 @@ Persistence is a later feature, not a prerequisite for the first working ISO. A 
 
 Keep the kernel features needed for live boot, disk access and the target laptop:
 
-- initramfs support, devtmpfs, procfs, sysfs and tmpfs
-- SquashFS, OverlayFS and loop devices
-- SATA/AHCI, libata, SCSI disk and USB mass storage
-- ISO9660 and support for ext2/3/4, VFAT, NTFS and Btrfs as required by the selected kernel configuration
-- Intel i915 graphics for GM965/GMA X3100, plus a fallback framebuffer
-- Intel 3945ABG Wi-Fi driver and matching firmware
-- Intel HDA audio and required sound components
-- Ethernet, USB input and Bluetooth support
-- ADB/fastboot and RNDIS support if included in the first runtime
+- direct ISO9660-root support, devtmpfs, procfs, sysfs and tmpfs
+- SATA/AHCI, libata, ATAPI, SCSI disk and USB mass storage
+- ext4, VFAT, NTFS3 and Btrfs rescue filesystem support
+- built-in Intel i915 graphics for GM965/GMA X3100, with framebuffer console support
+- built-in Intel 3945ABG Wi-Fi driver stack and matching firmware
+- built-in Intel HDA audio codec path and USB input
+- built-in USB RNDIS host networking for Android tethering; **no wired Ethernet drivers**
+- `CONFIG_X86_MSR=y`, plus ADB/fastboot userspace tools
 
 Prune unrelated drivers only after checking dependencies and the resulting configuration. In particular, do not blindly strip filesystem, storage, graphics or firmware support that the boot process or rescue use cases require. DVB, unrelated AMD and NVIDIA drivers are not priorities for this D630-focused image.
 
@@ -125,7 +124,8 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 ### Stage 1 — Establish the inputs
 - Select and record the Gentoo stage3 and profile.
 - Validate the initial package list, USE flags and firmware requirements.
-- Decide which kernel source/configuration will be used.
+- Pin Linux 6.18.y LTS and keep 6.12.y LTS as a fallback.
+- Build and audit the Core 2 kernel with required drivers built in, including i915, iwl3945, USB RNDIS host, HDA and MSR.
 - Add checks for missing files, invalid package entries and required target settings.
 
 ### Stage 2 — Build a minimal runtime root
@@ -135,9 +135,9 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Remove build-only content from the staging root and report the resulting size.
 
 ### Stage 3 — Make the live image
-- Build the kernel and initramfs.
-- Implement SquashFS discovery and RAM-backed OverlayFS startup.
-- Assemble a legacy-BIOS bootable ISO.
+- Build the kernel with required drivers built in and install no runtime kernel modules.
+- Assemble a legacy-BIOS ISO with the complete runtime tree directly on ISO9660 and no external initramfs.
+- Use a read-only root with tmpfs for `/run` and `/tmp`; audit other writable paths.
 - Publish the ISO as an artifact only after file-integrity checks pass.
 
 ### Stage 4 — Test and reduce
