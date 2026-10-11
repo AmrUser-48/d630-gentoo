@@ -27,6 +27,12 @@ A small Gentoo-based live rescue and installation system, primarily designed for
 
 The first release should prioritize the D630. Broader hardware compatibility is welcome only when it does not materially increase image size or threaten reliability.
 
+## Hardware inventory and graphics compatibility
+
+The detailed hardware inventory, confirmed requirements, unknown device IDs, kernel-driver priorities, and hardware collection commands live in [`docs/hardware-inventory.md`](docs/hardware-inventory.md). Treat that document as the source of truth when pruning kernel modules or setting Gentoo package flags. Do not guess Ethernet, audio codec, Bluetooth, storage-controller, or optional-device models; collect the D630's `lspci -nnk` and `lsusb` output first.
+
+**GMA X3100 / GM965 is Intel Gen4 graphics.** The initial Gentoo graphics configuration to validate is `VIDEO_CARDS="intel"`, with kernel `i915` KMS and Mesa Crocus support. The Gentoo `video_cards_i915` USE flag is not the same thing as the Linux kernel's `CONFIG_DRM_I915`; do not enable it just because the kernel module is called `i915`. Prefer Xorg's modesetting driver initially. Do not assume Vulkan, modern Intel graphics firmware, or hardware video acceleration is supported. Confirm the chosen Mesa ebuild and renderer on the real D630 before finalizing the runtime package set.
+
 ## Desktop and utilities
 
 The intended graphical stack is Xorg with lightweight window managers:
