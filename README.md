@@ -23,8 +23,8 @@ A small Gentoo-based live rescue and installation system, primarily designed for
 - **Audio:** Intel HDA `8086:284b` with IDT/SigmaTel STAC9205 codec `8384:76a0`; retain the matching HDA codec path, not every sound driver.
 - **Storage and USB:** SATA AHCI `8086:2829`, IDE/ATAPI `8086:2850`, ICH8 UHCI/EHCI controllers; a SATA SSD and ATAPI CD-RW/DVD-ROM are detected.
 - **Input and peripherals:** i8042 keyboard, AlpsPS/2 DualPoint touchpad/stick, USB mouse, O2 Micro USB CCID smart-card reader, and Huawei Android device currently in MTP mode.
-- **Still unresolved:** no Ethernet PCI function appeared in the supplied inventory; Bluetooth is exposed by the Dell rfkill platform but was software-blocked and no Bluetooth adapter enumerated. Verify before choosing drivers.
-- **Other requirements:** USB storage and joystick, Bluetooth, wired networking if available, Android ADB/fastboot and RNDIS, NTFS and Btrfs support.
+- **Networking:** Wi-Fi and Android USB RNDIS tethering are required. Wired Ethernet drivers are intentionally omitted. ADB/fastboot are separate userspace tools and must be tested with the phone in the appropriate USB mode.
+- **Other requirements:** USB storage and joystick, Bluetooth core support pending adapter identification, MSR access (`CONFIG_X86_MSR=y`), NTFS and Btrfs support.
 - **Disks and filesystems:** partition-table tools, ext-family filesystems, VFAT, NTFS and Btrfs. The live environment must be able to access and repair common installed systems.
 - **Boot:** legacy BIOS. Do not make UEFI or Secure Boot a prerequisite.
 
@@ -32,7 +32,7 @@ The first release should prioritize the D630. Broader hardware compatibility is 
 
 ## Hardware inventory and graphics compatibility
 
-The detailed hardware inventory, confirmed PCI/USB IDs, codec details, kernel-driver priorities, and outstanding questions live in [`docs/hardware-inventory.md`](docs/hardware-inventory.md). Treat it as the source of truth when pruning kernel modules or setting Gentoo package flags. The wired Ethernet function and Bluetooth adapter are still unconfirmed; do not guess their drivers.
+The detailed hardware inventory and confirmed PCI/USB IDs live in [`docs/hardware-inventory.md`](docs/hardware-inventory.md). Wired Ethernet drivers are out of scope. The Bluetooth adapter/transport remains unconfirmed.
 
 **GMA X3100 / GM965 is Intel Gen4 graphics.** The existing Debian 12 baseline is known-good: `glxinfo -B` reports Mesa 22.3.6, renderer `Mesa Intel(R) 965GM (CL)`, accelerated rendering, and OpenGL 2.1. Keep this as the comparison point while validating Gentoo's `VIDEO_CARDS="intel"` and Mesa Crocus support. The Gentoo `video_cards_i915` USE flag is not the same as kernel `CONFIG_DRM_I915`; do not enable it just because the kernel module is named `i915`. Prefer Xorg modesetting initially. Do not assume Vulkan, modern Intel firmware, or hardware video acceleration is supported.
 
@@ -64,10 +64,10 @@ Rescue utilities should focus on storage inspection, mounting, partitioning, fil
 
 The intended first image design is:
 
-1. A custom or carefully selected Linux kernel suitable for the D630.
-2. A small initramfs that initializes devices, locates the live medium, loads the compressed root and starts the live system. Do not remove it until the ISO boot flow works; a separate initramfs can be avoided only by building equivalent early-root logic into the kernel or changing the root-image design.
-3. A SquashFS-compressed, read-only runtime root.
-4. A RAM-backed OverlayFS writable layer so the base image remains unchanged during a session.
+1. A pinned Linux 6.18.y LTS kernel baseline (with 6.12.y LTS as a fallback test), compiled for Core 2.
+2. Required D630 drivers built into the kernel; no runtime kernel modules installed in the final image.
+3. A legacy-BIOS bootable ISO whose complete runtime tree is directly on ISO9660, allowing a no-external-initramfs first design.
+4. A read-only root with `/run` and `/tmp` mounted on tmpfs; writable paths must be audited and tested.
 5. A legacy-BIOS bootloader and a straightforward boot menu.
 
 Persistence is a later feature, not a prerequisite for the first working ISO. A raw `.img` target may be added after the ISO boots reliably. Do not claim the system is bootable until the image has been generated and tested.
@@ -95,7 +95,8 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 - `README.md`: project requirements, contributor/AI instructions and implementation plan.
 - `config/package.list`: initial runtime package candidates.
 - `config/make.conf`: starting compiler settings and USE flags; must be validated against the selected Gentoo profile.
-- `config/kernel-notes.md`: confirmed kernel/device requirements and live-boot strategy.
+- `config/kernel-notes.md`: confirmed kernel/device requirements and built-in driver priorities.
+- `docs/custom-iso-design.md`: Gentoo Handbook references, kernel baseline, direct ISO9660-root strategy and initramfs trade-offs.
 - `docs/hardware-inventory.md`: PCI/USB IDs, codec details, Mesa baseline, outstanding device identification and hardware collection notes.
 - `scripts/validate-sources.sh`: basic scaffold checks.
 - `.github/workflows/validate.yml`: source validation only, not a Gentoo build.
@@ -110,7 +111,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 4. **Do not fabricate results.** Never claim a workflow ran, a package built, an ISO booted or a file was tested unless the corresponding tool output or log confirms it.
 5. **Build for Core 2, not the runner.** Use `-march=core2 -mtune=core2`; do not use `-march=native` in distributable binaries.
 6. **Keep Portage out of the final image.** Portage is allowed in the isolated build environment only. Also exclude compilers, development headers, source trees, temporary files and package caches from the runtime root unless justified.
-7. **Do not over-strip.** Preserve D630 graphics, Wi-Fi, audio, Ethernet, USB, Bluetooth, boot-critical storage, rescue filesystems and required firmware. Confirm each proposed removal against dependencies and the actual kernel config.
+7. **Do not over-strip.** Preserve D630 graphics, Wi-Fi, audio, USB/RNDIS, Bluetooth core support, boot-critical storage, rescue filesystems and required firmware. Wired Ethernet is explicitly out of scope. Confirm each proposed removal against dependencies and the actual kernel config.
 8. **Validate Gentoo details.** Check package atom names, USE flags, ebuild availability, profiles and dependency changes against the selected Gentoo repository snapshot. Do not assume Debian package names or USE flags apply to Gentoo.
 9. **Keep CI stages honest and incremental.** First validate source files; next validate package metadata and build inputs; then build the runtime root; then assemble the ISO; finally run automated boot checks. A green source-validation job does not prove that Gentoo builds or that the ISO boots.
 10. **Make failures actionable.** Preserve concise logs, identify the first real error, fix the cause rather than masking it, and rerun the smallest relevant job before restarting expensive stages.
