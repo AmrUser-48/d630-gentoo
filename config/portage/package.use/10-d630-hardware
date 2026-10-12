@@ -1,7 +1,12 @@
-# Intel GM965 / GMA X3100. Kernel CONFIG_DRM_I915 is configured separately.
-media-libs/mesa VIDEO_CARDS: -* intel
-x11-base/xorg-drivers VIDEO_CARDS: -* intel
+# Dell D630: Intel GM965 / GMA X3100 (Gen 4).
+# Mesa Crocus is the hardware OpenGL driver. Disable LLVM/llvmpipe and Vulkan/lavapipe.
+media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
+
+# Xorg: Intel graphics via the built-in modesetting DDX, plus legacy Intel DDX as an alternate.
+# On xorg-drivers, "intel" selects xorg-server/modesetting and "i915" selects xf86-video-intel.
+x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
 x11-base/xorg-drivers INPUT_DEVICES: -* evdev libinput
+x11-base/xorg-server -minimal
 
 # Legacy BIOS only for the D630.
 sys-boot/grub GRUB_PLATFORMS: pc
