@@ -1,0 +1,14 @@
+# Installed into the temporary Gentoo chroot so it is useful over SSH.
+app-admin/sudo
+net-misc/openssh
+dev-vcs/git
+net-misc/rsync
+app-editors/nano
+app-misc/tmux
+app-misc/mc
+app-misc/less
+sys-process/htop
+app-portage/gentoolkit
+app-portage/eix
+app-portage/portage-utils
+app-portage/ufed
