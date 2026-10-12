@@ -33,6 +33,10 @@ GRUB must load only the kernel image; the kernel embeds a small initramfs to run
 - Test GRUB loading only the kernel, without external initramfs or a preexisting root partition argument. Verify the early init executes, the main root handoff succeeds, and the emergency shell works when the main root is intentionally unavailable.
 - Test reads from disposable ext4, Btrfs, NTFS3 and FAT volumes before testing writes.
 
+## Daily-use installed root and live ISO root
+
+The installed daily-use system should live on a writable ext4 or Btrfs filesystem so user files, browser profiles, preferences and updates survive reboot. For the live ISO, use a compressed read-only SquashFS root with a writable overlay only if that layout is validated; enable `CONFIG_SQUASHFS=y` and the selected decompression codecs in the kernel. GRUB must remain legacy-BIOS compatible. The ISO is a test/installation/recovery entry point, not the only intended way to use the system.
+
 ## Confirmed devices and driver priorities
 
 All required hardware drivers should be built into the kernel (`=y`) for the intended final configuration, not shipped as loadable modules. Firmware files are separate from kernel modules and may still need to live under `/lib/firmware`.
