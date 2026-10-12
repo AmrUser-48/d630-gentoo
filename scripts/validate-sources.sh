@@ -23,6 +23,8 @@ grep -Fq 'llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/
 grep -Fq 'llvm-core/clang LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
 grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel i915' config/portage/package.use/10-d630-hardware
+grep -Fq 'x11-base/xorg-drivers INPUT_DEVICES: -* evdev libinput synaptics' config/portage/package.use/10-d630-hardware
+test -s config/xorg/99-synaptics.conf
 grep -Fq 'x11-base/xorg-server -minimal' config/portage/package.use/10-d630-hardware
 grep -Fxq 'x11-base/xorg-drivers' config/package.list
 
