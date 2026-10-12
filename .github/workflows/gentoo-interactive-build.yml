@@ -147,7 +147,7 @@ jobs:
           root="$GENTOO_ROOT"
 
           sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package-sets" \
-            "$root/etc/portage/repos.conf" "$root/etc/bash/bashrc.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
+            "$root/etc/portage/repos.conf" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
             "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
@@ -156,6 +156,8 @@ jobs:
           sudo mkdir -p "$root/etc/portage/package.use"
           sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
           sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh "$root/etc/bash/bashrc.d/10-portage-ask.sh"
+          sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
+          sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
           # Enforce stable-only package selection: do not inherit per-package
           # testing keyword exceptions from the downloaded Stage 3.
           sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
@@ -192,6 +194,28 @@ jobs:
             echo '- FEATURES=parallel-fetch buildpkg; binary packages stored in /var/cache/binpkgs.'
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate UTF-8 locale for Gentoo shell sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/locale.log"
+          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -e
+            if command -v locale-gen >/dev/null 2>&1; then
+              locale-gen
+            else
+              localedef -i en_US -f UTF-8 en_US.UTF-8
+            fi
+            env-update
+            locale -a
+          ' |& tee "$log"; then
+            cat "$log" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'WARNING: en_US.UTF-8 generation failed; SSH sessions may show locale warnings.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            tail -n 40 "$log" || true
+          fi
 
       - name: Sync the Gentoo ebuild repository
         shell: bash
@@ -302,22 +326,31 @@ jobs:
           log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
             set -u
-            if [[ -e /usr/bin/byobu-screen ]]; then
-              target="$(readlink -f /usr/bin/byobu-screen 2>/dev/null || true)"
+            # Some package/archive paths can leave interpreter scripts without +x.
+            # Check the actual target for both symlinks and regular files.
+            found_byobu=0
+            for path in /usr/bin/byobu /usr/bin/byobu-*; do
+              [[ -e "$path" ]] || continue
+              found_byobu=1
+              target="$(readlink -f -- "$path" 2>/dev/null || true)"
               if [[ -n "$target" && -f "$target" && ! -x "$target" ]]; then
-                echo "Repairing non-executable Byobu entry point target: $target"
+                echo "Repairing non-executable Byobu script: $path -> $target"
                 chmod 0755 "$target"
               fi
-              ls -l /usr/bin/byobu /usr/bin/byobu-screen 2>&1 || true
-              if [[ -x /usr/bin/byobu-screen ]]; then
-                echo "Byobu Screen entry point is executable."
-              else
-                echo "ERROR: byobu-screen is not executable; inspect mount options and package install." >&2
-                findmnt -T /usr/bin/byobu-screen -o TARGET,FSTYPE,OPTIONS 2>&1 || true
-              fi
+            done
+            if (( found_byobu )); then
+              ls -l /usr/bin/byobu /usr/bin/byobu-* 2>&1 || true
             else
               echo "Byobu is not installed in this runner yet."
             fi
+            if [[ -x /usr/bin/byobu-screen && -x /usr/bin/byobu-janitor ]]; then
+              echo "Byobu entry points and janitor are executable."
+            else
+              echo "ERROR: Byobu entry point or janitor is still not executable." >&2
+              ls -l /usr/bin/byobu* 2>&1 || true
+              findmnt -T /usr/bin/byobu-janitor -o TARGET,FSTYPE,OPTIONS 2>&1 || true
+            fi
+            echo 'Byobu uses Screen by default; byobu-tmux explicitly requests tmux.'
             if [[ -r /usr/share/bash-completion/bash_completion ]]; then
               echo "bash-completion main script is installed."
             else
