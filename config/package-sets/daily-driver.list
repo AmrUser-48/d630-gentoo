@@ -1,0 +1,4 @@
+# Combined set for everyday desktop use. Heavy packages (notably Firefox,
+# Mesa, and FFmpeg) can take a long time to build from source.
+# Repeated atoms are harmless; emerge receives the unique list.
+@SHELL@
