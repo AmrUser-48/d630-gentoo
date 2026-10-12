@@ -439,7 +439,7 @@ jobs:
  /etc/byobu/backend; then
                 echo "Byobu default backend is Screen."
               else
-                printf 'BYOBU_BACKEND="screen"\n' > /etc/byobu/backend
+                printf "BYOBU_BACKEND=\\"screen\\"\\n" > /etc/byobu/backend
                 echo "Set Byobu default backend to Screen."
               fi
             fi
