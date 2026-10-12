@@ -344,12 +344,8 @@ jobs:
               echo "Byobu is not installed in this runner yet."
             fi
             if [[ -f /etc/byobu/backend ]]; then
-              if grep -q "^BYOBU_BACKEND=\\"screen\\"$" /etc/byobu/backend; then
-                echo "Byobu default backend is Screen."
-              else
-                printf "BYOBU_BACKEND=\\"screen\\"\\n" > /etc/byobu/backend
-                echo "Set Byobu default backend to Screen."
-              fi
+              printf '%s\\n' BYOBU_BACKEND=screen > /etc/byobu/backend
+              echo "Set Byobu default backend to Screen."
             fi
             if [[ -x /usr/bin/byobu-screen && -x /usr/bin/byobu-janitor ]]; then
               echo "Byobu entry points and janitor are executable."
