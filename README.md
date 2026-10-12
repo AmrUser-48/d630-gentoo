@@ -10,7 +10,7 @@ A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with
 2. Keep the final runtime small and practical for rescue work, without sacrificing support for the target laptop's hardware or common disk formats.
 3. Build on GitHub Actions rather than on the D630, whose Core 2 Duo is too slow for large Gentoo builds.
 4. Optimize compiled software for the Core 2 family, not for the remote build runner.
-5. Keep the build system separate from the final live root. **Portage must not be present in the final runtime image.** Build tools, compilers, headers, source trees, temporary build files and package caches must also be excluded unless a specific runtime need is documented.
+5. Keep the build system separate from the final live root. Keep the compiler toolchain, development headers, source trees and build caches out of the base runtime image. Since this is a daily-use Gentoo system, Portage should remain available for package management; prefer CI-built binary packages on the slow D630, and keep the ebuild repository/distfiles out of the base image until needed.
 6. Prefer a reproducible, inspectable build pipeline and small incremental changes over a large untested one-shot build.
 7. Deliver a genuinely usable daily system, not a disposable rescue shell: persistent installed system files and user data are core requirements. Keep the live ISO as a testing/installation entry point, then produce and verify the disk-install target.
 
@@ -68,14 +68,14 @@ The installed root filesystem is the main product; the ISO is a way to test, ins
 
 1. A pinned Linux 6.18.y LTS kernel baseline (with 6.12.y LTS as a fallback test), compiled for Core 2.
 2. Required D630 drivers built into the kernel; no runtime kernel modules installed in the final image.
-3. A legacy-BIOS bootable ISO, with a **kernel-embedded initramfs** so GRUB needs to load only the kernel file to reach the rescue shell.
+3. A legacy-BIOS bootable ISO, with a **kernel-embedded initramfs** and Super Grub2 Disk-compatible `/boot/grub/loopback.cfg` so GRUB needs to load only the kernel file.
 4. A **minimal embedded initramfs** that exists only to initialize early userspace, run the configured early MSR hook, discover storage, and hand off to the full Gentoo root. Do not duplicate Bash, GNU utilities or `lf` in the initramfs when the main root already supplies them.
 5. Filesystem and storage drivers built into the kernel so the embedded shell can discover and mount ext4, Btrfs, NTFS3 and FAT volumes without external modules.
 6. A legacy-BIOS GRUB bootloader and a straightforward boot menu.
 7. Persistent system configuration and user data on the installed disk. A live session may use a temporary overlay, but must not be presented as the daily-use installation.
 8. A documented installation procedure that lays out a target disk, installs the root filesystem and kernel, and configures GRUB for legacy BIOS.
 
-Persistence is a later feature, not a prerequisite for the first working ISO. A raw `.img` target may be added after the ISO boots reliably. Do not claim the system is bootable until the image has been generated and tested.
+The live ISO uses an Alpine/Arch-style writable overlay: a read-only SquashFS base plus `gentoo-data.img`, an ext4 persistence image stored beside the ISO. The repo contains the Super Grub2 Disk loopback config, kernel-command-line contract, initial embedded `/init` and image-creation helper; the build pipeline must still assemble them into a bootable ISO and test that persistence works.
 
 ## Kernel and firmware priorities
 
@@ -101,7 +101,11 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 
 - `README.md`: project requirements, contributor/AI instructions and implementation plan.
 - `config/package.list`: main Gentoo root package candidates.
-- `config/initramfs-package.list`: separate minimal early-boot package candidates (`busybox`, `msr-tools`).
+- `config/initramfs-package.list`: separate minimal early-boot package candidates.
+- `initramfs/init`: embedded early userspace for loopback ISO discovery and persistent/volatile OverlayFS.
+- `iso/boot/grub/loopback.cfg`: Super Grub2 Disk loopback menu.
+- `config/kernel-cmdline.txt`: documented `d630.*` kernel command-line parameters.
+- `scripts/create-persistence-image.sh`: create a sparse ext4 overlay image beside the ISO.
 - `config/make.conf`: starting compiler settings and USE flags; must be validated against the selected Gentoo profile.
 - `config/kernel-notes.md`: confirmed kernel/device requirements and built-in driver priorities.
 - `docs/custom-iso-design.md`: Gentoo Handbook references, kernel baseline, direct ISO9660-root strategy and initramfs trade-offs.
@@ -118,7 +122,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 3. **Protect the main branch.** Make small, coherent commits. Avoid destructive resets, force-pushes, deleting releases or overwriting unrelated work. Inspect existing content before replacing it.
 4. **Do not fabricate results.** Never claim a workflow ran, a package built, an ISO booted or a file was tested unless the corresponding tool output or log confirms it.
 5. **Build for Core 2, not the runner.** Use `-march=core2 -mtune=core2`; do not use `-march=native` in distributable binaries.
-6. **Keep Portage out of the final image.** Portage is allowed in the isolated build environment only. Also exclude compilers, development headers, source trees, temporary files and package caches from the runtime root unless justified.
+6. **Keep the daily-use system maintainable.** Include Portage for package management but avoid shipping compilers, development headers, source trees, ebuild trees and package caches in the base root. Prefer CI-built binary packages on the D630.
 7. **Do not over-strip.** Preserve D630 graphics, Wi-Fi, audio, USB/RNDIS, Bluetooth core support, boot-critical storage, rescue filesystems and required firmware. Wired Ethernet is explicitly out of scope. Confirm each proposed removal against dependencies and the actual kernel config.
 8. **Validate Gentoo details.** Check package atom names, USE flags, ebuild availability, profiles and dependency changes against the selected Gentoo repository snapshot. Do not assume Debian package names or USE flags apply to Gentoo.
 9. **Keep CI stages honest and incremental.** First validate source files; next validate package metadata and build inputs; then build the runtime root; then assemble the ISO; finally run automated boot checks. A green source-validation job does not prove that Gentoo builds or that the ISO boots.
