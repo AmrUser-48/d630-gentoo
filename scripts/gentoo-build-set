@@ -63,11 +63,12 @@ printf '  %s\n' "${ATOMS[@]}"
 printf '\nStarting Portage; logs are in /var/log/emerge.log and the workflow runner log.\n'
 
 # Ask before changing the live root when invoked interactively over SSH.
-# Background GitHub Actions builds have no TTY and must never wait for input.
+# In the background, ignore EMERGE_DEFAULT_OPTS so global --ask cannot stall CI.
+# Spell out --verbose and the build settings so both paths remain reproducible.
 if [[ -t 0 && -t 1 ]]; then
-    ASK_OPT=(--ask)
+    ASK_OPT=(--ask --verbose)
 else
-    ASK_OPT=(--ask=n)
+    ASK_OPT=(--ignore-default-opts --ask=n --verbose)
 fi
 
-exec emerge "${ASK_OPT[@]}" --quiet --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
+exec emerge "${ASK_OPT[@]}" --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
