@@ -228,7 +228,7 @@ jobs:
           log="$RUNNER_TEMP/gentoo-builder/portage-sync.log"
           if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$log"; then
             echo 'emerge-webrsync failed; trying the configured Portage sync method.' | tee -a "$log"
-            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --sync --quiet' |& tee -a "$log"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet' |& tee -a "$log"
           fi
           tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
 
