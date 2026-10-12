@@ -126,7 +126,7 @@ jobs:
           }
 
           curl -fsSL --retry 3 "$base/$archive.sha256" -o "$work/$archive.sha256"
-          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/$archive.sha256" | head -n 1)"
+          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/$archive.sha256" | sed -n '1p')"
           [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { echo 'Could not read the Stage 3 SHA-256.' >&2; exit 1; }
           printf '%s  %s\n' "$expected_sha" "$work/$archive" | sha256sum --check -
 
@@ -137,7 +137,8 @@ jobs:
             tee "$report/stage3-info.txt" | tee -a "$GITHUB_STEP_SUMMARY"
           sudo readlink "$GENTOO_ROOT/etc/portage/make.profile" |
             tee "$report/stage3-profile.txt" || true
-          sudo cp -a "$report/." "$GENTOO_ROOT/var/log/" 2>/dev/null || true
+          sudo mkdir -p "$GENTOO_ROOT/var/log/gentoo-bootstrap"
+          sudo cp -a "$report/." "$GENTOO_ROOT/var/log/gentoo-bootstrap/" 2>/dev/null || true
 
       - name: Configure Core 2 Portage and package sets in the Gentoo chroot
         shell: bash
@@ -145,14 +146,14 @@ jobs:
           set -euo pipefail
           root="$GENTOO_ROOT"
 
-          sudo mkdir -p "$root/etc/portage/package.use" "$root/etc/portage/package-sets" \
+          sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package-sets" \
             "$root/etc/portage/repos.conf" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
             "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
             sudo mv "$root/etc/portage/package.use" "$root/etc/portage/package.use.stage3"
-            sudo mkdir -p "$root/etc/portage/package.use"
           fi
+          sudo mkdir -p "$root/etc/portage/package.use"
           sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
           sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
           sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
@@ -192,8 +193,11 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/gentoo-builder/portage-sync.log"
+          # These redirects deliberately write as the runner user to RUNNER_TEMP.
+          # shellcheck disable=SC2024
           if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' >"$log" 2>&1; then
             echo 'emerge-webrsync failed; trying the configured Portage sync method.' | tee -a "$log"
+            # shellcheck disable=SC2024
             sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --sync --quiet' >>"$log" 2>&1
           fi
           tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -226,7 +230,6 @@ jobs:
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          root="$GENTOO_ROOT"
           report="$RUNNER_TEMP/gentoo-builder"
           ssh_key="${SSH_PUBLIC_KEY//$'\r'/}"
           ssh_key="${ssh_key%$'\n'}"
