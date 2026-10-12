@@ -37,6 +37,13 @@ test -s config/package-sets/multimedia.list
 test -s config/package-sets/daily-driver.list
 test -s scripts/gentoo-build-set
 test -s .github/workflows/gentoo-interactive-build.yml
+test -s .github/workflows/publish-gentoo-binpkgs.yml
+test -s scripts/package-binpkgs-release.sh
+test -s scripts/install-binpkgs-release.sh
+grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'name: Publish existing Gentoo binpkgs artifact' .github/workflows/publish-gentoo-binpkgs.yml
 
 grep -q 'march=core2' config/make.conf
 grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
@@ -53,6 +60,8 @@ grep -q 'd630.persistence=volatile' iso/boot/grub/loopback.cfg
 sh -n initramfs/init
 sh -n scripts/create-persistence-image.sh
 bash -n scripts/gentoo-build-set
+bash -n scripts/package-binpkgs-release.sh
+bash -n scripts/install-binpkgs-release.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
 grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
 grep -q 'rootfs.squashfs' iso/boot/grub/loopback.cfg
