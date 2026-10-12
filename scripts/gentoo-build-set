@@ -62,4 +62,4 @@ printf 'Requested atoms (%s):\n' "${#ATOMS[@]}"
 printf '  %s\n' "${ATOMS[@]}"
 printf '\nStarting Portage; logs are in /var/log/emerge.log and the workflow runner log.\n'
 
-exec emerge --ask=n --verbose --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
+exec emerge --ask=n --quiet --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
