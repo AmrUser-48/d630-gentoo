@@ -1,3 +1,5 @@
 # Prefer GNU Screen as Byobu's backend; do not pull in tmux.
 app-misc/byobu screen
 dev-libs/newt python
+dev-libs/newt gpm
+app-misc/screen multiuser
