@@ -1,0 +1,360 @@
+name: Gentoo — Interactive Build Runner
+run-name: "Gentoo builder • ${{ inputs.package_set || 'none' }} • ${{ inputs.session_minutes || 240 }} min"
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_minutes:
+        description: SSH session duration after preparation (maximum 300; job timeout 360 minutes)
+        required: true
+        type: number
+        default: 240
+      package_set:
+        description: Optional package set to build in background while SSH is available
+        required: true
+        type: choice
+        options:
+          - none
+          - cli
+          - development
+          - desktop
+          - multimedia
+          - daily-driver
+          - custom
+        default: none
+      build_set_on_start:
+        description: Build the selected package set automatically after SSH is ready
+        required: true
+        type: boolean
+        default: false
+      custom_atoms:
+        description: For custom set only; space- or comma-separated category/package atoms
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gentoo-interactive-build-runner
+  cancel-in-progress: true
+
+jobs:
+  gentoo-builder:
+    name: Gentoo glibc/OpenRC chroot with private SSH
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    env:
+      GENTOO_ROOT: /opt/gentoo
+      PACKAGE_SET: ${{ inputs.package_set || 'none' }}
+      BUILD_SET_ON_START: ${{ inputs.build_set_on_start }}
+      CUSTOM_ATOMS: ${{ inputs.custom_atoms }}
+      SESSION_MINUTES: ${{ inputs.session_minutes || 240 }}
+
+    steps:
+      - name: Check out D630 Gentoo configuration
+        uses: actions/checkout@v4
+
+      - name: Validate secrets and workflow inputs
+        shell: bash
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || { echo 'Missing repository secret TAILSCALE_AUTHKEY.' >&2; exit 1; }
+          [[ -n "${SSH_PUBLIC_KEY:-}" ]] || { echo 'Missing repository secret SSH_PUBLIC_KEY (one-line OpenSSH public key).' >&2; exit 1; }
+
+          session="${SESSION_MINUTES:-240}"
+          [[ "$session" =~ ^[0-9]+$ ]] || { echo 'session_minutes must be an integer.' >&2; exit 1; }
+          (( session >= 1 && session <= 300 )) || { echo 'session_minutes must be between 1 and 300.' >&2; exit 1; }
+
+          if [[ "$BUILD_SET_ON_START" == 'true' ]]; then
+            [[ "$PACKAGE_SET" != 'none' ]] || { echo 'Choose a package_set when build_set_on_start is enabled.' >&2; exit 1; }
+            if [[ "$PACKAGE_SET" == 'custom' && -z "${CUSTOM_ATOMS//[ ,]/}" ]]; then
+              echo 'For package_set=custom, provide custom_atoms such as "dev-vcs/git net-misc/curl".' >&2
+              exit 1
+            fi
+          fi
+
+          key="${SSH_PUBLIC_KEY//$'\r'/}"
+          key="${key%$'\n'}"
+          [[ "$key" != *$'\n'* ]] || { echo 'SSH_PUBLIC_KEY must contain exactly one key line.' >&2; exit 1; }
+          printf '%s\n' "$key" > "$RUNNER_TEMP/ssh_public_key.pub"
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" >/dev/null ||
+            { echo 'SSH_PUBLIC_KEY is not a valid OpenSSH public key.' >&2; exit 1; }
+          {
+            echo "Target CPU: Intel Core 2 / Merom"
+            echo "Portage flags: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Selected package set: $PACKAGE_SET"
+            echo "Build set on start: $BUILD_SET_ON_START"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install host bootstrap and SSH utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl coreutils xz-utils tar rsync openssh-server iptables sudo
+          sudo apt-get clean
+          df -h / | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Download and verify official Gentoo amd64 OpenRC Stage 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc'
+          work="$RUNNER_TEMP/gentoo-stage3"
+          report="$RUNNER_TEMP/gentoo-builder"
+          mkdir -p "$work" "$report"
+
+          curl -fsSL --retry 3 "$base/latest-stage3-amd64-openrc.txt" -o "$report/stage3-latest.txt"
+          line="$(grep -E '^stage3-amd64-openrc-[0-9]{8}T[0-9]{6}Z\.tar\.xz [0-9]+$' "$report/stage3-latest.txt" | head -n 1)"
+          [[ -n "$line" ]] || { echo 'Could not parse the official Gentoo latest Stage 3 manifest.' >&2; exit 1; }
+          archive="${line%% *}"
+          expected_size="${line##* }"
+          printf '%s\n' "$archive" > "$report/stage3-archive.txt"
+
+          curl -fL --retry 3 "$base/$archive" -o "$work/$archive"
+          actual_size="$(stat -c '%s' "$work/$archive")"
+          [[ "$actual_size" == "$expected_size" ]] || {
+            echo "Stage 3 size mismatch: expected $expected_size, got $actual_size." >&2
+            exit 1
+          }
+
+          curl -fsSL --retry 3 "$base/$archive.sha256" -o "$work/$archive.sha256"
+          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/$archive.sha256" | head -n 1)"
+          [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { echo 'Could not read the Stage 3 SHA-256.' >&2; exit 1; }
+          printf '%s  %s\n' "$expected_sha" "$work/$archive" | sha256sum --check -
+
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+          sudo tar --extract --file "$work/$archive" --directory "$GENTOO_ROOT" \
+            --numeric-owner --xattrs --xattrs-include='*' --preserve-permissions
+          printf 'Stage 3 archive: %s\nSHA256: %s\n' "$archive" "$expected_sha" |
+            tee "$report/stage3-info.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo readlink "$GENTOO_ROOT/etc/portage/make.profile" |
+            tee "$report/stage3-profile.txt" || true
+          sudo cp -a "$report/." "$GENTOO_ROOT/var/log/" 2>/dev/null || true
+
+      - name: Configure Core 2 Portage and package sets in the Gentoo chroot
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+
+          sudo mkdir -p "$root/etc/portage/package.use" "$root/etc/portage/package-sets" \
+            "$root/etc/portage/repos.conf" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
+            "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
+
+          if [[ -f "$root/etc/portage/package.use" ]]; then
+            sudo mv "$root/etc/portage/package.use" "$root/etc/portage/package.use.stage3"
+            sudo mkdir -p "$root/etc/portage/package.use"
+          fi
+          sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
+          sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
+          sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
+          sudo install -m 0755 scripts/gentoo-build-set "$root/usr/local/sbin/gentoo-build-set"
+
+          if [[ ! -f "$root/etc/portage/repos.conf/gentoo.conf" ]]; then
+            sudo tee "$root/etc/portage/repos.conf/gentoo.conf" >/dev/null <<'EOF'
+          [gentoo]
+          location = /var/db/repos/gentoo
+          sync-type = rsync
+          sync-uri = rsync://rsync.gentoo.org/gentoo-portage
+          auto-sync = yes
+          EOF
+          fi
+
+          # The chroot shares the host network namespace; copy resolver contents
+          # rather than a possibly broken systemd-resolved stub symlink.
+          sudo rm -f "$root/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$root/etc/resolv.conf"
+
+          for mountpoint in dev proc sys run; do
+            sudo mount --rbind "/$mountpoint" "$root/$mountpoint"
+            sudo mount --make-rslave "$root/$mountpoint"
+          done
+
+          {
+            echo '## Portage configuration installed'
+            echo '- Compiler: -O2 -pipe -march=core2 -mtune=core2'
+            echo '- CPU_FLAGS_X86: MMX, MMXEXT, SSE, SSE2, SSE3, SSSE3 only (Core 2 T7250; not copied from the CI CPU).'
+            echo '- OpenRC profile inherited from official Gentoo Stage 3.'
+            echo '- FEATURES=parallel-fetch buildpkg; binary packages stored in /var/cache/binpkgs.'
+            echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Sync the Gentoo ebuild repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/portage-sync.log"
+          if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' >"$log" 2>&1; then
+            echo 'emerge-webrsync failed; trying the configured Portage sync method.' | tee -a "$log"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --sync --quiet' >>"$log" 2>&1
+          fi
+          tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Gentoo builder utilities
+        id: builder-tools
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
+          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' >"$log" 2>&1; then
+            echo 'Builder utilities installed.' | tee -a "$GITHUB_STEP_SUMMARY"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' >>"$log" 2>&1 || true
+          else
+            echo 'WARNING: one or more optional builder utilities failed to build. SSH remains available; inspect runner-tools.log.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            tail -n 60 "$log" || true
+          fi
+
+      - name: Connect runner to private Tailscale network
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          use-cache: "true"
+
+      - name: Configure key-only SSH directly into the Gentoo chroot
+        shell: bash
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          report="$RUNNER_TEMP/gentoo-builder"
+          ssh_key="${SSH_PUBLIC_KEY//$'\r'/}"
+          ssh_key="${ssh_key%$'\n'}"
+          tailnet_ip="$(tailscale ip -4 | awk '/^100\./ {print; exit}')"
+          [[ "$tailnet_ip" =~ ^100\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] ||
+            { echo 'Tailscale IPv4 address not found.' >&2; exit 1; }
+          printf 'TAILSCALE_IP=%s\n' "$tailnet_ip" >> "$GITHUB_ENV"
+
+          sudo useradd --create-home --shell /bin/bash gentoo 2>/dev/null || true
+          sudo install -d -o gentoo -g gentoo -m 0700 /home/gentoo/.ssh
+          printf 'from="100.64.0.0/10",no-agent-forwarding,no-X11-forwarding %s\n' "$ssh_key" |
+            sudo tee /home/gentoo/.ssh/authorized_keys >/dev/null
+          sudo chown gentoo:gentoo /home/gentoo/.ssh/authorized_keys
+          sudo chmod 0600 /home/gentoo/.ssh/authorized_keys
+
+          sudo tee /etc/ssh/sshd_config.d/00-gentoo-builder.conf >/dev/null <<'EOF'
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin no
+          AllowUsers gentoo
+          EOF
+
+          sudo tee /etc/sudoers.d/gentoo-chroot >/dev/null <<'EOF'
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          EOF
+          sudo chmod 0440 /etc/sudoers.d/gentoo-chroot
+          sudo visudo -cf /etc/sudoers.d/gentoo-chroot
+
+          # Force an SSH login into the Gentoo rootfs. The account is only
+          # reachable using the one public key over the private Tailscale IP.
+          sudo tee -a /etc/ssh/sshd_config >/dev/null <<'EOF'
+
+          Match User gentoo
+              ForceCommand /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+              PermitTTY yes
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTunnel no
+          EOF
+
+          sudo sshd -t
+          sudo systemctl restart ssh
+          sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
+          sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
+          sudo ssh-keygen -lf /home/gentoo/.ssh/authorized_keys |
+            tee "$report/ssh-key-fingerprint.txt"
+          {
+            echo '## Gentoo SSH session ready'
+            echo "- Gentoo login: ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip"
+            echo '- SSH account password authentication is disabled; SSH is filtered to Tailscale IPv4 peers.'
+            echo '- The SSH login is forced directly into the Gentoo chroot as root.'
+            echo '- The session is temporary; the host and chroot disappear when the job ends.'
+          } | tee -a "$GITHUB_STEP_SUMMARY" | tee "$report/remote-access.txt"
+
+      - name: Keep interactive Gentoo session alive
+        shell: bash
+        timeout-minutes: 310
+        run: |
+          set -euo pipefail
+          session_minutes="${SESSION_MINUTES:-240}"
+          end_epoch=$(( $(date +%s) + session_minutes * 60 ))
+          log="$RUNNER_TEMP/gentoo-builder/session-heartbeat.log"
+
+          if [[ "$BUILD_SET_ON_START" == 'true' ]]; then
+            build_log="$GENTOO_ROOT/var/log/gentoo-build-set.log"
+            sudo install -o "$USER" -g "$(id -gn)" -m 0644 /dev/null "$build_log"
+            nohup sudo -n chroot "$GENTOO_ROOT" /usr/local/sbin/gentoo-build-set "$PACKAGE_SET" "$CUSTOM_ATOMS" \
+              >"$build_log" 2>&1 < /dev/null &
+            build_pid=$!
+            printf 'Started background Portage set: %s (host PID %s). Log inside Gentoo: /var/log/gentoo-build-set.log\n' \
+              "$PACKAGE_SET" "$build_pid" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No package set was auto-started. Log in and use emerge or gentoo-build-set manually.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          printf 'Session starts UTC=%s; requested minutes=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$session_minutes" | tee "$log"
+          while :; do
+            now="$(date +%s)"
+            remaining=$(( end_epoch - now ))
+            (( remaining > 0 )) || break
+            sleep_seconds=60
+            (( remaining >= sleep_seconds )) || sleep_seconds=$remaining
+            sleep "$sleep_seconds"
+            printf 'Heartbeat UTC=%s; remaining_seconds=%s\n' \
+              "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(( end_epoch - $(date +%s) ))" | tee -a "$log"
+          done
+          echo 'Interactive session timer expired.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Gentoo binary packages and logs
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          out="$RUNNER_TEMP/gentoo-build-artifacts"
+          mkdir -p "$out/binpkgs" "$out/logs" "$out/config"
+          root="$GENTOO_ROOT"
+
+          if [[ -d "$root/var/cache/binpkgs" ]]; then
+            sudo cp -a "$root/var/cache/binpkgs/." "$out/binpkgs/" 2>/dev/null || true
+          fi
+          if [[ -f "$root/var/log/emerge.log" ]]; then
+            sudo cp "$root/var/log/emerge.log" "$out/logs/emerge.log" || true
+          fi
+          if [[ -f "$root/var/log/gentoo-build-set.log" ]]; then
+            sudo cp "$root/var/log/gentoo-build-set.log" "$out/logs/gentoo-build-set.log" || true
+          fi
+          cp -a "$RUNNER_TEMP/gentoo-builder/." "$out/logs/" 2>/dev/null || true
+          sudo cp "$root/etc/portage/make.conf" "$out/config/make.conf" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package.use" "$out/config/" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package-sets" "$out/config/" 2>/dev/null || true
+          {
+            echo "Target: amd64, glibc, OpenRC Stage 3"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Build host: GitHub-hosted Ubuntu 24.04 x86_64"
+            echo 'The binpkgs are for amd64 and compiled with Core 2 target flags where packages were built from source.'
+          } > "$out/BUILD-MANIFEST.txt"
+          sudo chown -R "$(id -u):$(id -g)" "$out"
+          chmod -R a+rX "$out"
+          du -sh "$out/binpkgs" 2>/dev/null || true
+
+      - name: Upload Gentoo binary packages and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gentoo-build-output-${{ github.run_id }}
+          path: ${{ runner.temp }}/gentoo-build-artifacts/
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
