@@ -292,6 +292,39 @@ jobs:
             tail -n 60 "$log" || true
           fi
 
+      - name: Verify Byobu permissions and Bash completion setup
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -u
+          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -u
+            if [[ -e /usr/bin/byobu-screen ]]; then
+              target="$(readlink -f /usr/bin/byobu-screen 2>/dev/null || true)"
+              if [[ -n "$target" && -f "$target" && ! -x "$target" ]]; then
+                echo "Repairing non-executable Byobu entry point target: $target"
+                chmod 0755 "$target"
+              fi
+              ls -l /usr/bin/byobu /usr/bin/byobu-screen 2>&1 || true
+              if [[ -x /usr/bin/byobu-screen ]]; then
+                echo "Byobu Screen entry point is executable."
+              else
+                echo "ERROR: byobu-screen is not executable; inspect mount options and package install." >&2
+                findmnt -T /usr/bin/byobu-screen -o TARGET,FSTYPE,OPTIONS 2>&1 || true
+              fi
+            else
+              echo "Byobu is not installed in this runner yet."
+            fi
+            if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+              echo "bash-completion main script is installed."
+            else
+              echo "bash-completion main script not found; package installation may have failed."
+            fi
+            find /etc/bash/bashrc.d /etc/profile.d -maxdepth 1 -type f -iname "*completion*" -print 2>/dev/null || true
+          ' |& tee -a "$log" || true
+
       - name: Keep interactive Gentoo session alive
         shell: bash
         timeout-minutes: 310
