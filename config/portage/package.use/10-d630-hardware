@@ -5,7 +5,8 @@ media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
 llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV
 llvm-core/clang LLVM_TARGETS: -* X86 SPIRV
 # libclc is only needed as Mesa's build helper here; do not build AMD/NVIDIA target libraries.
-dev-util/mesa_clc LLVM_SLOT: -* 22 VIDEO_CARDS: -*
+dev-util/mesa_clc LLVM_SLOT: -* 22
+dev-util/mesa_clc VIDEO_CARDS: -*
 llvm-runtimes/libclc VIDEO_CARDS: -*
 
 # Xorg: Intel graphics via the built-in modesetting DDX, plus legacy Intel DDX as an alternate.
