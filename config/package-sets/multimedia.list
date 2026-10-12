@@ -1,0 +1,6 @@
+media-video/mpv
+media-video/ffmpeg
+media-sound/mpd
+media-sound/ncmpcpp
+media-sound/lame
+media-sound/alsa-utils
