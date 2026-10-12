@@ -3,3 +3,4 @@ app-misc/byobu screen
 dev-libs/newt python
 dev-libs/newt gpm
 app-misc/screen multiuser
+sys-apps/ripgrep pcre
