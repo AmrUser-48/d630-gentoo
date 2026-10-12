@@ -272,7 +272,7 @@ jobs:
           sudo systemctl restart ssh
           sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
           sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
-          sudo ssh-keygen -lf /home/gentoo/.ssh/authorized_keys |
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" |
             tee "$report/ssh-key-fingerprint.txt"
           {
             echo '## Gentoo SSH session ready'
