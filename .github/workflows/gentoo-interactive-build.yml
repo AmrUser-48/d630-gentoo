@@ -181,7 +181,7 @@ jobs:
           {
             echo '## Portage configuration installed'
             echo '- Compiler: -O2 -pipe -march=core2 -mtune=core2'
-            echo '- CPU_FLAGS_X86: MMX, MMXEXT, SSE, SSE2, SSE3, SSSE3 only (Core 2 T7250; not copied from the CI CPU).'
+            echo '- CPU_FLAGS_X86: MMX, SSE, SSE2, SSE3, SSSE3 only (Core 2 T7250; not copied from the CI CPU).'
             echo '- OpenRC profile inherited from official Gentoo Stage 3.'
             echo '- FEATURES=parallel-fetch buildpkg; binary packages stored in /var/cache/binpkgs.'
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
