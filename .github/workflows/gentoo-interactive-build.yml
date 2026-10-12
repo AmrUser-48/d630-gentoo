@@ -200,7 +200,7 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/gentoo-builder/locale.log"
-          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+          if sudo chroot "$GENTOO_ROOT" /usr/bin/env -u LC_ALL -u LC_CTYPE -u LC_MESSAGES -u LANGUAGE LANG=C /bin/bash -c '
             set -e
             if command -v locale-gen >/dev/null 2>&1; then
               locale-gen
@@ -342,6 +342,106 @@ jobs:
               ls -l /usr/bin/byobu /usr/bin/byobu-* 2>&1 || true
             else
               echo "Byobu is not installed in this runner yet."
+            fi
+            if [[ -f /etc/byobu/backend ]]; then
+              if grep -q '^BYOBU_BACKEND="screen"            if [[ -x /usr/bin/byobu-screen && -x /usr/bin/byobu-janitor ]]; then
+              echo "Byobu entry points and janitor are executable."
+            else
+              echo "ERROR: Byobu entry point or janitor is still not executable." >&2
+              ls -l /usr/bin/byobu* 2>&1 || true
+              findmnt -T /usr/bin/byobu-janitor -o TARGET,FSTYPE,OPTIONS 2>&1 || true
+            fi
+            echo "Byobu uses Screen by default; byobu-tmux explicitly requests tmux."
+            if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+              echo "bash-completion main script is installed."
+            else
+              echo "bash-completion main script not found; package installation may have failed."
+            fi
+            find /etc/bash/bashrc.d /etc/profile.d -maxdepth 1 -type f -iname "*completion*" -print 2>/dev/null || true
+          ' |& tee -a "$log" || true
+
+      - name: Keep interactive Gentoo session alive
+        shell: bash
+        timeout-minutes: 310
+        run: |
+          set -euo pipefail
+          session_minutes="${SESSION_MINUTES:-240}"
+          end_epoch=$(( $(date +%s) + session_minutes * 60 ))
+          log="$RUNNER_TEMP/gentoo-builder/session-heartbeat.log"
+
+          if [[ "$BUILD_SET_ON_START" == 'true' ]]; then
+            build_log="$GENTOO_ROOT/var/log/gentoo-build-set.log"
+            sudo install -o "$USER" -g "$(id -gn)" -m 0644 /dev/null "$build_log"
+            nohup sudo -n chroot "$GENTOO_ROOT" /usr/local/sbin/gentoo-build-set "$PACKAGE_SET" "$CUSTOM_ATOMS" \
+              >"$build_log" 2>&1 < /dev/null &
+            build_pid=$!
+            printf 'Started background Portage set: %s (host PID %s). Log inside Gentoo: /var/log/gentoo-build-set.log\n' \
+              "$PACKAGE_SET" "$build_pid" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No package set was auto-started. Log in and use emerge or gentoo-build-set manually.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          printf 'Session starts UTC=%s; requested minutes=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$session_minutes" | tee "$log"
+          while :; do
+            now="$(date +%s)"
+            remaining=$(( end_epoch - now ))
+            (( remaining > 0 )) || break
+            sleep_seconds=60
+            (( remaining >= sleep_seconds )) || sleep_seconds=$remaining
+            sleep "$sleep_seconds"
+            printf 'Heartbeat UTC=%s; remaining_seconds=%s\n' \
+              "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(( end_epoch - $(date +%s) ))" | tee -a "$log"
+          done
+          echo 'Interactive session timer expired.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Gentoo binary packages and logs
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          out="$RUNNER_TEMP/gentoo-build-artifacts"
+          mkdir -p "$out/binpkgs" "$out/logs" "$out/config"
+          root="$GENTOO_ROOT"
+
+          if [[ -d "$root/var/cache/binpkgs" ]]; then
+            sudo cp -a "$root/var/cache/binpkgs/." "$out/binpkgs/" 2>/dev/null || true
+          fi
+          if [[ -f "$root/var/log/emerge.log" ]]; then
+            sudo cp "$root/var/log/emerge.log" "$out/logs/emerge.log" || true
+          fi
+          if [[ -f "$root/var/log/gentoo-build-set.log" ]]; then
+            sudo cp "$root/var/log/gentoo-build-set.log" "$out/logs/gentoo-build-set.log" || true
+          fi
+          cp -a "$RUNNER_TEMP/gentoo-builder/." "$out/logs/" 2>/dev/null || true
+          sudo cp "$root/etc/portage/make.conf" "$out/config/make.conf" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package.use" "$out/config/" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package-sets" "$out/config/" 2>/dev/null || true
+          {
+            echo "Target: amd64, glibc, OpenRC Stage 3"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Build host: GitHub-hosted Ubuntu 24.04 x86_64"
+            echo 'The binpkgs are for amd64 and compiled with Core 2 target flags where packages were built from source.'
+          } > "$out/BUILD-MANIFEST.txt"
+          sudo chown -R "$(id -u):$(id -g)" "$out"
+          chmod -R a+rX "$out"
+          du -sh "$out/binpkgs" 2>/dev/null || true
+
+      - name: Upload Gentoo binary packages and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gentoo-build-output-${{ github.run_id }}
+          path: ${{ runner.temp }}/gentoo-build-artifacts/
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+ /etc/byobu/backend; then
+                echo "Byobu default backend is Screen."
+              else
+                printf 'BYOBU_BACKEND="screen"\n' > /etc/byobu/backend
+                echo "Set Byobu default backend to Screen."
+              fi
             fi
             if [[ -x /usr/bin/byobu-screen && -x /usr/bin/byobu-janitor ]]; then
               echo "Byobu entry points and janitor are executable."
