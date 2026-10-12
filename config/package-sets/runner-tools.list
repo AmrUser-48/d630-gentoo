@@ -7,6 +7,8 @@ app-editors/nano
 app-misc/screen
 app-misc/byobu
 app-misc/mc
+app-cdr/cdrtools
+dev-libs/libisoburn
 sys-apps/less
 sys-process/htop
 app-portage/gentoolkit
