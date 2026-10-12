@@ -193,12 +193,9 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/gentoo-builder/portage-sync.log"
-          # These redirects deliberately write as the runner user to RUNNER_TEMP.
-          # shellcheck disable=SC2024
-          if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' >"$log" 2>&1; then
+          if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' 2>&1 | tee "$log"; then
             echo 'emerge-webrsync failed; trying the configured Portage sync method.' | tee -a "$log"
-            # shellcheck disable=SC2024
-            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --sync --quiet' >>"$log" 2>&1
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --sync --quiet' 2>&1 | tee -a "$log"
           fi
           tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
 
