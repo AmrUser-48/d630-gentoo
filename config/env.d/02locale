@@ -1,0 +1,2 @@
+# Default locale for Gentoo builder shell sessions.
+LANG="en_US.UTF-8"
