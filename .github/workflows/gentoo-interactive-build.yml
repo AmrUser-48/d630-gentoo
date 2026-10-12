@@ -199,22 +199,6 @@ jobs:
           fi
           tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Install Gentoo builder utilities
-        id: builder-tools
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
-          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' |& tee "$log"; then
-            echo 'Builder utilities installed.' | tee -a "$GITHUB_STEP_SUMMARY"
-            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' |& tee -a "$log" || true
-          else
-            echo 'WARNING: one or more optional builder utilities failed to build. SSH remains available; inspect runner-tools.log.' |
-              tee -a "$GITHUB_STEP_SUMMARY"
-            tail -n 60 "$log" || true
-          fi
-
       - name: Connect runner to private Tailscale network
         uses: tailscale/github-action@v4
         with:
@@ -281,6 +265,24 @@ jobs:
             echo '- The SSH login is forced directly into the Gentoo chroot as root.'
             echo '- The session is temporary; the host and chroot disappear when the job ends.'
           } | tee -a "$GITHUB_STEP_SUMMARY" | tee "$report/remote-access.txt"
+          echo '- Optional Gentoo builder utilities may still be compiling in the next step; SSH is already available. Check /var/log/emerge.log inside Gentoo. Utilities bootstrap is best-effort and capped at 35 minutes.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Gentoo builder utilities
+        id: builder-tools
+        continue-on-error: true
+        timeout-minutes: 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
+          if timeout 35m sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' |& tee "$log"; then
+            echo 'Builder utilities installed.' | tee -a "$GITHUB_STEP_SUMMARY"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' |& tee -a "$log" || true
+          else
+            echo 'WARNING: one or more optional builder utilities failed to build. SSH remains available; inspect runner-tools.log.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            tail -n 60 "$log" || true
+          fi
 
       - name: Keep interactive Gentoo session alive
         shell: bash
