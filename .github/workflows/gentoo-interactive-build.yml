@@ -210,7 +210,7 @@ jobs:
             env-update
             locale -a
           ' |& tee "$log"; then
-            cat "$log" | tee -a "$GITHUB_STEP_SUMMARY"
+            tee -a "$GITHUB_STEP_SUMMARY" < "$log"
           else
             echo 'WARNING: en_US.UTF-8 generation failed; SSH sessions may show locale warnings.' |
               tee -a "$GITHUB_STEP_SUMMARY"
@@ -350,7 +350,7 @@ jobs:
               ls -l /usr/bin/byobu* 2>&1 || true
               findmnt -T /usr/bin/byobu-janitor -o TARGET,FSTYPE,OPTIONS 2>&1 || true
             fi
-            echo 'Byobu uses Screen by default; byobu-tmux explicitly requests tmux.'
+            echo "Byobu uses Screen by default; byobu-tmux explicitly requests tmux."
             if [[ -r /usr/share/bash-completion/bash_completion ]]; then
               echo "bash-completion main script is installed."
             else
