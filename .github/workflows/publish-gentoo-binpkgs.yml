@@ -68,7 +68,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$release_dir"
-          scripts/package-binpkgs-release.sh "$source_dir" "$release_dir"
+          bash scripts/package-binpkgs-release.sh "$source_dir" "$release_dir"
           {
             echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
             echo "CPU target: Intel Core 2 / Merom"
