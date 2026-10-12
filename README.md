@@ -1,18 +1,18 @@
 # d630-gentoo
 
-A small Gentoo-based live rescue and installation system, primarily designed for the Dell Latitude D630. The goal is a fast-booting, compact, legacy-BIOS-compatible live environment that can inspect disks, repair or install operating systems, connect to networks, and provide a lightweight X11 desktop.
+A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with an optional live ISO for testing, installation and recovery. The goal is a fast, responsive, legacy-BIOS-compatible desktop you can use every day for web browsing, file management, development, media, Wi-Fi, Android tools and ordinary computing; disk repair and rescue tools are included as secondary capabilities.
 
 **Current state:** source scaffold only. The repository is not yet a bootable image. The current GitHub Actions workflow validates files; it does not bootstrap Gentoo or build an ISO.
 
 ## Project goals
 
-1. Produce a bootable x86_64 live ISO for old BIOS-based computers, with the D630 as the primary target.
+1. Produce an installable x86_64 Gentoo daily-use system for old BIOS-based computers, with the D630 as the primary target; provide a bootable legacy-BIOS ISO for live testing, installation and recovery.
 2. Keep the final runtime small and practical for rescue work, without sacrificing support for the target laptop's hardware or common disk formats.
 3. Build on GitHub Actions rather than on the D630, whose Core 2 Duo is too slow for large Gentoo builds.
 4. Optimize compiled software for the Core 2 family, not for the remote build runner.
 5. Keep the build system separate from the final live root. **Portage must not be present in the final runtime image.** Build tools, compilers, headers, source trees, temporary build files and package caches must also be excluded unless a specific runtime need is documented.
 6. Prefer a reproducible, inspectable build pipeline and small incremental changes over a large untested one-shot build.
-7. Establish a working minimal ISO first. Only then consider persistence, a raw disk image, more applications or further size reduction.
+7. Deliver a genuinely usable daily system, not a disposable rescue shell: persistent installed system files and user data are core requirements. Keep the live ISO as a testing/installation entry point, then produce and verify the disk-install target.
 
 ## Primary target hardware
 
@@ -36,7 +36,9 @@ The detailed hardware inventory and confirmed PCI/USB IDs live in [`docs/hardwar
 
 **GMA X3100 / GM965 is Intel Gen4 graphics.** The existing Debian 12 baseline is known-good: `glxinfo -B` reports Mesa 22.3.6, renderer `Mesa Intel(R) 965GM (CL)`, accelerated rendering, and OpenGL 2.1. Keep this as the comparison point while validating Gentoo's `VIDEO_CARDS="intel"` and Mesa Crocus support. The Gentoo `video_cards_i915` USE flag is not the same as kernel `CONFIG_DRM_I915`; do not enable it just because the kernel module is named `i915`. Prefer Xorg modesetting initially. Do not assume Vulkan, modern Intel firmware, or hardware video acceleration is supported.
 
-## Desktop and utilities
+## Daily-use desktop and utilities
+
+This is intended to be the system you actually use, not merely a rescue CD. The first usable desktop should provide a browser, graphical file manager, terminal, editor, audio playback, Wi-Fi controls, development tools and the existing rescue utilities. Keep optional applications modular so the installed base stays small.
 
 The intended graphical stack is Xorg with lightweight window managers:
 
@@ -46,7 +48,7 @@ The intended graphical stack is Xorg with lightweight window managers:
 
 Include xterm as the small, dependable terminal fallback. Alacritty is desired but should be checked against the chosen Gentoo profile and its graphics/runtime dependencies before being treated as mandatory. Keep the environment useful without a display manager if that reduces complexity.
 
-Rescue utilities should focus on storage inspection, mounting, partitioning, file transfer, network troubleshooting and text editing. Avoid pulling in large desktop suites or redundant tools without a clear use case.
+Everyday utilities should cover web browsing, file management, archiving, terminal work, editing, Git and media playback. Keep rescue utilities for storage inspection, mounting, partitioning, file transfer and filesystem repair. Avoid large desktop suites and redundant tools without a clear use case.
 
 ## Build and optimization rules
 
@@ -60,16 +62,18 @@ Rescue utilities should focus on storage inspection, mounting, partitioning, fil
 - Inspect dependency closure and package contents before stripping. Do not delete libraries or files merely because they look large or unused.
 - Keep logs and publish build artifacts only after the workflow has checked that the expected files exist and are non-empty.
 
-## Planned live-image architecture
+## Planned daily-use system and boot-image architecture
 
-The intended first image design is:
+The installed root filesystem is the main product; the ISO is a way to test, install and recover it. The first deliverables should be a usable installable root filesystem plus a legacy-BIOS ISO, not an ISO-only rescue environment. The intended architecture is:
 
 1. A pinned Linux 6.18.y LTS kernel baseline (with 6.12.y LTS as a fallback test), compiled for Core 2.
 2. Required D630 drivers built into the kernel; no runtime kernel modules installed in the final image.
 3. A legacy-BIOS bootable ISO, with a **kernel-embedded initramfs** so GRUB needs to load only the kernel file to reach the rescue shell.
 4. A **minimal embedded initramfs** that exists only to initialize early userspace, run the configured early MSR hook, discover storage, and hand off to the full Gentoo root. Do not duplicate Bash, GNU utilities or `lf` in the initramfs when the main root already supplies them.
 5. Filesystem and storage drivers built into the kernel so the embedded shell can discover and mount ext4, Btrfs, NTFS3 and FAT volumes without external modules.
-6. A legacy-BIOS bootloader and a straightforward boot menu.
+6. A legacy-BIOS GRUB bootloader and a straightforward boot menu.
+7. Persistent system configuration and user data on the installed disk. A live session may use a temporary overlay, but must not be presented as the daily-use installation.
+8. A documented installation procedure that lays out a target disk, installs the root filesystem and kernel, and configures GRUB for legacy BIOS.
 
 Persistence is a later feature, not a prerequisite for the first working ISO. A raw `.img` target may be added after the ISO boots reliably. Do not claim the system is bootable until the image has been generated and tested.
 
@@ -135,15 +139,17 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Keep Bash/GNU/`lf` configuration in the main Gentoo root, with only a minimal emergency shell and the early `wrmsr` hook in the initramfs.
 - Add checks for missing files, invalid package entries and required target settings.
 
-### Stage 2 — Build a minimal runtime root
+### Stage 2 — Build the compact daily-use runtime root
 - Bootstrap Gentoo in GitHub Actions.
+- Include a practical browser, file manager, terminal/editor, audio playback, Wi-Fi management, development tools and rescue utilities.
 - Install only the selected runtime packages into a separate staging root.
 - Resolve and inspect runtime dependencies.
 - Remove build-only content from the staging root and report the resulting size.
 
-### Stage 3 — Make the live image
+### Stage 3 — Make the installable system and live ISO
 - Build the kernel with required drivers built in and install no runtime kernel modules.
-- Package the embedded rescue userspace as a cpio initramfs and compile it into the kernel via `CONFIG_INITRAMFS_SOURCE`; do not publish or require a separate initramfs file.
+- Package the minimal early-boot userspace as a cpio initramfs and compile it into the kernel via `CONFIG_INITRAMFS_SOURCE`; do not publish or require a separate initramfs file.
+- Publish a compressed installable root filesystem and a legacy-BIOS GRUB ISO for testing/installation. The installed system must retain changes, preferences and user files across reboots.
 - Ensure the kernel can boot directly to `/init`, establish device nodes, run the early MSR hook only when explicitly configured and validated, and mount/handoff to the main Gentoo root with no external initramfs file.
 - Verify Bash, GNU utilities and `lf` are provided by the main root rather than duplicated in the embedded archive; keep a small emergency shell in initramfs for root-mount failures.
 - From the main root or emergency shell, test mounting ext4, Btrfs, NTFS3 and FAT volumes using the built-in kernel drivers and available userspace tools.
@@ -162,4 +168,4 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 
 ## Current limitations
 
-The repository currently contains the initial source scaffold and a workflow that validates those source files. It does not yet resolve the Gentoo package set, build a Gentoo runtime, compile the kernel, assemble an ISO or run boot tests. Those are the next engineering tasks; the README does not claim they are already implemented.
+The repository currently contains the initial source scaffold and a workflow that validates those source files. It does not yet resolve the Gentoo package set, build a daily-use runtime, compile the kernel, assemble an ISO, prepare a persistent install target or run boot tests. Those are the next engineering tasks; the README does not claim they are already implemented.
