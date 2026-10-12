@@ -147,7 +147,7 @@ jobs:
           root="$GENTOO_ROOT"
 
           sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package-sets" \
-            "$root/etc/portage/repos.conf" "$root/etc/portage/profile" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
+            "$root/etc/portage/repos.conf" "$root/etc/portage/profile" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/etc/X11/xorg.conf.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
             "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
@@ -160,6 +160,7 @@ jobs:
           sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh "$root/etc/bash/bashrc.d/10-portage-ask.sh"
           sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
           sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
+          sudo install -m 0644 config/xorg/99-synaptics.conf "$root/etc/X11/xorg.conf.d/99-synaptics.conf"
           # Enforce stable-only package selection: do not inherit per-package
           # testing keyword exceptions from the downloaded Stage 3.
           sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
