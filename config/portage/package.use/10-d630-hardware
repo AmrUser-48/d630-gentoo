@@ -1,9 +1,9 @@
 # Intel GM965 / GMA X3100. Kernel CONFIG_DRM_I915 is configured separately.
-media-libs/mesa video_cards_intel
-x11-base/xorg-drivers video_cards_intel input_devices_evdev input_devices_libinput
+media-libs/mesa video_cards: intel
+x11-base/xorg-drivers video_cards: intel input_devices: evdev libinput
 
 # Legacy BIOS only for the D630.
-sys-boot/grub grub_platforms_pc
+sys-boot/grub grub_platforms: pc
 
 # Utilities installed in the temporary SSH builder.
 net-misc/openssh pam
