@@ -6,6 +6,7 @@
 # Main Gentoo root: everyday system. Portage stays available for package management;
 # compilers, headers, source trees and build caches are not part of the base image.
 app-shells/bash
+app-shells/bash-completion
 sys-apps/coreutils
 sys-apps/findutils
 sys-apps/grep
