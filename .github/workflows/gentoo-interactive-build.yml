@@ -147,7 +147,7 @@ jobs:
           root="$GENTOO_ROOT"
 
           sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package-sets" \
-            "$root/etc/portage/repos.conf" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
+            "$root/etc/portage/repos.conf" "$root/etc/portage/profile" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
             "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
@@ -155,6 +155,8 @@ jobs:
           fi
           sudo mkdir -p "$root/etc/portage/package.use"
           sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
+          # Override Gentoo's profile-forced LLVM targets for this deliberately minimal x86_64 builder.
+          sudo install -m 0644 config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force"
           sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh "$root/etc/bash/bashrc.d/10-portage-ask.sh"
           sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
           sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
@@ -192,6 +194,7 @@ jobs:
             echo '- CPU_FLAGS_X86: MMX, SSE, SSE2, SSE3, SSSE3 only (Core 2 T7250; not copied from the CI CPU).'
             echo '- OpenRC profile inherited from official Gentoo Stage 3.'
             echo '- FEATURES=parallel-fetch buildpkg; binary packages stored in /var/cache/binpkgs.'
+            echo '- LLVM backends reduced to X86 and SPIRV by a deliberate local package.use.force override.'
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
