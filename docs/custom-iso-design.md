@@ -37,6 +37,20 @@ GRUB should load a **single kernel file**. Embed a small initramfs in that kerne
 
 The embedded archive increases kernel size, but remains much smaller than duplicating the whole Gentoo userland. Ensure any dynamically linked early binaries have their loader and shared libraries inside the archive.
 
+## Persistence and Super Grub2 Disk loopback
+
+The live ISO must preserve changes by default. Use a compressed, immutable base and a writable overlay rather than trying to write into the ISO.
+
+1. Build the daily-use Gentoo runtime root, then create `/LiveOS/rootfs.squashfs` in the ISO. SquashFS is read-only; this keeps the distribution base compact.
+2. Embed the minimal `initramfs/init` into the Core 2 kernel (`CONFIG_INITRAMFS_SOURCE`); there is no separate initrd file.
+3. Put `iso/boot/grub/loopback.cfg` into the ISO at exactly `/boot/grub/loopback.cfg`. Super Grub2 Disk expects this path and passes the exported `iso_path` variable. The config finds the backing filesystem UUID with GRUB's `search`/`probe` commands and passes `d630.iso_uuid` and `d630.iso_path` to the kernel.
+4. Store a sparse ext4 file named `gentoo-data.img` in the **same host directory** as the ISO. Create it on the user’s existing writable disk with `scripts/create-persistence-image.sh /path/to/ISOs/gentoo-data.img 4G`. The filesystem inside the image stores `upper/` and `work/`; OverlayFS uses those directories to keep changed/new files, deletions, user settings and package changes between boots.
+5. If the image is missing or cannot mount, persistent mode must stop with an explicit error. A separate “temporary RAM-only” menu entry uses tmpfs so tests never overwrite the persistent profile. The debug entry adds `d630.debug=1 loglevel=7 ignore_loglevel`.
+6. The embedded `/init` needs the BusyBox `blkid`, `mount` (loop option), `switch_root` and shell applets; mount support for the host filesystem (ext4, Btrfs, NTFS3 or VFAT as built), ISO9660, SquashFS/loop and OverlayFS must be built into the kernel.
+7. The persistence image is user data, not a backup. Back it up before changing the base ISO or performing upgrades. Because root changes are layered over a read-only package base, a major base-image refresh can conflict with persistent package files. For long-term daily use, also publish an installable writable ext4/Btrfs root so standard Gentoo upgrades can be performed without a live overlay.
+
+Super Grub2 Disk documentation confirms the loopback config path and exported ISO path convention: https://www.supergrubdisk.org/wiki/Loopback.cfg. Alpine's `apkovl` is good for small configuration backups, but it does not by itself provide full root filesystem persistence; a whole-root OverlayFS image better matches the desired “boot and keep using the same desktop” behavior. See https://wiki.alpinelinux.org/wiki/Alpine_local_backup and https://wiki.alpinelinux.org/wiki/Alpine_Diskless_Mode.
+
 ## Required network functions
 
 - Wi-Fi: built-in Intel 3945ABG driver stack and firmware.
