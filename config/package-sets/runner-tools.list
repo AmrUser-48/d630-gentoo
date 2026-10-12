@@ -5,6 +5,7 @@ dev-vcs/git
 net-misc/rsync
 app-editors/nano
 app-misc/tmux
+app-misc/byobu
 app-misc/mc
 sys-apps/less
 sys-process/htop
