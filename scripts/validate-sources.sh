@@ -9,6 +9,9 @@ test -s initramfs/init
 test -s iso/boot/grub/loopback.cfg
 test -s config/kernel-cmdline.txt
 test -s config/portage/make.conf
+test -s config/portage/profile/package.use.force
+grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.force
+grep -Fq 'config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force"' .github/workflows/gentoo-interactive-build.yml
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
 
