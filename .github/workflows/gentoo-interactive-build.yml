@@ -252,8 +252,12 @@ jobs:
               PermitTunnel no
           EOF
 
+          # Ubuntu GitHub runners may not have sshd's privilege-separation dir.
+          # Create it before sshd -t so the daemon can validate and start.
+          sudo install -d -o root -g root -m 0755 /run/sshd
           sudo sshd -t
           sudo systemctl restart ssh
+          sudo systemctl is-active --quiet ssh
           sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
           sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
           ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" |
