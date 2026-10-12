@@ -14,6 +14,43 @@ A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with
 6. Prefer a reproducible, inspectable build pipeline and small incremental changes over a large untested one-shot build.
 7. Deliver a genuinely usable daily system, not a disposable rescue shell: persistent installed system files and user data are core requirements. Keep the live ISO as a testing/installation entry point, then produce and verify the disk-install target.
 
+## Interactive Gentoo build runner
+
+The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-interactive-build.yml) starts an ephemeral Ubuntu 24.04 GitHub-hosted runner, downloads the current official **amd64 glibc/OpenRC Stage 3**, installs the Portage configuration from this repository, syncs the Gentoo ebuild tree, and opens a private SSH session that drops directly into the Gentoo rootfs at `/opt/gentoo`. This is a chroot sharing the GitHub runner's Ubuntu kernel, not a virtual machine or a security-isolated Docker container; the runner is destroyed when the job ends.
+
+### Portage target settings
+
+- `CFLAGS/CXXFLAGS: -O2 -pipe -march=core2 -mtune=core2`; never use `-march=native` because the build host is newer than the D630.
+- `config/portage/package.use/00-core2-cpu` enables only MMX/MMXEXT/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
+- OpenRC profile is inherited from the official OpenRC Stage 3. The workflow copies the D630-specific USE flags in `config/portage/package.use/`.
+- Portage uses `MAKEOPTS=-j4`, one concurrent emerge job, parallel fetch, and `FEATURES=buildpkg`. Generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
+- The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
+
+### Start an interactive session
+
+1. Ensure repository Actions secrets `TAILSCALE_AUTHKEY` and `SSH_PUBLIC_KEY` exist. `SSH_PUBLIC_KEY` is the single-line public key from a client key such as `~/.ssh/id_ed25519_macos_runner.pub`; never upload the private key.
+2. Open **Actions → Gentoo — Interactive Build Runner → Run workflow**.
+3. Select the session duration (up to 300 minutes). Leave package set as `none` for an interactive-only session, or choose a package set and enable **Build the selected package set automatically** to start that build in the background while SSH stays open.
+4. Copy the SSH command from the run summary. It looks like:
+
+   ```bash
+   ssh -tt -i ~/.ssh/id_ed25519_macos_runner \
+     -o IdentitiesOnly=yes \
+     -o PreferredAuthentications=publickey \
+     -o PasswordAuthentication=no \
+     gentoo@TAILSCALE_IP
+   ```
+
+The login enters the Gentoo chroot as root, so you can run `emerge --sync`, `emerge -av category/package`, inspect `/etc/portage/make.conf`, and use `gentoo-build-set cli`, `gentoo-build-set development`, `gentoo-build-set desktop`, `gentoo-build-set multimedia`, or `gentoo-build-set daily-driver`. For a custom startup set, select `custom` and enter space- or comma-separated atoms such as `dev-vcs/git net-misc/curl`. Custom atoms are validated as package atoms; complex USE-dependency expressions should be added to Portage configuration explicitly.
+
+If a build was started automatically, watch it inside Gentoo with `tail -f /var/log/gentoo-build-set.log`; Portage's main log is `/var/log/emerge.log`. The runner can build for up to six hours total, including preparation and package compilation. Large sets such as `daily-driver` (Firefox, Xorg, Mesa and FFmpeg) can exceed that limit; start with smaller sets when you need to keep the interactive session available.
+
+Download the `gentoo-build-output-...` artifact before it expires (retention is one day). It contains generated binary packages, logs, and the effective Portage configuration. Binary packages are amd64 packages compiled with Core 2 flags for packages built from source; Stage 3's preinstalled base packages are not automatically rebuilt.
+
+### SquashFS naming is separate from persistence
+
+The live ISO's read-only base is named `/LiveOS/rootfs.squashfs` and keeps its `.squashfs` extension. The separate writable persistence layer is `gentoo-data.img`, an ext4 filesystem image next to the ISO. These are different formats with different jobs; the Gentoo build-runner workflow does not rename a SquashFS file to `.img`.
+
 ## Primary target hardware
 
 - **Laptop:** Dell Latitude D630.
