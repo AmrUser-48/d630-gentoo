@@ -1,0 +1,10 @@
+app-shells/zsh
+app-misc/lf
+app-misc/mc
+app-misc/tmux
+app-editors/neovim
+app-editors/nano
+sys-process/htop
+sys-process/btop
+sys-apps/fd
+sys-apps/ripgrep
