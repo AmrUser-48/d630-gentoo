@@ -54,7 +54,7 @@ for file in "${SET_FILES[@]}"; do
     done < "$path"
 done
 
-(("${#ATOMS[@]}" > 0)) || die "selected package set contains no atoms."
+(( ${#ATOMS[@]} > 0 )) || die "selected package set contains no atoms."
 printf 'Package set: %s\n' "$SET_NAME"
 printf 'Target compiler flags: '
 grep -E '^(COMMON_FLAGS|CFLAGS|CXXFLAGS)=' /etc/portage/make.conf || true
