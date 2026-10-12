@@ -454,7 +454,7 @@ jobs:
             exit 0
           fi
 
-          scripts/package-binpkgs-release.sh "$out/binpkgs" "$release"
+          bash scripts/package-binpkgs-release.sh "$out/binpkgs" "$release"
           {
             echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
             echo "CPU target: Intel Core 2 / Merom"
