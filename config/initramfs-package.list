@@ -7,3 +7,8 @@
 # The early MSR hook must not guess register numbers or values.
 sys-apps/busybox
 sys-apps/msr-tools
+
+# BusyBox must be built static with at least these applets enabled:
+# ash, blkid, cat, echo, find, grep, mount+loop, mkdir, sleep, switch_root, tr.
+# The host filesystem used to store the ISO and gentoo-data.img must have
+# built-in kernel support; OverlayFS upper/work live on ext4 inside the image.
