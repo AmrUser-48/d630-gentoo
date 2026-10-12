@@ -9,6 +9,7 @@ test -s initramfs/init
 test -s iso/boot/grub/loopback.cfg
 test -s config/kernel-cmdline.txt
 test -s config/portage/make.conf
+grep -Fq 'EMERGE_DEFAULT_OPTS="--ask --verbose --jobs=1 --load-average=4 --with-bdeps=y"' config/portage/make.conf
 test -s config/portage/profile/package.use.force
 grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.force
 grep -Fq 'config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force"' .github/workflows/gentoo-interactive-build.yml
@@ -52,6 +53,8 @@ grep -q 'd630.persistence=volatile' iso/boot/grub/loopback.cfg
 sh -n initramfs/init
 sh -n scripts/create-persistence-image.sh
 bash -n scripts/gentoo-build-set
+grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
+grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
 grep -q 'rootfs.squashfs' iso/boot/grub/loopback.cfg
 grep -q 'gentoo-data.img' iso/boot/grub/loopback.cfg
 ! grep -q '@SHELL@' config/package-sets/daily-driver.list
