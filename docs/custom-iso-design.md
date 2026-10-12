@@ -1,6 +1,6 @@
-# Custom ISO build design
+# D630 daily-use Gentoo system and ISO design
 
-This document records the first ISO strategy for the D630. It is a project plan, not evidence that an ISO has already been built or boot-tested.
+The primary product is a small, persistent Gentoo system for everyday use on the D630. The legacy-BIOS ISO is a live test/installation/recovery environment, not the only deliverable. This is a project plan, not evidence that the system has already been built or boot-tested.
 
 ## References and the Handbook's scope
 
@@ -18,11 +18,11 @@ Compile for Core 2 (-march=core2 -mtune=core2, kernel CONFIG_MCORE2=y). Build re
 
 Required built-in functionality includes the selected boot-device path, block layer, SATA/AHCI and ATAPI, USB host controller and USB storage, ISO9660, devtmpfs, tmpfs, procfs, sysfs, ext4/VFAT/NTFS3/Btrfs, i915, the iwl3945 stack, HDA codec path, USB HID, and USB RNDIS host networking. Verify exact Kconfig symbols against the pinned source with scripts/config, olddefconfig, and a final .config audit.
 
-## Chosen first image: minimal kernel-embedded initramfs
+## Boot and install architecture: minimal embedded initramfs plus persistent installed root
 
 GRUB should load a **single kernel file**. Embed a small initramfs in that kernel, but do not copy the full main system into it. The initramfs is early userspace, not a second copy of the rescue distribution.
 
-1. Build the full Gentoo runtime root in CI. Use `config/package.list` for the main Gentoo root: Bash, its maintained startup configuration, GNU coreutils/findutils/grep/sed/gawk, `less`, `file`, `lf`, mount tools, filesystem utilities, network tools and the desktop.
+1. Build the full Gentoo runtime root in CI. Use `config/package.list` for a practical daily environment: Bash, GNU utilities, `less`, `file`, `lf`, graphical file manager, browser, editor/Git, audio and media tools, mount/filesystem tools, Wi-Fi/network manager and lightweight desktop.
 2. Create a separate, minimal initramfs staging tree according to `config/initramfs-package.list`. Include an executable `/init`, a tiny shell/toolbox (prefer statically linked BusyBox), the mount/device setup needed before root handoff, and only tools needed before the full root is available.
 3. Include `wrmsr` from the Gentoo msr-tools package in the initramfs if the early CPU-throttling workaround is retained. Ensure `CONFIG_X86_MSR=y`, device-node creation and any required libraries are available. Do not guess the MSR register, bit mask or value: put the verified D630-specific write in a separately documented/configurable hook and keep it disabled until validated. An incorrect MSR write can alter CPU/platform behavior or hang the machine.
 4. Make `/init` mount devtmpfs, procfs and sysfs, wait only as needed for the MSR device and target CPU to be available, run the configured hook at the earliest safe point after kernel CPU initialization, then discover/mount the main root and switch to it. On failure, show the error and drop to a minimal emergency shell. Do not make root mounting depend on a separate initramfs file or module directory.
