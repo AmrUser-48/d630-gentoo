@@ -3,7 +3,8 @@
 # This is not a resolved dependency closure. Validate atoms and USE flags
 # against the selected Gentoo profile before starting the full build.
 
-# Main Gentoo root: daily-use shell and userland; Portage and toolchains remain build-only.
+# Main Gentoo root: everyday system. Portage stays available for package management;
+# compilers, headers, source trees and build caches are not part of the base image.
 app-shells/bash
 sys-apps/coreutils
 sys-apps/findutils
@@ -19,6 +20,7 @@ sys-process/htop
 
 sys-apps/dbus
 sys-apps/openrc
+sys-apps/portage
 sys-apps/util-linux
 sys-apps/pciutils
 sys-apps/usbutils
