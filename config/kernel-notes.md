@@ -19,23 +19,23 @@ This is a reasoned starting choice, not a claim that 6.18 has been tested on thi
 - Host bridge Intel PM965/GM965/GL960 `8086:2a00`; ICH8M LPC `8086:2815`.
 - Compile for Core 2 (`-march=core2 -mtune=core2`); never `-march=native` in CI.
 
-## Boot architecture: minimal embedded initramfs, no external initramfs file
+## Boot architecture: minimal embedded initramfs, read-only SquashFS plus persistent OverlayFS
 
-GRUB must load only the kernel image; the kernel embeds a small initramfs to run early userspace. Do **not** duplicate the full Gentoo shell environment in the embedded archive.
+The main ISO root is a compressed, read-only SquashFS at `/LiveOS/rootfs.squashfs`. The kernel embeds `initramfs/init` using `CONFIG_INITRAMFS_SOURCE`; this early userspace finds the ISO's backing filesystem from the Super Grub2 Disk kernel parameters, mounts the ISO and root SquashFS, then creates a writable OverlayFS root.
 
-- Set `CONFIG_BLK_DEV_INITRD=y` and `CONFIG_INITRAMFS_SOURCE` to the generated minimal cpio archive or staging tree. Verify the archive is embedded; the GRUB entry must not need an `initrd` command.
-- Include an executable `/init` and a tiny shell/toolbox, preferably statically linked BusyBox. It mounts devtmpfs, procfs and sysfs, initializes the console, runs configured early tasks, locates/mounts the main root, and hands off with `switch_root` or equivalent. If root handoff fails, show the error and provide an emergency shell.
-- The **main Gentoo root** (package candidates in `config/package.list`) contains Bash and its startup files, GNU coreutils/findutils/grep/sed/gawk, `less`, `file`, `lf` and its configuration, mount tools and filesystem-specific utilities. The separate `config/initramfs-package.list` contains only early-boot packages; do not duplicate the full userland there.
-- Include `wrmsr` from msr-tools in the initramfs only if needed for the early CPU-throttling workaround. Ensure `CONFIG_X86_MSR=y`, device-node setup, and the binary's runtime dependencies (or a tested static build).
-- Make the early MSR hook explicit and configurable. It can run after kernel CPU initialization and after `/dev/cpu/<N>/msr` becomes accessible, before main-root handoff. Do not guess the MSR number, mask or value; a wrong write may destabilize or hang the laptop. Keep it disabled by default until the exact D630-specific operation has been verified and tested with a recovery path.
-- Build all needed storage/filesystem drivers into the kernel: block layer, SATA/AHCI, IDE/ATAPI, SCSI disk, USB host and mass storage, partition parsing, ext4, Btrfs, NTFS3 and FAT/VFAT.
-- No `/lib/modules/<kernel-release>` tree is needed for the boot and mount path. Firmware needed before the main root is mounted must be embedded in the initramfs or otherwise made available to the built-in driver; Wi-Fi firmware is separate from driver code.
-- Test GRUB loading only the kernel, without external initramfs or a preexisting root partition argument. Verify the early init executes, the main root handoff succeeds, and the emergency shell works when the main root is intentionally unavailable.
-- Test reads from disposable ext4, Btrfs, NTFS3 and FAT volumes before testing writes.
+Required kernel support for the loopback live path must be built in (`=y`, not modules): `CONFIG_BLK_DEV_INITRD`, `CONFIG_BLK_DEV_LOOP`, `CONFIG_OVERLAY_FS`, `CONFIG_SQUASHFS`, the selected SquashFS decompressor (prefer Zstandard or XZ only after comparing image size/CPU cost), ISO9660, ext4, and the filesystem used by the partition containing the ISO/data image (ext4, Btrfs, NTFS3 or VFAT as supported). OverlayFS upper/work directories live inside an ext4 `gentoo-data.img`; do not use a plain FAT directory for OverlayFS upperdir because xattr/d_type semantics are unsuitable. The container image is not the live root: the built ISO contains the read-only rootfs and the self-contained kernel.
 
-## Daily-use installed root and live ISO root
+The GRUB entry is installed inside the ISO at `/boot/grub/loopback.cfg` (the name/path expected by Super Grub2 Disk). The repository source is `iso/boot/grub/loopback.cfg`. It provides three modes: persistent desktop (`d630.persistence=auto`), temporary RAM-only (`d630.persistence=volatile`), and persistent verbose/debug (`d630.debug=1 loglevel=7 ignore_loglevel`). The persistent entry expects a writable `gentoo-data.img` in the same directory as the ISO and must stop with an actionable error if the image is missing; it must never silently boot volatile and lose user changes.
 
-The installed daily-use system should live on a writable ext4 or Btrfs filesystem so user files, browser profiles, preferences and updates survive reboot. For the live ISO, use a compressed read-only SquashFS root with a writable overlay only if that layout is validated; enable `CONFIG_SQUASHFS=y` and the selected decompression codecs in the kernel. GRUB must remain legacy-BIOS compatible. The ISO is a test/installation/recovery entry point, not the only intended way to use the system.
+The custom `d630.*` kernel-command-line contract is documented in `config/kernel-cmdline.txt` and parsed from `/proc/cmdline` by the embedded `/init`. Keep paths to the ISO free of spaces for the first implementation. Super Grub2 Disk exports `iso_path`; the loopback config discovers the host filesystem UUID and passes both values to the kernel.
+
+### Persistence model
+
+- **Base:** `rootfs.squashfs` inside the ISO; read-only and compressed.
+- **Persistent changes:** a separate ext4 filesystem image named `gentoo-data.img`, stored beside the ISO. OverlayFS stores changed/new files and whiteouts in its `upper` directory; the `work` directory is on the same ext4 filesystem. User home/configuration, package database changes and installed files therefore persist.
+- **Volatile test mode:** a tmpfs upper/work area; all changes vanish at reboot.
+- **Create the image:** run `scripts/create-persistence-image.sh /path/to/ISOs/gentoo-data.img 4G` on a Linux system with `coreutils` and `e2fsprogs`. The file is sparse, but grows as real changes consume space. Keep free space on the host filesystem; FAT32 cannot hold a 4 GiB single file, so prefer ext4/Btrfs/NTFS or choose a smaller image.
+- **Backups and upgrades:** the data image is user data and is never overwritten automatically. Back it up before experimenting. Because the upper layer is tied to the base package set, test ISO upgrades carefully; package overlays can conflict with a substantially changed lower image. A later installer can provide a normal writable ext4/Btrfs root, which is the most robust long-term upgrade path for a daily-driver system.
 
 ## Confirmed devices and driver priorities
 
