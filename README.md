@@ -109,6 +109,16 @@ Notes and risks:
 4. **Do not copy the CI CPU's `cpuid2cpuflags` output.** It describes the newer runner, not the T7250.
 5. **Do not treat a successful source-validation workflow as a successful Gentoo emerge.** Validation checks repository inputs; only a real Portage pretend/build proves that the current ebuild graph and USE choices resolve.
 
+#### Kernel source selection
+
+For the current kernel-source plan, request the specific Gentoo source slot/version interactively:
+
+```bash
+emerge --ask --verbose sys-kernel/gentoo-sources:6.18.54
+```
+
+This is the requested kernel source atom, not a compiled/installed kernel by itself. Read the Portage plan before answering yes, and check the available ebuild if Portage reports that this exact version is unavailable or masked. Do not silently substitute a different version; verify the desired 6.18.y source first. After installing the sources, kernel configuration, compilation, installation and boot-loader setup remain separate steps.
+
 #### Verification commands for a resumed session
 
 Run these inside the Gentoo chroot before starting a long build:
