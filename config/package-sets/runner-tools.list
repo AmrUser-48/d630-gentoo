@@ -4,7 +4,6 @@ net-misc/openssh
 dev-vcs/git
 net-misc/rsync
 app-editors/nano
-app-misc/tmux
 app-misc/byobu
 app-misc/mc
 sys-apps/less
@@ -13,4 +12,5 @@ app-portage/gentoolkit
 app-portage/eix
 app-portage/portage-utils
 app-portage/ufed
+
 
