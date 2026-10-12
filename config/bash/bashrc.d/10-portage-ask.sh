@@ -1,5 +1,5 @@
-# Prompt before applying changes when emerge is run from an interactive Bash shell.
-# Automation scripts use explicit --ask=n or their own TTY-aware prompt policy.
+# Reinforce the interactive defaults from EMERGE_DEFAULT_OPTS in make.conf.
+# Non-interactive scripts do not read this interactive-shell alias.
 if [[ $- == *i* ]]; then
-    alias emerge='emerge --ask'
+    alias emerge='emerge --ask --verbose'
 fi
