@@ -1,0 +1,2 @@
+# Prefer GNU Screen as Byobu's backend; do not pull in tmux.
+app-misc/byobu screen
