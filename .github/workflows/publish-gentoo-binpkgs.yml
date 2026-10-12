@@ -1,0 +1,105 @@
+name: Publish existing Gentoo binpkgs artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Numeric run ID of a completed Gentoo Interactive Build Runner
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Turn a temporary build artifact into a persistent package release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out package exporter/importer
+        uses: actions/checkout@v4
+
+      - name: Validate source run ID
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || {
+            echo "source_run_id must be a numeric GitHub Actions run ID." >&2
+            exit 2
+          }
+
+      - name: Download the completed runner artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gentoo-build-output-${{ inputs.source_run_id }}
+          path: ${{ runner.temp }}/source-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install archive tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends zstd tar coreutils python3
+          sudo apt-get clean
+
+      - name: Package binpkgs into release-sized shards
+        id: package
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          source_dir="${{ runner.temp }}/source-artifact/binpkgs"
+          release_dir="${{ runner.temp }}/release-assets"
+          [[ -d "$source_dir" ]] || {
+            echo "The selected artifact contains no binpkgs/ directory." >&2
+            find "${{ runner.temp }}/source-artifact" -maxdepth 3 -type f | head -n 80 || true
+            exit 1
+          }
+          if ! find "$source_dir" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) -print -quit | grep -q .; then
+            echo "The selected run did not produce any Gentoo binary packages." >&2
+            exit 1
+          fi
+          mkdir -p "$release_dir"
+          scripts/package-binpkgs-release.sh "$source_dir" "$release_dir"
+          {
+            echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
+            echo "CPU target: Intel Core 2 / Merom"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Source workflow run: $SOURCE_RUN_ID"
+            echo "Source artifact: gentoo-build-output-$SOURCE_RUN_ID"
+            echo "Release tag: binpkgs-$SOURCE_RUN_ID"
+            echo "Package archives are shards of Portage PKGDIR. Extract them into the target PKGDIR and run 'emaint binhost --fix'."
+            echo "Only packages actually built in the source runner are included; Stage 3's preinstalled packages are not rebuilt automatically."
+          } > "$release_dir/BUILD-MANIFEST.txt"
+          (
+            cd "$release_dir"
+            sha256sum binpkgs-part-*.tar.zst PACKAGE-LIST.txt BUILD-MANIFEST.txt > SHA256SUMS
+          )
+          echo "has_packages=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish persistent GitHub Release
+        if: steps.package.outputs.has_packages == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: binpkgs-${{ inputs.source_run_id }}
+          name: "D630 Gentoo binary packages — run ${{ inputs.source_run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/release-assets/binpkgs-part-*.tar.zst
+            ${{ runner.temp }}/release-assets/PACKAGE-LIST.txt
+            ${{ runner.temp }}/release-assets/BUILD-MANIFEST.txt
+            ${{ runner.temp }}/release-assets/SHA256SUMS
