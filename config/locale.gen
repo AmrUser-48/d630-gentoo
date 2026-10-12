@@ -1,0 +1,2 @@
+# Generate only the UTF-8 locale used by the interactive builder and SSH clients.
+en_US.UTF-8 UTF-8
