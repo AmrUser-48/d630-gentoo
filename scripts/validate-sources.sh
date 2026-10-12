@@ -11,6 +11,9 @@ test -s config/kernel-cmdline.txt
 test -s config/portage/make.conf
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
+
+grep -Fq 'media-libs/mesa VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
+grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 test -s config/package-sets/runner-tools.list
 test -s config/package-sets/cli.list
 test -s config/package-sets/development.list
@@ -22,8 +25,8 @@ test -s .github/workflows/gentoo-interactive-build.yml
 
 grep -q 'march=core2' config/make.conf
 grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
-grep -q 'cpu_flags_x86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-core2-cpu
-! grep -Eq 'cpu_flags_x86:.*(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
+grep -q 'CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-core2-cpu
+! grep -Eq 'CPU_FLAGS_X86:.*(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'cpu_flags_x86_(sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 grep -q 'x11-base/xorg-server' config/package.list
 grep -q 'x11-wm/openbox' config/package.list
