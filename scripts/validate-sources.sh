@@ -13,6 +13,8 @@ grep -q 'march=core2' config/make.conf
 grep -q 'x11-base/xorg-server' config/package.list
 grep -q 'x11-wm/openbox' config/package.list
 grep -qi 'squashfs' config/kernel-notes.md
+grep -q 'CONFIG_OVERLAY_FS=y' config/kernel-notes.md
+grep -q 'CONFIG_BLK_DEV_LOOP=y' config/kernel-notes.md
 grep -q 'd630.persistence=auto' iso/boot/grub/loopback.cfg
 grep -q 'd630.persistence=volatile' iso/boot/grub/loopback.cfg
 sh -n initramfs/init
