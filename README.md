@@ -23,7 +23,7 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - `CFLAGS/CXXFLAGS: -O2 -pipe -march=core2 -mtune=core2`; never use `-march=native` because the build host is newer than the D630.
 - `config/portage/package.use/00-core2-cpu` enables only MMX/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
 - OpenRC profile is inherited from the official OpenRC Stage 3. The workflow copies the D630-specific USE flags in `config/portage/package.use/`.
-- Portage uses `MAKEOPTS=-j4`, one concurrent emerge job, parallel fetch, and `FEATURES=buildpkg`. Generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
+- Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, `--load-average=4`, parallel fetch, and `FEATURES=buildpkg`. This makes each interactive package plan visible for review before it is applied. Automated operations explicitly disable prompting; generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
 ### D630 USE flags and Mesa/LLVM troubleshooting
@@ -129,7 +129,7 @@ emerge --ask --pretend --verbose --tree llvm-core/llvm llvm-core/clang \
 emerge --ask --pretend --changed-use --deep @world
 ```
 
-Do not launch the final `@world` rebuild merely to diagnose one package: its dependency closure may be large. First check the Mesa pretend output and the exact forced-target list. Interactive shells use the configured `emerge --ask` alias; automation must explicitly use non-interactive options so it does not hang waiting for input.
+Do not launch the final `@world` rebuild merely to diagnose one package: its dependency closure may be large. First check the Mesa pretend output and the exact forced-target list. Interactive shells inherit `--ask --verbose` from `EMERGE_DEFAULT_OPTS` and reinforce those options through the Bash alias. The `gentoo-build-set` script uses `--ignore-default-opts --ask=n --verbose` when it has no TTY, and the workflow ignores defaults for its non-interactive repository sync, so automation cannot hang on the global `--ask`.
 
 References: [Gentoo Handbook — base installation and VIDEO_CARDS](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base#VIDEO_CARDS), [Gentoo profile semantics](https://wiki.gentoo.org/wiki/Profile_(Portage)), and [Gentoo discussion of LLVM target unforcing](https://forums.gentoo.org/viewtopic-p-8694335.html).
 
