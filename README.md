@@ -23,7 +23,7 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - `CFLAGS/CXXFLAGS: -O2 -pipe -march=core2 -mtune=core2`; never use `-march=native` because the build host is newer than the D630.
 - `config/portage/package.use/00-core2-cpu` enables only MMX/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
 - OpenRC profile is inherited from the official OpenRC Stage 3. The workflow copies the D630-specific USE flags in `config/portage/package.use/`.
-- Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, `--load-average=4`, parallel fetch, and `FEATURES=buildpkg`. This makes each interactive package plan visible for review before it is applied. Automated operations explicitly disable prompting; generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
+- Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, `--load-average=4`, parallel fetch, and `FEATURES=buildpkg`. Each interactive package plan is visible before it is applied. Built packages are retained in `/var/cache/binpkgs`, exported in persistent `binpkgs-<RUN_ID>` Releases, and also included in a short-lived Actions artifact for recovery.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
 ### D630 USE flags and Mesa/LLVM troubleshooting
@@ -164,6 +164,49 @@ If a build was started automatically, watch it inside Gentoo with `tail -f /var/
 
 Download the `gentoo-build-output-...` artifact before it expires (retention is one day). It contains generated binary packages, logs, and the effective Portage configuration. Binary packages are amd64 packages compiled with Core 2 flags for packages built from source; Stage 3's preinstalled base packages are not automatically rebuilt.
 
+### Persistent binary packages for the D630
+
+The interactive runner now publishes packages that were built during its session to a persistent GitHub Release. This avoids putting large binary files into Git history and avoids relying on the one-day Actions artifact retention.
+
+- Each runner run with at least one built Gentoo binary package creates a prerelease tagged `binpkgs-<RUN_ID>`.
+- Release assets include `binpkgs-part-NNN.tar.zst` shards, `PACKAGE-LIST.txt`, `BUILD-MANIFEST.txt`, and `SHA256SUMS`. Each shard is kept below 2 GB and preserves the category/package paths from Portage's `PKGDIR`.
+- Only packages actually built on that runner are included. The untouched stage3 base packages are not magically rebuilt. A release is a durable package export, not a complete installable Gentoo root and not yet an always-online Portage binhost.
+- After extraction, the importer runs `emaint binhost --fix` to rebuild the local `Packages` index, then you can use normal Portage dependency resolution with `--usepkgonly`.
+
+#### Save the currently running session's packages
+
+The current runner session was started before automatic release publishing was added. To preserve its packages:
+
+1. Let the Gentoo runner finish so its `gentoo-build-output-<RUN_ID>` Actions artifact is uploaded. Copy the numeric run ID from the Actions run page.
+2. Open **Actions → Publish existing Gentoo binpkgs artifact → Run workflow**, enter that run ID as `source_run_id`, and start it. The workflow downloads the temporary artifact and publishes the persistent `binpkgs-<RUN_ID>` Release.
+3. Do this before that source artifact expires (one day). The publishing workflow cannot rescue an artifact that GitHub has already deleted.
+
+For future sessions, the interactive runner publishes the release automatically at the end whenever it has binpkgs.
+
+#### Import released packages into a Gentoo installation
+
+Check that the effective Portage `PKGDIR` has enough free space first. If needed, change `PKGDIR` in `/etc/portage/make.conf` to a directory on a larger filesystem before importing.
+
+Download the importer from the repository and run it as root, passing the source runner's numeric run ID (or the full `binpkgs-<RUN_ID>` tag):
+
+```bash
+curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/scripts/install-binpkgs-release.sh \
+  -o /usr/local/sbin/install-d630-binpkgs
+chmod 0755 /usr/local/sbin/install-d630-binpkgs
+/usr/local/sbin/install-d630-binpkgs <RUN_ID>
+```
+
+The importer downloads one shard at a time, checks it against `SHA256SUMS`, extracts it into the configured `PKGDIR`, and deletes each downloaded shard to limit temporary disk use. Run it as root; it does not install packages by itself.
+
+Preview and install only from matching local binary packages:
+
+```bash
+emerge --ask --verbose --usepkgonly --pretend app-misc/mc sys-apps/ripgrep
+emerge --ask --verbose --usepkgonly app-misc/mc sys-apps/ripgrep
+```
+
+`--usepkgonly` prevents falling back to compiling missing packages. If Portage reports a missing binary, its dependency was not built/published in that release, or its USE/profile/ABI settings do not match the target. Use a package set that builds the required dependency closure, or compile only the missing pieces deliberately.
+
 ### SquashFS naming is separate from persistence
 
 The live ISO's read-only base is named `/LiveOS/rootfs.squashfs` and keeps its `.squashfs` extension. The separate writable persistence layer is `gentoo-data.img`, an ext4 filesystem image next to the ISO. These are different formats with different jobs; the Gentoo build-runner workflow does not rename a SquashFS file to `.img`.
@@ -264,7 +307,10 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 - `config/kernel-notes.md`: confirmed kernel/device requirements and built-in driver priorities.
 - `docs/custom-iso-design.md`: Gentoo Handbook references, kernel baseline, direct ISO9660-root strategy and initramfs trade-offs.
 - `docs/hardware-inventory.md`: PCI/USB IDs, codec details, Mesa baseline, outstanding device identification and hardware collection notes.
-- `scripts/validate-sources.sh`: basic scaffold checks.
+- `scripts/validate-sources.sh`: source/configuration checks.
+- `scripts/package-binpkgs-release.sh`: shard built packages into persistent GitHub Release assets.
+- `scripts/install-binpkgs-release.sh`: verify and import a package release into the target's configured Portage `PKGDIR`.
+- `.github/workflows/publish-gentoo-binpkgs.yml`: publish packages from an existing, still-retained runner artifact.
 - `.github/workflows/validate.yml`: source validation only, not a Gentoo build.
 
 ## Instructions for AI coding agents
