@@ -23,6 +23,7 @@ test -s .github/workflows/gentoo-interactive-build.yml
 grep -q 'march=core2' config/make.conf
 grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
 grep -q 'cpu_flags_x86_ssse3' config/portage/package.use/00-core2-cpu
+! grep -Eq 'cpu_flags_x86_(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'cpu_flags_x86_(sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 grep -q 'x11-base/xorg-server' config/package.list
 grep -q 'x11-wm/openbox' config/package.list
