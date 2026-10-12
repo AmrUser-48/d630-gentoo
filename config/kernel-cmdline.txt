@@ -1,0 +1,35 @@
+# D630 Gentoo kernel command-line contract.
+# Implement these d630.* options in the kernel-embedded /init.
+# Super Grub2 Disk's loopback.cfg passes the actual values.
+
+# Normal daily-use session with persistent root changes:
+d630.iso_uuid=<filesystem-uuid-containing-iso>
+d630.iso_path=/path/without-spaces/d630-gentoo.iso
+d630.persistence=auto
+d630.datafile=gentoo-data.img
+d630.rootfs=/LiveOS/rootfs.squashfs
+ro quiet loglevel=3
+
+# Temporary RAM-only session; all changes are lost on reboot:
+d630.persistence=volatile
+
+# Verbose initramfs and kernel logs:
+d630.debug=1 loglevel=7 ignore_loglevel
+
+# Required implementation contract for embedded /init:
+# 1. Parse /proc/cmdline and validate all d630.* values.
+# 2. Mount the host filesystem identified by d630.iso_uuid at /run/bootdev.
+# 3. Find d630.iso_path and mount the ISO read-only.
+# 4. Mount d630.rootfs from that ISO as the read-only OverlayFS lowerdir.
+# 5. With persistence=auto, mount d630.datafile as an ext4 loop image from
+#    the directory containing the ISO; make /upper and /work inside it.
+# 6. Mount OverlayFS with lowerdir=<SquashFS root>, upperdir=/upper,
+#    workdir=/work and switch_root into the merged root.
+# 7. With persistence=volatile, put upperdir/workdir on tmpfs instead.
+# 8. In persistent mode, fail visibly rather than silently falling back to
+#    RAM if the image is missing, cannot be mounted, or lacks free space.
+#
+# Keep paths to the ISO and data image free of spaces for the first version.
+# The backing partition must be writable and able to store gentoo-data.img.
+# Its filesystem must be supported by the kernel/initramfs; the filesystem
+# INSIDE gentoo-data.img is ext4 so OverlayFS xattrs and d_type are available.
