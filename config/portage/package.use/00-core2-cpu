@@ -2,4 +2,4 @@
 # Gentoo spelling is cpu_flags_x86_*; only enable instruction sets supported
 # by the target. Keep these as package.use flags rather than trusting
 # cpuid2cpuflags on a GitHub Actions runner.
-*/* cpu_flags_x86_mmx cpu_flags_x86_mmxext cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 cpu_flags_x86_ssse3
+*/* cpu_flags_x86_mmx cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 cpu_flags_x86_ssse3
