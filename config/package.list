@@ -35,7 +35,8 @@ app-editors/nano
 app-misc/mc
 app-cdr/cdrtools
 dev-libs/libisoburn
-app-misc/tmux
+app-misc/screen
+app-misc/byobu
 app-admin/sudo
 net-misc/openssh
 net-misc/rsync
