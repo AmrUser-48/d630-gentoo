@@ -26,6 +26,113 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - Portage uses `MAKEOPTS=-j4`, one concurrent emerge job, parallel fetch, and `FEATURES=buildpkg`. Generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
+### D630 USE flags and Mesa/LLVM troubleshooting
+
+This section records decisions and failure modes from the interactive Gentoo session. Use the checked-in configuration as the source of truth; a running GitHub Actions chroot does **not** receive repository changes automatically. Restart the workflow to get the new configuration, or edit the current chroot manually.
+
+#### Baseline and CPU flags
+
+`config/portage/make.conf` is deliberately small:
+
+- `ACCEPT_KEYWORDS="amd64"`: stable amd64 ebuilds only. Do not add `~amd64` globally or add per-package testing keywords as a shortcut around a build problem.
+- `CFLAGS/CXXFLAGS/FCFLAGS/FFLAGS="-O2 -pipe -march=core2 -mtune=core2"`; Rust uses `RUSTFLAGS="-C target-cpu=core2"`. Never use `-march=native` on the GitHub runner.
+- `USE="X alsa dbus udev -systemd -wayland"`: an OpenRC/X11 target, not a global systemd/Wayland desktop.
+- `MAKEOPTS="-j4"`, one concurrent Portage job, `FEATURES="parallel-fetch buildpkg"`, and binpkgs under `/var/cache/binpkgs`.
+
+`config/portage/package.use/00-core2-cpu` is intentionally not generated from the remote runner's CPUID:
+
+```text
+*/* CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3
+```
+
+The T7250 is Core 2/Merom. Do not enable SSE4, AES, AVX, or other instructions the CPU does not support. `CPU_FLAGS_X86` describes optional package code paths; it is not a replacement for `-march=core2`.
+
+#### Put VIDEO_CARDS in package.use, not make.conf
+
+Gentoo treats `VIDEO_CARDS` as a USE_EXPAND setting. The current Handbook recommends the per-package `/etc/portage/package.use` method; a global `VIDEO_CARDS="i915 intel"` in `make.conf` applies choices too broadly and makes package-specific selection harder. Do not try to use negative card names in that global variable as a filtering mechanism. In `package.use`, the `-*` reset and positive values are the intended syntax.
+
+The intended D630 settings are in `config/portage/package.use/10-d630-hardware`:
+
+```text
+# Mesa for Intel GM965 / GMA X3100 (Gen 4): Crocus.
+media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
+
+# Xorg modesetting plus the optional legacy Intel DDX.
+x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
+
+# Input support; Synaptics is preferred for the D630 touchpad by Xorg config.
+x11-base/xorg-drivers INPUT_DEVICES: -* evdev libinput synaptics
+x11-base/xorg-server -minimal
+
+# Legacy BIOS only.
+sys-boot/grub GRUB_PLATFORMS: pc
+```
+
+Important distinctions:
+
+- For the GM965/GMA X3100, `intel` is the Mesa video-card option for the Intel Gen4 hardware driver (Crocus).
+- `i915` under `x11-base/xorg-drivers` selects the legacy `xf86-video-intel` Xorg driver as an alternative to the Xorg server's built-in modesetting driver. It is **not** the kernel `i915` DRM driver and is not the same as Mesa's `video_cards_i915` Gallium driver.
+- Do not enable Mesa's `video_cards_i915` just because the kernel module is named `i915`; for this hardware the target is `VIDEO_CARDS: -* intel`.
+- Avoid global AMD, Radeon, NVIDIA, Asahi, Panfrost, VirGL and other unrelated GPU options. They are not part of the D630 target. In a verbose emerge plan, a card shown with a leading minus is disabled; a card shown in parentheses is profile-forced and needs separate investigation.
+
+#### LLVM target pruning: why the dependency still appears
+
+There are two different goals: disable LLVM-based **runtime rendering** that is not needed by this laptop, and reduce LLVM/Clang **build-time targets**. They are related but not interchangeable.
+
+The current package USE choices are intended to disable Mesa's LLVM/llvmpipe software renderer and Vulkan/lavapipe runtime path. However, the current Gentoo Mesa ebuild can still pull in `dev-util/mesa_clc`, `llvm-core/clang`, `llvm-core/llvm` and `llvm-runtimes/libclc` as **build dependencies** for the Intel/SPIR-V helper path. Seeing LLVM in the dependency tree therefore does not, by itself, mean the final graphics setup will use llvmpipe or a Vulkan software renderer. Do not claim LLVM is absent just because `media-libs/mesa -llvm` is set.
+
+The relevant checked-in settings are:
+
+```text
+media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
+llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV
+llvm-core/clang LLVM_TARGETS: -* X86 SPIRV
+dev-util/mesa_clc LLVM_SLOT: -* 22
+dev-util/mesa_clc VIDEO_CARDS: -*
+llvm-runtimes/libclc VIDEO_CARDS: -*
+```
+
+Notes and risks:
+
+- Gentoo's base profile force-enables many `LLVM_TARGETS` flags because arbitrarily disabling LLVM backends can break reverse dependencies, including Clang, LLD and Rust. Forced flags often appear in parentheses in `emerge -pv` output and cannot be removed by an ordinary `package.use` line alone.
+- `config/portage/profile/package.use.force` deliberately unforces unrelated LLVM targets for this size-constrained x86_64 builder. This is an opt-in deviation from Gentoo's defensive defaults, not a universally safe recommendation. Keep the native `X86` and the required `SPIRV` support; review this override after every repository sync because Gentoo may add new LLVM target names.
+- Validate the actual target list in the emerge plan rather than assuming the profile override worked. If new targets remain forced, inspect the current `/var/db/repos/gentoo/profiles/base/package.use.force` and update the local override with the current target names. Be prepared to rebuild affected LLVM consumers, particularly Clang/LLD/Rust, if their target configuration changes.
+- Keep the `LLVM_SLOT` selection for `dev-util/mesa_clc`. Setting the whole package to `dev-util/mesa_clc -*` is wrong: it removes the required slot choice and can produce a `REQUIRED_USE` error such as `exactly-one-of ( llvm_slot_18 ... llvm_slot_22 )`. The intended current setting is `LLVM_SLOT: -* 22`; re-check the available slot if the Gentoo tree has moved to a newer Mesa/LLVM generation.
+- `llvm-runtimes/libclc` may still show `USE="spirv"`. That is not evidence that AMD or NVIDIA drivers are enabled; the important check is that its `VIDEO_CARDS` list does not enable `radeonsi`, `r600`, `nvidia`, or other unwanted targets.
+- A local `VIDEO_CARDS: -* intel` setting selects requested options; it does not guarantee that every build dependency is absent. Ebuild `DEPEND`/`BDEPEND` declarations still determine what Portage must build.
+
+#### Past mistakes: do not repeat
+
+1. **Do not mask `>=media-libs/mesa-24.0.0` to get the desired driver.** That masks Mesa 24.0.0 and newer, including later stable releases; it can leave Portage with no acceptable Mesa candidate. Remove that mask unless the deliberate intent is to block every version in that range.
+2. **Do not set `dev-util/mesa_clc -*`.** Keep its exactly-one-of LLVM slot requirement satisfied with `LLVM_SLOT: -* 22` (or the slot required by the current ebuild).
+3. **Do not assume `-llvm` means no LLVM packages are installed or built.** It controls the Mesa USE-dependent path; build-time helpers can still depend on LLVM/Clang.
+4. **Do not copy the CI CPU's `cpuid2cpuflags` output.** It describes the newer runner, not the T7250.
+5. **Do not treat a successful source-validation workflow as a successful Gentoo emerge.** Validation checks repository inputs; only a real Portage pretend/build proves that the current ebuild graph and USE choices resolve.
+
+#### Verification commands for a resumed session
+
+Run these inside the Gentoo chroot before starting a long build:
+
+```bash
+# Inspect local choices and profile overrides.
+grep -R -nE 'VIDEO_CARDS|LLVM_TARGETS|LLVM_SLOT|CPU_FLAGS_X86|media-libs/mesa|mesa_clc|libclc' \
+  /etc/portage/make.conf /etc/portage/package.use /etc/portage/profile 2>/dev/null
+
+# Check the effective Mesa flags and dependency tree; this does not build anything.
+emerge --ask --pretend --verbose --tree --oneshot media-libs/mesa
+
+# Inspect LLVM/Clang targets and the helper packages if the plan is unexpectedly large.
+emerge --ask --pretend --verbose --tree llvm-core/llvm llvm-core/clang \
+  dev-util/mesa_clc llvm-runtimes/libclc
+
+# Review the complete rebuild impact before committing to changed USE flags.
+emerge --ask --pretend --changed-use --deep @world
+```
+
+Do not launch the final `@world` rebuild merely to diagnose one package: its dependency closure may be large. First check the Mesa pretend output and the exact forced-target list. Interactive shells use the configured `emerge --ask` alias; automation must explicitly use non-interactive options so it does not hang waiting for input.
+
+References: [Gentoo Handbook — base installation and VIDEO_CARDS](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base#VIDEO_CARDS), [Gentoo profile semantics](https://wiki.gentoo.org/wiki/Profile_(Portage)), and [Gentoo discussion of LLVM target unforcing](https://forums.gentoo.org/viewtopic-p-8694335.html).
+
 ### Start an interactive session
 
 1. Ensure repository Actions secrets `TAILSCALE_AUTHKEY` and `SSH_PUBLIC_KEY` exist. `SSH_PUBLIC_KEY` is the single-line public key from a client key such as `~/.ssh/id_ed25519_macos_runner.pub`; never upload the private key.
