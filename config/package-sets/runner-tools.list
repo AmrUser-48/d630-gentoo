@@ -4,6 +4,7 @@ net-misc/openssh
 dev-vcs/git
 net-misc/rsync
 app-editors/nano
+app-shells/bash-completion
 app-misc/screen
 app-misc/byobu
 app-misc/mc
