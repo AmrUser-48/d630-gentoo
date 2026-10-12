@@ -1,0 +1,6 @@
+dev-vcs/git
+dev-util/cmake
+dev-util/ninja
+sys-devel/gdb
+app-editors/neovim
+app-editors/geany
