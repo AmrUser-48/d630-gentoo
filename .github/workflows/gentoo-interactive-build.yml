@@ -206,9 +206,9 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
-          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' >"$log" 2>&1; then
+          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' |& tee "$log"; then
             echo 'Builder utilities installed.' | tee -a "$GITHUB_STEP_SUMMARY"
-            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' >>"$log" 2>&1 || true
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' |& tee -a "$log" || true
           else
             echo 'WARNING: one or more optional builder utilities failed to build. SSH remains available; inspect runner-tools.log.' |
               tee -a "$GITHUB_STEP_SUMMARY"
