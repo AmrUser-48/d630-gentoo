@@ -67,6 +67,43 @@ All required hardware drivers should be built into the kernel (`=y`) for the int
 - Avoid unrelated DVB, AMD and NVIDIA driver families. **Do not add Ethernet drivers.**
 - Inspect the final `.config`, `vmlinux`/kernel size, firmware requests and boot logs. Test the ISO before each further pruning pass.
 
+## Gentoo kernel configuration procedure
+
+The source package planned for this build is `sys-kernel/gentoo-sources:6.18.54`. Emerging it only installs source files; it does not configure, compile, install, or boot a kernel.
+
+### Configuration seed and important differences
+
+A D630-specific configuration fragment already exists in the companion repository `AmrUser-48/linux`, at `arch/x86/configs/d630.config`. It was designed to be merged over the upstream `x86_64_defconfig`, followed by `make olddefconfig`. Treat it as a useful starting fragment, **not as a finished Gentoo/ISO configuration**.
+
+That fragment needs explicit reconciliation before using it for this Gentoo target:
+
+- Enable Bluetooth core/support rather than inheriting `CONFIG_BLUETOOTH=n` and `CONFIG_BT=n`. Keep the core enabled even though the exact adapter has not yet been identified.
+- Enable the ISO/live-image path built in: `CONFIG_BLK_DEV_INITRD=y`, loop-device support, `CONFIG_OVERLAY_FS=y`, `CONFIG_SQUASHFS=y`, SquashFS Zstandard decompression, ISO9660/Joliet, devtmpfs, tmpfs, ext4, Btrfs, NTFS3 and VFAT. The existing generic D630 fragment currently has `CONFIG_SQUASHFS=n` and does not by itself enable the complete overlay path.
+- Build target-critical storage, USB host, USB mass storage, RNDIS/CDC tethering, joystick interface, Intel 3945ABG Wi-Fi stack, Intel i915 graphics, HDA/SigmaTel audio, ACPI and filesystems in (`=y`) where their Kconfig dependencies allow it. Do not leave a required early-boot driver as `=m`.
+- Disable the Broadcom `TIGON3` wired Ethernet driver; wired Ethernet is out of project scope. Do not carry it over just because it appears in the other repository's older fragment.
+- Set `CONFIG_MCORE2=y`, `CONFIG_X86_MSR=y`, the schedutil governor as the default, built-in zram with LZ4, and the required legacy BIOS/framebuffer path. Disable EFI/EFI stub for this legacy-BIOS target.
+- Keep unrelated DVB/video-capture, AMD/NVIDIA GPU, broad networking, and unused hardware-driver families disabled. Do not apply a blanket module-pruning script unless the built-in requirements have first been checked against the resulting config.
+
+### Build procedure
+
+1. In the interactive Gentoo chroot, install the pinned source package only after reviewing Portage's plan:
+
+   ```bash
+   emerge --ask sys-kernel/gentoo-sources:6.18.54
+   ```
+
+2. In the build workflow, start from the source tree's `x86_64_defconfig`, merge the checked-in D630 configuration fragment plus a **Gentoo-specific override fragment** for the differences above, then run `make olddefconfig`. Save the final generated `.config` as a build artifact and validate important symbols programmatically. Do not use the GitHub runner's `/boot/config-$(uname -r)`, `localmodconfig`, or hardware probing as a target profile: the runner is not the D630 and its virtual devices are not the laptop's devices.
+
+3. Enable the Gentoo kernel integration options for Gentoo and script-based init systems (including OpenRC) that are offered by the exact `gentoo-sources` version. Keep the configuration buildable with that exact source version; symbol names and dependencies can change.
+
+4. Pass the repository's `initramfs/init` into the kernel build through `CONFIG_INITRAMFS_SOURCE` (or the build system's equivalent reproducible cpio-input step), so the ISO can boot with a single kernel file. Validate that the archive contains an executable `/init` and all tools/files needed before handing off to the SquashFS/OverlayFS root.
+
+5. Build the kernel and verify `arch/x86/boot/bzImage`, the effective `.config`, its size, and the generated initramfs contents. Publish these as artifacts for inspection. The Gentoo builder chroot shares the Ubuntu runner's kernel, so **do not attempt to install or boot the target kernel inside that chroot**.
+
+6. For this ISO workflow, package/copy the resulting `bzImage` into the ISO tree directly. `sys-kernel/installkernel` is useful if managing a manually built kernel on an installed Gentoo system and using `make install`; it is not a substitute for building or validating the custom ISO. Keep a known-working kernel as a fallback when testing on the actual D630.
+
+Initial debug-friendly build policy: keep `CONFIG_MODULES=y` while validating the first configuration, but build all required D630 and early-boot drivers in. Do not install a broad `/lib/modules` tree into the final image. Only consider disabling module support entirely after boot, networking, graphics, suspend and the live-root handoff have been tested. This is safer than blindly turning every `=m` symbol off before checking dependencies.
+
 ## Firmware and graphics tests
 
 - Required Wi-Fi firmware confirmed by dmesg: `iwlwifi-3945-2.ucode`; include regulatory database files.
