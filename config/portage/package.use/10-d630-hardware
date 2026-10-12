@@ -1,6 +1,11 @@
 # Dell D630: Intel GM965 / GMA X3100 (Gen 4).
 # Mesa Crocus is the hardware OpenGL driver. Disable LLVM/llvmpipe and Vulkan/lavapipe.
 media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
+# Mesa's Intel build helper still uses LLVM/Clang at build time; keep only native x86 and SPIR-V targets.
+llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV
+llvm-core/clang LLVM_TARGETS: -* X86 SPIRV
+# libclc is only needed as Mesa's build helper here; do not build AMD/NVIDIA target libraries.
+llvm-runtimes/libclc VIDEO_CARDS: -*
 
 # Xorg: Intel graphics via the built-in modesetting DDX, plus legacy Intel DDX as an alternate.
 # On xorg-drivers, "intel" selects xorg-server/modesetting and "i915" selects xf86-video-intel.
