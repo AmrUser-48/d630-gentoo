@@ -1,0 +1,4 @@
+# This is an intentional override of Gentoo's base profile, which force-enables
+# nearly all LLVM targets for safety. This builder targets x86_64 and SPIR-V only.
+# Keep X86 and SPIRV enabled; unforce unrelated LLVM backends to reduce build size.
+*/* LLVM_TARGETS: -AArch64 -AMDGPU -ARM -AVR -BPF -Hexagon -Lanai -LoongArch -MSP430 -Mips -NVPTX -PowerPC -RISCV -Sparc -SystemZ -VE -WebAssembly -XCore
