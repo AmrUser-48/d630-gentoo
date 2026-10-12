@@ -21,7 +21,7 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 ### Portage target settings
 
 - `CFLAGS/CXXFLAGS: -O2 -pipe -march=core2 -mtune=core2`; never use `-march=native` because the build host is newer than the D630.
-- `config/portage/package.use/00-core2-cpu` enables only MMX/MMXEXT/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
+- `config/portage/package.use/00-core2-cpu` enables only MMX/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
 - OpenRC profile is inherited from the official OpenRC Stage 3. The workflow copies the D630-specific USE flags in `config/portage/package.use/`.
 - Portage uses `MAKEOPTS=-j4`, one concurrent emerge job, parallel fetch, and `FEATURES=buildpkg`. Generated binary packages are stored under `/var/cache/binpkgs` and uploaded as a short-lived Actions artifact after the session.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
