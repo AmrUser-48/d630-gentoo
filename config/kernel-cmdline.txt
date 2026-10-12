@@ -8,7 +8,7 @@ d630.iso_path=/path/without-spaces/d630-gentoo.iso
 d630.persistence=auto
 d630.datafile=gentoo-data.img
 d630.rootfs=/LiveOS/rootfs.squashfs
-ro quiet loglevel=3
+quiet loglevel=3
 
 # Temporary RAM-only session; all changes are lost on reboot:
 d630.persistence=volatile
@@ -18,7 +18,7 @@ d630.debug=1 loglevel=7 ignore_loglevel
 
 # Required implementation contract for embedded /init:
 # 1. Parse /proc/cmdline and validate all d630.* values.
-# 2. Mount the host filesystem identified by d630.iso_uuid at /run/bootdev.
+# 2. Mount the host filesystem identified by d630.iso_uuid at /run/d630/bootdev.
 # 3. Find d630.iso_path and mount the ISO read-only.
 # 4. Mount d630.rootfs from that ISO as the read-only OverlayFS lowerdir.
 # 5. With persistence=auto, mount d630.datafile as an ext4 loop image from
