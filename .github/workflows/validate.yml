@@ -17,3 +17,6 @@ jobs:
         run: |
           chmod +x scripts/validate-sources.sh
           ./scripts/validate-sources.sh
+
+      - name: Lint GitHub Actions workflow syntax
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color
