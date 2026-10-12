@@ -128,7 +128,6 @@ if [ "$persistence" = auto ]; then
         fail "cannot create OverlayFS upper/work directories in $datafile"
     upper=/mnt/persist/upper
     work=/mnt/persist/work
-    backing= persist
 else
     log "Using temporary tmpfs overlay; changes will be lost on reboot"
     mount -t tmpfs -o mode=0755,size=50% tmpfs /mnt/volatile ||
@@ -136,7 +135,6 @@ else
     mkdir -p /mnt/volatile/upper /mnt/volatile/work
     upper=/mnt/volatile/upper
     work=/mnt/volatile/work
-    backing=volatile
 fi
 
 log "Creating merged writable root (persistence=$persistence)"
