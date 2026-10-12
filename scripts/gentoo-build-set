@@ -62,4 +62,12 @@ printf 'Requested atoms (%s):\n' "${#ATOMS[@]}"
 printf '  %s\n' "${ATOMS[@]}"
 printf '\nStarting Portage; logs are in /var/log/emerge.log and the workflow runner log.\n'
 
-exec emerge --ask=n --quiet --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
+# Ask before changing the live root when invoked interactively over SSH.
+# Background GitHub Actions builds have no TTY and must never wait for input.
+if [[ -t 0 && -t 1 ]]; then
+    ASK_OPT=(--ask)
+else
+    ASK_OPT=(--ask=n)
+fi
+
+exec emerge "${ASK_OPT[@]}" --quiet --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
