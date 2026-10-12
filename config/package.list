@@ -33,6 +33,8 @@ sys-block/parted
 sys-boot/grub
 app-editors/nano
 app-misc/mc
+app-cdr/cdrtools
+dev-libs/libisoburn
 app-misc/tmux
 app-admin/sudo
 net-misc/openssh
