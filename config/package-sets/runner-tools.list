@@ -7,10 +7,10 @@ app-editors/nano
 app-misc/tmux
 app-misc/byobu
 app-misc/mc
-app-misc/lf
 sys-apps/less
 sys-process/htop
 app-portage/gentoolkit
 app-portage/eix
 app-portage/portage-utils
 app-portage/ufed
+
