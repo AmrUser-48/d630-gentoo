@@ -13,6 +13,9 @@ test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
+grep -Fq 'dev-util/mesa_clc LLVM_SLOT: -* 22' config/portage/package.use/10-d630-hardware
+grep -Fq 'dev-util/mesa_clc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
+grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-core/clang LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
