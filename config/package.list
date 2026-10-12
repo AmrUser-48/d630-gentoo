@@ -3,7 +3,7 @@
 # This is not a resolved dependency closure. Validate atoms and USE flags
 # against the selected Gentoo profile before starting the full build.
 
-# Main Gentoo root: full interactive shell and userland.
+# Main Gentoo root: daily-use shell and userland; Portage and toolchains remain build-only.
 app-shells/bash
 sys-apps/coreutils
 sys-apps/findutils
@@ -13,6 +13,9 @@ sys-apps/gawk
 sys-apps/less
 sys-apps/file
 app-misc/lf
+app-editors/geany
+dev-vcs/git
+sys-process/htop
 
 sys-apps/dbus
 sys-apps/openrc
@@ -29,6 +32,7 @@ sys-boot/grub
 app-editors/nano
 app-misc/mc
 app-misc/tmux
+app-admin/sudo
 net-misc/openssh
 net-misc/rsync
 
@@ -36,9 +40,16 @@ net-misc/rsync
 net-misc/dhcpcd
 net-wireless/iw
 net-wireless/wpa_supplicant
+net-misc/networkmanager
+gnome-extra/nm-applet
 net-wireless/bluez
 
 # Xorg desktop
+www-client/firefox
+lxde-base/pcmanfm
+media-sound/alsa-utils
+media-video/mpv
+
 x11-base/xorg-server
 x11-apps/xinit
 x11-apps/xterm
