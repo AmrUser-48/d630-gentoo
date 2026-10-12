@@ -34,7 +34,7 @@ on:
         default: ""
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: gentoo-interactive-build-runner
@@ -98,7 +98,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl coreutils xz-utils tar rsync openssh-server iptables sudo
+            ca-certificates curl coreutils xz-utils zstd python3 tar rsync openssh-server iptables sudo
           sudo apt-get clean
           df -h / | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -412,6 +412,10 @@ jobs:
           root="$GENTOO_ROOT"
 
           if [[ -d "$root/var/cache/binpkgs" ]]; then
+            # Keep an index with the artifact for inspection; the receiver regenerates
+            # it after import so the resulting index matches the merged local cache.
+            sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix' 2>&1 |
+              tee -a "$out/logs/binhost-index.log" || true
             sudo cp -a "$root/var/cache/binpkgs/." "$out/binpkgs/" 2>/dev/null || true
           fi
           if [[ -f "$root/var/log/emerge.log" ]]; then
@@ -433,6 +437,60 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$out"
           chmod -R a+rX "$out"
           du -sh "$out/binpkgs" 2>/dev/null || true
+
+      - name: Prepare persistent binpkg release assets
+        id: prepare-binpkgs-release
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/gentoo-build-artifacts"
+          release="$out/release"
+          mkdir -p "$release"
+          if [[ ! -d "$out/binpkgs" ]] ||
+             ! find "$out/binpkgs" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) -print -quit | grep -q .; then
+            echo 'No binary packages to publish in this session.'
+            echo 'has_packages=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          scripts/package-binpkgs-release.sh "$out/binpkgs" "$release"
+          {
+            echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
+            echo "CPU target: Intel Core 2 / Merom"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Source workflow run: $GITHUB_RUN_ID"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Release tag: binpkgs-$GITHUB_RUN_ID"
+            echo "Build session: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "The archives contain packages actually produced in this runner, preserving PKGDIR paths."
+            echo "They are not a complete Gentoo installation; Stage 3 packages are not rebuilt unless explicitly requested."
+          } > "$release/BUILD-MANIFEST.txt"
+          (
+            cd "$release"
+            sha256sum binpkgs-part-*.tar.zst PACKAGE-LIST.txt BUILD-MANIFEST.txt > SHA256SUMS
+          )
+          echo "has_packages=true" >> "$GITHUB_OUTPUT"
+          du -h "$release"/* | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish durable Gentoo binary package release
+        if: always() && steps.prepare-binpkgs-release.outputs.has_packages == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: binpkgs-${{ github.run_id }}
+          name: "D630 Gentoo binary packages — run ${{ github.run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/gentoo-build-artifacts/release/binpkgs-part-*.tar.zst
+            ${{ runner.temp }}/gentoo-build-artifacts/release/PACKAGE-LIST.txt
+            ${{ runner.temp }}/gentoo-build-artifacts/release/BUILD-MANIFEST.txt
+            ${{ runner.temp }}/gentoo-build-artifacts/release/SHA256SUMS
 
       - name: Upload Gentoo binary packages and build logs
         if: always()
