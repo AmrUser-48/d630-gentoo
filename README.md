@@ -111,10 +111,10 @@ Notes and risks:
 
 #### Kernel source selection
 
-For the current kernel-source plan, request the specific Gentoo source slot/version interactively:
+For the current kernel-source plan, request the specific Gentoo source slot/version interactively. The configured `EMERGE_DEFAULT_OPTS` adds `--verbose` automatically:
 
 ```bash
-emerge --ask --verbose sys-kernel/gentoo-sources:6.18.54
+emerge --ask sys-kernel/gentoo-sources:6.18.54
 ```
 
 This is the requested kernel source atom, not a compiled/installed kernel by itself. Read the Portage plan before answering yes, and check the available ebuild if Portage reports that this exact version is unavailable or masked. Do not silently substitute a different version; verify the desired 6.18.y source first. After installing the sources, kernel configuration, compilation, installation and boot-loader setup remain separate steps.
