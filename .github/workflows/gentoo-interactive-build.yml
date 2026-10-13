@@ -204,7 +204,7 @@ jobs:
           root="$GENTOO_ROOT"
 
           sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package-sets" \
-            "$root/etc/portage/repos.conf" "$root/etc/portage/profile" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/etc/X11/xorg.conf.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
+            "$root/etc/portage/repos.conf" "$root/etc/portage/binrepos.conf" "$root/etc/portage/profile" "$root/etc/bash/bashrc.d" "$root/etc/env.d" "$root/etc/X11/xorg.conf.d" "$root/usr/local/sbin" "$root/var/cache/binpkgs" \
             "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
@@ -222,6 +222,7 @@ jobs:
           # testing keyword exceptions from the downloaded Stage 3.
           sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
           sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
+          sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
           sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
           sudo install -m 0755 scripts/gentoo-build-set "$root/usr/local/sbin/gentoo-build-set"
 
@@ -310,6 +311,9 @@ jobs:
             accept_keywords="$(portageq envvar ACCEPT_KEYWORDS)"
             printf "FEATURES=%s\nPKGDIR=%s\nVIDEO_CARDS=%s\nCOMMON_FLAGS=%s\nMAKEOPTS=%s\nACCEPT_KEYWORDS=%s\n" "$features" "$pkgdir" "$video_cards" "$common_flags" "$makeopts" "$accept_keywords"
             [[ " $features " == *" buildpkg "* ]] || { echo "ERROR: FEATURES lacks buildpkg." >&2; exit 1; }
+            [[ " $features " == *" getbinpkg "* ]] || { echo "ERROR: FEATURES lacks getbinpkg." >&2; exit 1; }
+            [[ " $features " == *" binpkg-request-signature "* ]] || { echo "ERROR: binary package signatures are not required." >&2; exit 1; }
+            test -s /etc/portage/binrepos.conf/gentoobinhost.conf || { echo "ERROR: official Gentoo binhost is not configured." >&2; exit 1; }
             [[ "$pkgdir" == "/var/cache/binpkgs" ]] || { echo "ERROR: unexpected PKGDIR." >&2; exit 1; }
             [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
             [[ "$common_flags" == *"-march=core2"* && "$common_flags" == *"-mtune=core2"* ]] ||
@@ -428,6 +432,23 @@ jobs:
             sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet' |& tee -a "$log"
           fi
           tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Initialize trust for signed Gentoo binary packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/getuto.log"
+          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -euo pipefail
+            command -v getuto >/dev/null
+            getuto
+          ' |& tee "$log"; then
+            tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+          else
+            echo 'Could not initialize Gentoo binary-package trust; stopping instead of silently accepting unsigned packages.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
       - name: Connect runner to private Tailscale network
         uses: tailscale/github-action@v4
