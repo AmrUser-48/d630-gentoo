@@ -15,6 +15,9 @@ grep -Fq 'verify-signature = true' config/portage/binrepos.conf/gentoobinhost.co
 grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/portage/make.conf
 grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/make.conf
 grep -Fq -- '--with-bdeps=n' config/portage/make.conf
+grep -Fq 'NINJAOPTS="-j4"' config/portage/make.conf
+grep -Fq 'NINJAOPTS="-j4"' config/make.conf
+grep -Fq 'NINJAOPTS="-j%s"' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'EMERGE_DEFAULT_OPTS="--ask --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg"' config/portage/make.conf
 test -s config/portage/profile/package.use.force
 grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.force
