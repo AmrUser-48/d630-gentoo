@@ -253,7 +253,7 @@ jobs:
             echo '- ACCEPT_KEYWORDS=amd64: stable amd64 ebuilds only; no inherited package.accept_keywords testing exceptions.'
             echo '- CPU_FLAGS_X86: MMX, SSE, SSE2, SSE3, SSSE3 only (Core 2 T7250; not copied from the CI CPU).'
             echo '- OpenRC profile inherited from official Gentoo Stage 3.'
-            echo '- FEATURES=parallel-fetch buildpkg; binary packages stored in /var/cache/binpkgs.'
+            echo '- FEATURES=parallel-fetch buildpkg getbinpkg; local packages stored in /var/cache/binpkgs, official binhost signatures verified per repository.'
             echo '- LLVM backends reduced to X86 and SPIRV by a deliberate local package.use.force override.'
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
@@ -313,8 +313,9 @@ jobs:
             printf "FEATURES=%s\nPKGDIR=%s\nVIDEO_CARDS=%s\nCOMMON_FLAGS=%s\nMAKEOPTS=%s\nACCEPT_KEYWORDS=%s\n" "$features" "$pkgdir" "$video_cards" "$common_flags" "$makeopts" "$accept_keywords"
             [[ " $features " == *" buildpkg "* ]] || { echo "ERROR: FEATURES lacks buildpkg." >&2; exit 1; }
             [[ " $features " == *" getbinpkg "* ]] || { echo "ERROR: FEATURES lacks getbinpkg." >&2; exit 1; }
-            [[ " $features " == *" binpkg-request-signature "* ]] || { echo "ERROR: binary package signatures are not required." >&2; exit 1; }
             test -s /etc/portage/binrepos.conf/gentoobinhost.conf || { echo "ERROR: official Gentoo binhost is not configured." >&2; exit 1; }
+            grep -Fq "verify-signature = true" /etc/portage/binrepos.conf/gentoobinhost.conf || { echo "ERROR: official Gentoo binhost signature verification is not enabled." >&2; exit 1; }
+            grep -Fq "x86-64/" /etc/portage/binrepos.conf/gentoobinhost.conf || { echo "ERROR: binhost is not using the generic x86-64 baseline." >&2; exit 1; }
             [[ "$pkgdir" == "/var/cache/binpkgs" ]] || { echo "ERROR: unexpected PKGDIR." >&2; exit 1; }
             [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
             [[ "$common_flags" == *"-march=core2"* && "$common_flags" == *"-mtune=core2"* ]] ||
