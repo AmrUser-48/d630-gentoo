@@ -21,7 +21,7 @@ output="$(realpath -m "$2")"
   exit 1
 }
 mkdir -p "$(dirname "$output")"
-stage="$(mktemp -d "\${TMPDIR:-/var/tmp}/d630-squashfs.XXXXXXXX")"
+stage="$(mktemp -d "${TMPDIR:-/var/tmp}/d630-squashfs.XXXXXXXX")"
 tmp_output=""
 cleanup() {
   for mountpoint in run sys proc dev; do
