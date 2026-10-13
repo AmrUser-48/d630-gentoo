@@ -1,4 +1,6 @@
-# Focused package closure for the standalone Openbox window manager and Thunar file manager.
-# Keep Xorg/Mesa and other desktop atoms separate so this set only builds the requested applications.
+# Focused package set for an Openbox + Thunar session, terminal, and readable console/X11 fonts.
+# Xorg and Mesa remain in the broader desktop set so this focused set has a smaller build closure.
 x11-wm/openbox
 xfce-base/thunar
+x11-terms/xterm
+media-fonts/terminus-font
