@@ -102,6 +102,48 @@ jobs:
           sudo apt-get clean
           df -h / | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Enable optional zram swap for memory-heavy Gentoo builds
+        shell: bash
+        run: |
+          set -u
+          log="$RUNNER_TEMP/gentoo-builder/zram.log"
+          mkdir -p "$(dirname "$log")"
+          {
+            echo "Before zram:"
+            free -h
+            echo "Existing swap:"
+            swapon --show
+          } | tee "$log"
+
+          # The chroot shares the Ubuntu runner kernel. zram must be configured
+          # on the host before entering Gentoo; compressed swap is a safety net,
+          # not extra CPU or a substitute for physical RAM.
+          if [[ ! -e /sys/block/zram0 ]]; then
+            sudo modprobe zram num_devices=1 >/dev/null 2>&1 ||
+              sudo modprobe zram >/dev/null 2>&1 || true
+          fi
+
+          if command -v zramctl >/dev/null 2>&1; then
+            zdev="$(sudo zramctl --find --size 4G --algorithm lz4 2>/dev/null || true)"
+            if [[ "$zdev" == /dev/zram* ]] &&
+               sudo mkswap "$zdev" >/dev/null 2>&1 &&
+               sudo swapon --priority 100 "$zdev" 2>/dev/null; then
+              echo "Enabled $zdev as 4 GiB LZ4 zram swap (priority 100)." | tee -a "$log"
+            else
+              echo "zram is unavailable or could not be enabled; continuing with existing swap." |
+                tee -a "$log"
+            fi
+          else
+            echo "zramctl is unavailable; continuing with existing swap." | tee -a "$log"
+          fi
+
+          {
+            echo "After zram:"
+            free -h
+            swapon --show
+          } | tee -a "$log"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+
       - name: Download and verify official Gentoo amd64 OpenRC Stage 3
         shell: bash
         run: |
@@ -216,10 +258,11 @@ jobs:
             fi
           fi
 
-          # Approximate a conservative memory budget of about 2 GB per compile
-          # job. On the standard public Ubuntu runner (4 vCPU / 16 GB), use -j8;
-          # on smaller runners, step down automatically to avoid OOM during LLVM.
-          if (( cpus >= 4 && mem_kib >= 15000000 )); then
+          # Use aggressive in-package parallelism only on the 4-vCPU / ~16-GB
+          # runner. Optional host zram is a backstop if LLVM causes a memory spike.
+          if (( cpus >= 4 && mem_kib >= 13000000 )); then
+            jobs=12
+          elif (( cpus >= 4 && mem_kib >= 9000000 )); then
             jobs=8
           elif (( cpus >= 2 && mem_kib >= 7000000 )); then
             jobs=4
@@ -256,7 +299,7 @@ jobs:
             [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
             [[ "$common_flags" == *"-march=core2"* && "$common_flags" == *"-mtune=core2"* ]] ||
               { echo "ERROR: compiler flags do not target Core 2." >&2; exit 1; }
-            [[ "$makeopts" =~ -j[1-8] ]] || { echo "ERROR: MAKEOPTS was not resource-tuned." >&2; exit 1; }
+            [[ "$makeopts" =~ -j(1[0-2]|[1-9]) ]] || { echo "ERROR: MAKEOPTS was not resource-tuned." >&2; exit 1; }
             grep -F -- "media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel" /etc/portage/package.use/10-d630-hardware >/dev/null ||
               { echo "ERROR: D630 Mesa package.use line missing." >&2; exit 1; }
             grep -R -F -- "LLVM_TARGETS:" /etc/portage/profile/package.use.force >/dev/null ||
