@@ -94,6 +94,11 @@ work=/run/d630/volatile/work
 log "Creating merged writable root"
 mount -t overlay overlay -o "lowerdir=/run/d630/lower,upperdir=$upper,workdir=$work" /mnt/newroot ||
     fail "OverlayFS mount failed; check CONFIG_OVERLAY_FS and tmpfs upper/work support"
+if [ -d /lib/firmware ]; then
+    mkdir -p "$upper/lib/firmware" || fail "cannot create firmware directory in the writable root"
+    cp -a /lib/firmware/. "$upper/lib/firmware/" || fail "cannot preserve initramfs firmware across switch_root"
+fi
+
 [ -x /mnt/newroot/sbin/init ] || fail "SquashFS root has no executable /sbin/init"
 
 mkdir -p /mnt/newroot/dev /mnt/newroot/proc /mnt/newroot/sys /mnt/newroot/run

@@ -2,7 +2,7 @@
 
 A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with an optional live ISO for testing, installation and recovery. The goal is a fast, responsive, legacy-BIOS-compatible desktop you can use every day for web browsing, file management, development, media, Wi-Fi, Android tools and ordinary computing; disk repair and rescue tools are included as secondary capabilities.
 
-**Current state:** the repository now defines the standalone three-file boot contract and has an initramfs discovery script plus a GRUB2 menu-entry example. It does not yet produce a finished kernel/initramfs/SquashFS payload automatically; the image-build workflow remains to be implemented.
+**Current state:** the repository defines a standalone three-file boot contract, GRUB2 entry, and an Actions workflow that builds the stable D630 kernel, matching module archive, early Intel microcode + BusyBox initramfs, and selected firmware bundle. The Gentoo SquashFS root and live ISO remain separate unfinished stages.
 
 ## Preferred boot: three files, root filesystem may be on another partition
 
@@ -19,7 +19,7 @@ This can be a Windows NTFS partition or another filesystem supported by GRUB. Th
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
-The old ISO loopback configuration remains in the repository as a reference, but the current build targets direct-folder boot. The kernel and external initramfs are built by the new workflow; the SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
+The old ISO loopback configuration remains in the repository as a reference, but the current build targets direct-folder boot. The kernel workflow publishes the kernel, matching /lib/modules archive, external initramfs (including early Intel microcode and Intel 3945ABG firmware), and a separate firmware tarball. The SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
 
 ## Project goals
 
@@ -394,7 +394,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Remove build-only content from the staging root and report the resulting size.
 
 ### Stage 3 — Make the installable system and live ISO
-- Build the kernel with required drivers built in and install no runtime kernel modules.
+- Keep boot-critical D630 drivers built into the kernel, and publish the matching /lib/modules/<kernelrelease> archive for optional modules enabled in the config. Never mix modules from different kernel releases.
 - Package the minimal early-boot userspace as a cpio initramfs and compile it into the kernel via `CONFIG_INITRAMFS_SOURCE`; do not publish or require a separate initramfs file.
 - Publish a compressed installable root filesystem and a legacy-BIOS GRUB ISO for testing/installation. The installed system must retain changes, preferences and user files across reboots.
 - Ensure GRUB can load the external initramfs, `/init` can mount device nodes and discover the SquashFS root, and the system can switch to the main Gentoo root. Keep any early MSR hook disabled until explicitly configured and validated.
@@ -415,4 +415,4 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 
 ## Current limitations
 
-The repository currently contains the initial source scaffold and a workflow that validates those source files. It does not yet resolve the Gentoo package set, build a daily-use runtime, compile the kernel, assemble an ISO, prepare a persistent install target or run boot tests. Those are the next engineering tasks; the README does not claim they are already implemented.
+The repository contains a source/configuration scaffold, an interactive Gentoo bootstrap runner, and a kernel-bundle workflow. The kernel workflow compiles and publishes the D630 kernel, matching modules, early microcode initramfs, and selected firmware. The repository does not yet resolve and build the full Gentoo daily-use root, assemble a live ISO, prepare a persistent install target, or complete boot tests on the D630.

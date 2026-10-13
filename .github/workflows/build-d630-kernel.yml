@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: d630-kernel-build
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -75,6 +75,70 @@ jobs:
           tar -xJf "$archive" -C "$RUNNER_TEMP" --no-same-owner
           test -d "$RUNNER_TEMP/linux-$KERNEL_VERSION"
 
+      - name: Download pinned Intel microcode and D630 Wi-Fi firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          firmware_root="$RUNNER_TEMP/d630-firmware"
+          mkdir -p "$firmware_root/intel-ucode"
+
+          # Pinned Intel release includes the Merom and Penryn signatures used by Core 2 models.
+          microcode_ref="microcode-20260925"
+          microcode_base="https://raw.githubusercontent.com/intel/Intel-Linux-Processor-Microcode-Data-Files/$microcode_ref/intel-ucode"
+          download_microcode() {
+            local signature="$1" expected_git_sha="$2" expected_size="$3"
+            local destination="$firmware_root/intel-ucode/$signature"
+            curl --fail --location --retry 4 --retry-all-errors "$microcode_base/$signature" -o "$destination"
+            [[ "$(stat -c '%s' "$destination")" == "$expected_size" ]] || {
+              echo "Unexpected Intel microcode size for $signature." >&2
+              exit 1
+            }
+            local actual_git_sha
+            actual_git_sha="$(git hash-object "$destination")"
+            [[ "$actual_git_sha" == "$expected_git_sha" ]] || {
+              echo "Intel microcode Git-object checksum mismatch for $signature." >&2
+              exit 1
+            }
+          }
+
+          download_microcode "06-0f-0d" "d7e6227788f7525fbba8c0f75561c50d467ef1a6" "12288"
+          download_microcode "06-17-06" "93a69eb9b1519453f0016ae575f43386c2b806b0" "20480"
+
+          # Intel PRO/Wireless 3945ABG uses iwlwifi-3945-2.ucode (version 15.32.2.9).
+          # This blob has not changed since its upstream 2009 update; pin the redistributable linux-firmware tag.
+          wifi_ref="20251021"
+          wifi_url="https://gitlab.com/kernel-firmware/linux-firmware/-/raw/$wifi_ref/intel/iwlwifi/iwlwifi-3945-2.ucode"
+          curl --fail --location --retry 4 --retry-all-errors "$wifi_url" -o "$firmware_root/iwlwifi-3945-2.ucode"
+          [[ "$(stat -c '%s' "$firmware_root/iwlwifi-3945-2.ucode")" == "150100" ]] || {
+            echo "Unexpected Intel 3945ABG firmware size." >&2
+            exit 1
+          }
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            "https://raw.githubusercontent.com/intel/Intel-Linux-Processor-Microcode-Data-Files/$microcode_ref/license" \
+            -o "$firmware_root/Intel-Microcode-LICENSE.txt"
+          curl --fail --location --retry 4 --retry-all-errors \
+            "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/$wifi_ref/LICENCE.iwlwifi_firmware" \
+            -o "$firmware_root/LICENCE.iwlwifi_firmware"
+          test -s "$firmware_root/Intel-Microcode-LICENSE.txt"
+          test -s "$firmware_root/LICENCE.iwlwifi_firmware"
+
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          {
+            echo "D630 target firmware manifest"
+            echo "Intel microcode release: $microcode_ref"
+            echo "  06-0f-0d: Merom/Core 2; source Git blob SHA-1 d7e6227788f7525fbba8c0f75561c50d467ef1a6"
+            echo "  06-17-06: Penryn/Core 2; source Git blob SHA-1 93a69eb9b1519453f0016ae575f43386c2b806b0"
+            echo "Intel Wi-Fi firmware: PRO/Wireless 3945ABG; linux-firmware tag $wifi_ref; version 15.32.2.9"
+            echo "Wi-Fi firmware URL: $wifi_url"
+            echo "License notices are included in d630-firmware.tar.zst under /usr/share/licenses/d630-gentoo/."
+            echo
+            sha256sum "$firmware_root/intel-ucode/06-0f-0d" \
+              "$firmware_root/intel-ucode/06-17-06" \
+              "$firmware_root/iwlwifi-3945-2.ucode"
+          } > "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt"
+          cat "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Configure for D630 and validate required symbols
         shell: bash
         run: |
@@ -87,12 +151,18 @@ jobs:
             "$GITHUB_WORKSPACE/config/kernel/d630-base.fragment" \
             "$GITHUB_WORKSPACE/config/kernel/d630-live.fragment" \
             2>&1 | tee "$GITHUB_WORKSPACE/kernel-config-merge.log"
+          scripts/config --file .config --enable MICROCODE
+          scripts/config --file .config --enable FW_LOADER
           make ARCH="$ARCH" olddefconfig
           cp .config "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config"
 
           required=(
             CONFIG_X86_64
             CONFIG_X86_MSR
+            CONFIG_MICROCODE
+            CONFIG_FW_LOADER
+            CONFIG_MODULES
+            CONFIG_IWLEGACY
             CONFIG_BLK_DEV_INITRD
             CONFIG_BLK_DEV_LOOP
             CONFIG_OVERLAY_FS
@@ -139,34 +209,60 @@ jobs:
 
           {
             echo "Effective D630 kernel options:"
-            grep -E '^(CONFIG_(X86_64|X86_MSR|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
+            grep -E '^(CONFIG_(X86_64|X86_MSR|MICROCODE|FW_LOADER|MODULES|IWLEGACY|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Compile the kernel image
+      - name: Compile kernel image and modules
         shell: bash
         run: |
           set -euo pipefail
           source_dir="$RUNNER_TEMP/linux-$KERNEL_VERSION"
-          mkdir -p "$GITHUB_WORKSPACE/output"
+          out="$GITHUB_WORKSPACE/output"
+          mkdir -p "$out"
           cd "$source_dir"
+
           jobs="$(nproc)"
           (( jobs > 4 )) && jobs=4
-          echo "Compiling bzImage using $jobs jobs."
-          make -j"$jobs" ARCH="$ARCH" KCFLAGS=-mtune=core2 bzImage 2>&1 | tee "$GITHUB_WORKSPACE/output/kernel-build.log"
-          test -s arch/x86/boot/bzImage
-          cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/kernel"
-          cp "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config" "$GITHUB_WORKSPACE/output/d630-$KERNEL_VERSION.config"
-          cp "$RUNNER_TEMP/kernel-source.txt" "$GITHUB_WORKSPACE/output/kernel-source.txt"
-          printf 'make -j%s ARCH=%s KCFLAGS=-mtune=core2 bzImage\n' "$jobs" "$ARCH" > "$GITHUB_WORKSPACE/output/build-command.txt"
-          file "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
-          du -h "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Compiling bzImage and enabled modules using $jobs jobs."
+          make -j"$jobs" ARCH="$ARCH" KCFLAGS=-mtune=core2 bzImage modules 2>&1 \
+            | tee "$out/kernel-build.log"
 
-      - name: Build external initramfs with static BusyBox
+          test -s arch/x86/boot/bzImage
+          cp arch/x86/boot/bzImage "$out/kernel"
+          cp "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config" "$out/d630-$KERNEL_VERSION.config"
+          cp "$RUNNER_TEMP/kernel-source.txt" "$out/kernel-source.txt"
+
+          kernel_release="$(make -s ARCH="$ARCH" kernelrelease)"
+          printf '%s\n' "$kernel_release" > "$out/kernel-release.txt"
+          printf 'make -j%s ARCH=%s KCFLAGS=-mtune=core2 bzImage modules\n' "$jobs" "$ARCH" \
+            > "$out/build-command.txt"
+
+          module_root="$out/modules-root"
+          rm -rf "$module_root"
+          make ARCH="$ARCH" INSTALL_MOD_PATH="$module_root" INSTALL_MOD_STRIP=1 modules_install 2>&1 \
+            | tee "$out/modules-install.log"
+          module_tree="$module_root/lib/modules/$kernel_release"
+          test -d "$module_tree"
+          test -n "$(find "$module_tree" -type f -name '*.ko' -print -quit)"
+          # Remove links back to the temporary build host; they are not useful on the target.
+          rm -f "$module_tree/build" "$module_tree/source"
+          tar --zstd -cf "$out/modules-$kernel_release.tar.zst" \
+            -C "$module_root" "lib/modules/$kernel_release"
+
+          {
+            echo "Kernel release: $kernel_release"
+            file "$out/kernel"
+            du -h "$out/kernel" "$out/modules-$kernel_release.tar.zst"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build external initramfs with early Intel microcode and Wi-Fi firmware
         shell: bash
         run: |
           set -euo pipefail
+          out="$GITHUB_WORKSPACE/output"
+          firmware_root="$RUNNER_TEMP/d630-firmware"
           command -v busybox
-          applets=(sh mount find mkdir sleep switch_root umount cat)
+          applets=(sh mount find mkdir sleep switch_root umount cat cp)
           for applet in "${applets[@]}"; do
             if ! busybox --list | grep -Fxq "$applet"; then
               echo "Required BusyBox applet missing from busybox-static: $applet" >&2
@@ -174,61 +270,133 @@ jobs:
             fi
           done
 
+          # The main initramfs contains firmware needed by built-in iwl3945. Copy /lib/firmware
+          # into the volatile OverlayFS upper layer so it remains available after switch_root.
           root="$RUNNER_TEMP/d630-initramfs-root"
           rm -rf "$root"
-          mkdir -p "$root"/{bin,sbin,etc,proc,sys,dev,run,mnt/newroot}
+          mkdir -p "$root"/{bin,sbin,etc,proc,sys,dev,run,mnt/newroot,lib/firmware/intel-ucode}
           cp "$(command -v busybox)" "$root/bin/busybox"
           "$root/bin/busybox" --install -s "$root/bin"
           cp initramfs/init "$root/init"
           chmod 0755 "$root/init"
+          cp "$firmware_root/iwlwifi-3945-2.ucode" "$root/lib/firmware/"
+          cp "$firmware_root/intel-ucode/"* "$root/lib/firmware/intel-ucode/"
           test -x "$root/bin/sh"
+          test -x "$root/bin/cp"
 
-          cd "$root"
-          find . -print0 | cpio --null --create --format=newc --owner=0:0 2>"$GITHUB_WORKSPACE/output/initramfs-cpio.log" \
-            | gzip -9n > "$GITHUB_WORKSPACE/output/initramfs"
-          gzip -t "$GITHUB_WORKSPACE/output/initramfs"
-          cpio -it < <(gzip -dc "$GITHUB_WORKSPACE/output/initramfs") > "$GITHUB_WORKSPACE/output/initramfs-file-list.txt"
-          grep -Fxq './init' "$GITHUB_WORKSPACE/output/initramfs-file-list.txt"
-          du -h "$GITHUB_WORKSPACE/output/initramfs" | tee -a "$GITHUB_STEP_SUMMARY"
+          (
+            cd "$root"
+            find . -print0 | cpio --null --create --format=newc --owner=0:0
+          ) 2>"$out/initramfs-cpio.log" | gzip -9n > "$out/initramfs-main.gz"
+          gzip -t "$out/initramfs-main.gz"
+          cpio -it < <(gzip -dc "$out/initramfs-main.gz") > "$out/initramfs-file-list.txt"
+          grep -Exq '(\./)?init' "$out/initramfs-file-list.txt"
+          grep -Fq 'lib/firmware/iwlwifi-3945-2.ucode' "$out/initramfs-file-list.txt"
+
+          # Linux early microcode loading expects an uncompressed newc archive
+          # before the ordinary (here gzip-compressed) initramfs archive.
+          early_root="$RUNNER_TEMP/d630-early-microcode"
+          rm -rf "$early_root"
+          mkdir -p "$early_root/kernel/x86/microcode"
+          cat "$firmware_root/intel-ucode/06-0f-0d" "$firmware_root/intel-ucode/06-17-06" \
+            > "$early_root/kernel/x86/microcode/GenuineIntel.bin"
+          (
+            cd "$early_root"
+            find kernel -print0 | cpio --null --create --format=newc --owner=0:0
+          ) > "$out/early-microcode.cpio" 2>"$out/early-microcode-cpio.log"
+          cpio -it < "$out/early-microcode.cpio" > "$out/early-microcode-list.txt"
+          grep -Fxq 'kernel/x86/microcode/GenuineIntel.bin' "$out/early-microcode-list.txt"
+          test -s "$early_root/kernel/x86/microcode/GenuineIntel.bin"
+
+          cat "$out/early-microcode.cpio" "$out/initramfs-main.gz" > "$out/initramfs"
+          test -s "$out/initramfs"
+          {
+            echo "Initramfs layout: uncompressed Intel microcode cpio prepended to gzip-compressed main initramfs."
+            du -h "$out/early-microcode.cpio" "$out/initramfs-main.gz" "$out/initramfs"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Package reusable firmware bundle with license notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/output"
+          firmware_root="$RUNNER_TEMP/d630-firmware"
+          stage="$RUNNER_TEMP/d630-firmware-root"
+          rm -rf "$stage"
+          mkdir -p "$stage/lib/firmware/intel-ucode" "$stage/usr/share/licenses/d630-gentoo"
+
+          cp "$firmware_root/iwlwifi-3945-2.ucode" "$stage/lib/firmware/"
+          cp "$firmware_root/intel-ucode/"* "$stage/lib/firmware/intel-ucode/"
+          cp "$firmware_root/Intel-Microcode-LICENSE.txt" \
+            "$stage/usr/share/licenses/d630-gentoo/Intel-Microcode-LICENSE.txt"
+          cp "$firmware_root/LICENCE.iwlwifi_firmware" \
+            "$stage/usr/share/licenses/d630-gentoo/LICENCE.iwlwifi_firmware"
+          cp "$out/FIRMWARE-SOURCES.txt" "$stage/usr/share/licenses/d630-gentoo/FIRMWARE-SOURCES.txt"
+
+          tar --zstd -cf "$out/d630-firmware.tar.zst" -C "$stage" .
+          du -h "$out/d630-firmware.tar.zst" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Create checksums and build manifest
         shell: bash
         run: |
           set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          kernel_release="$(cat output/kernel-release.txt)"
           cat > output/BUILD-MANIFEST.txt <<EOF
           Project: AmrUser-48/d630-gentoo
           Kernel source: Linux $KERNEL_VERSION (stable 6.18.y LTS)
+          Kernel release: $kernel_release
           Target CPU: Intel Core 2 Duo / Merom; generic x86-64 ISA baseline, KCFLAGS=-mtune=core2
           Boot: legacy BIOS / GRUB2
           Boot files: kernel + external initramfs
+          Early CPU microcode: Intel signatures 06-0f-0d (Merom) and 06-17-06 (Penryn), supplied in the early cpio archive prepended to initramfs
+          Wi-Fi firmware: Intel PRO/Wireless 3945ABG; iwlwifi-3945-2.ucode version 15.32.2.9, available in the initramfs and the separate firmware archive
+          Kernel modules: modules-$kernel_release.tar.zst, installed under /lib/modules/$kernel_release
+          Firmware archive: d630-firmware.tar.zst, contains /lib/firmware files and required license notices
           Root discovery: initramfs tries NTFS3, exFAT, VFAT, ext4 and Btrfs on block devices for /d630-gentoo/squashfs
           Root filesystem: SquashFS with Zstandard decompression enabled in the kernel
-          Runtime modules: none are built or packaged by this workflow
           Build commit: $GITHUB_SHA
           Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           Note: the SquashFS root is a separate next-stage artifact and is not built by this workflow.
           EOF
-          (cd output && sha256sum kernel initramfs "d630-$KERNEL_VERSION.config" BUILD-MANIFEST.txt kernel-source.txt > SHA256SUMS)
+
+          (cd output && sha256sum \
+            kernel initramfs initramfs-main.gz early-microcode.cpio \
+            "modules-$kernel_release.tar.zst" d630-firmware.tar.zst FIRMWARE-SOURCES.txt \
+            "d630-$KERNEL_VERSION.config" BUILD-MANIFEST.txt kernel-source.txt kernel-release.txt \
+            > SHA256SUMS)
           {
-            echo "Output sizes:"
-            ls -lh output/kernel output/initramfs "output/d630-$KERNEL_VERSION.config" output/BUILD-MANIFEST.txt output/SHA256SUMS
+            echo "Output files:"
+            ls -lh output/kernel output/initramfs output/initramfs-main.gz \
+              output/early-microcode.cpio "output/modules-$kernel_release.tar.zst" \
+              output/d630-firmware.tar.zst output/FIRMWARE-SOURCES.txt \
+              "output/d630-$KERNEL_VERSION.config" output/BUILD-MANIFEST.txt output/SHA256SUMS
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload inspectable build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: d630-kernel-initramfs-${{ inputs.kernel_version || '6.18.56' }}-run-${{ github.run_number }}
+          name: d630-kernel-bundle-${{ inputs.kernel_version || '6.18.56' }}-run-${{ github.run_number }}
           path: |
             output/kernel
             output/initramfs
+            output/initramfs-main.gz
+            output/early-microcode.cpio
+            output/early-microcode-list.txt
             output/d630-*.config
+            output/modules-*.tar.zst
+            output/d630-firmware.tar.zst
+            output/FIRMWARE-SOURCES.txt
             output/BUILD-MANIFEST.txt
             output/SHA256SUMS
             output/kernel-source.txt
+            output/kernel-release.txt
             output/build-command.txt
             output/kernel-build.log
+            output/modules-install.log
             output/initramfs-file-list.txt
             output/initramfs-cpio.log
+            output/early-microcode-cpio.log
           if-no-files-found: error
           retention-days: 30
 
@@ -236,7 +404,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: d630-kernel-${{ inputs.kernel_version || '6.18.56' }}-build-${{ github.run_number }}
-          name: "D630 Gentoo kernel ${{ inputs.kernel_version || '6.18.56' }} — build ${{ github.run_number }}"
+          name: "D630 Gentoo kernel bundle ${{ inputs.kernel_version || '6.18.56' }} — build ${{ github.run_number }}"
           prerelease: true
           make_latest: false
           draft: false
@@ -245,6 +413,11 @@ jobs:
           files: |
             output/kernel
             output/initramfs
+            output/initramfs-main.gz
+            output/early-microcode.cpio
             output/d630-*.config
+            output/modules-*.tar.zst
+            output/d630-firmware.tar.zst
+            output/FIRMWARE-SOURCES.txt
             output/BUILD-MANIFEST.txt
             output/SHA256SUMS
