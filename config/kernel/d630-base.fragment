@@ -321,7 +321,7 @@ CONFIG_VMWARE_VMCI=n
 CONFIG_DRM_GMA500=n
 CONFIG_DRM_MGAG200=n
 
-# Unused network hardware families (retain only Broadcom Ethernet + possible D630 Wi-Fi)
+# Unused network hardware families are pruned; wired Ethernet is disabled.
 CONFIG_NET_TULIP=n
 CONFIG_E100=n
 CONFIG_E1000=n
