@@ -41,6 +41,7 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - `config/portage/package.use/00-core2-cpu` enables only MMX/SSE/SSE2/SSE3/SSSE3 flags supported by the Core 2 Duo T7250. Do **not** run `cpuid2cpuflags` on the GitHub host and blindly copy those results into the target configuration.
 - OpenRC profile is inherited from the official OpenRC Stage 3. `VIDEO_CARDS="intel"` is the global default; `config/portage/package.use/10-d630-hardware` explicitly narrows Mesa to `VIDEO_CARDS: -* intel` and sets the Xorg hardware choices.
 - The workflow copies the D630-specific USE flags in `config/portage/package.use/`, including console GPM support and the OpenRC PipeWire/WirePlumber audio stack without Bluetooth.
+- The interactive workflow now captures a redacted `SESSION-SNAPSHOT.tar.zst` with effective Portage settings, package configuration, the installed-package list, `emerge --info`, and runner resource details in the same persistent release as the binpkgs. On the next run, provide that release run ID in `binpkg_run_id`: compatible binpkgs are imported and the previous snapshot is placed under `/var/log/gentoo-bootstrap/previous-session-<RUN_ID>` for reference. The snapshot is not blindly applied over the canonical configuration.
 - Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, `--load-average=4`, parallel fetch, and `FEATURES=buildpkg`. Each interactive package plan is visible before it is applied. Built packages are retained in `/var/cache/binpkgs`, exported in persistent `binpkgs-<RUN_ID>` Releases, and also included in a short-lived Actions artifact for recovery.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
@@ -54,7 +55,7 @@ This section records decisions and failure modes from the interactive Gentoo ses
 
 - `ACCEPT_KEYWORDS="amd64"`: stable amd64 ebuilds only. Do not add `~amd64` globally or add per-package testing keywords as a shortcut around a build problem.
 - `CFLAGS/CXXFLAGS/FCFLAGS/FFLAGS="-O2 -pipe -march=core2 -mtune=core2"`; Rust uses `RUSTFLAGS="-C target-cpu=core2"`. Never use `-march=native` on the GitHub runner.
-- `USE="X alsa dbus udev -systemd -wayland"`: an OpenRC/X11 target, not a global systemd/Wayland desktop.
+- `USE="X alsa dbus elogind udev -systemd -wayland"`: an OpenRC/X11 target, not a global systemd/Wayland desktop.
 - `MAKEOPTS` is tuned per runner: the standard 4-vCPU runner with at least about 9 GB RAM uses `-j8`; smaller runners step down to `-j6`, `-j4`, `-j2`, or `-j1`. The workflow only attempts 4 GiB LZ4 zram swap on hosts with under 8 GB RAM, and continues with existing swap if zram is unavailable. Zram is an OOM safety net, not a source of CPU or physical RAM; keeping it disabled on the standard runner avoids unnecessary compression overhead. Portage still merges one package at a time (`--jobs=1`), `FEATURES="parallel-fetch buildpkg"`, with binpkgs under `/var/cache/binpkgs`.
 
 `config/portage/package.use/00-core2-cpu` is intentionally not generated from the remote runner's CPUID:
@@ -79,7 +80,7 @@ media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
 x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
 
 # Input support; Synaptics is preferred for the D630 touchpad by Xorg config.
-x11-base/xorg-drivers INPUT_DEVICES: -* evdev libinput synaptics
+x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics
 x11-base/xorg-server -minimal
 
 # Legacy BIOS only.
