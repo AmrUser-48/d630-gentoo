@@ -1,0 +1,5 @@
+# Interactive terminal tools for the D630 Gentoo runner.
+# Enable hardware sensor readings in htop (Core 2 temperature visibility depends on kernel sensors support).
+sys-process/htop lm-sensors
+# Enable sixel graphics support in xterm.
+x11-terms/xterm sixel
