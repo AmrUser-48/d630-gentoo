@@ -717,9 +717,12 @@ jobs:
           tar --zstd -cf "$release/SESSION-SNAPSHOT.tar.zst" -C "$out" session-snapshot
 
           if [[ -d "$out/boot-bundle" ]]; then
-            cp -p "$out/boot-bundle/." "$release/" 2>/dev/null || {
-              cp -p "$out/boot-bundle/"* "$release/"
-            }
+            shopt -s nullglob
+            boot_assets=( "$out/boot-bundle/"* )
+            shopt -u nullglob
+            if (( ${#boot_assets[@]} > 0 )); then
+              cp -p "${boot_assets[@]}" "$release/"
+            fi
           fi
 
           has_packages=false
@@ -749,7 +752,8 @@ jobs:
             if [[ -s "$release/kernel" && -s "$release/initramfs" ]]; then
               echo "Custom boot bundle assets: kernel + initramfs"
               [[ -s "$release/KERNELRELEASE.txt" ]] && echo "Kernel release: $(cat "$release/KERNELRELEASE.txt")"
-              [[ -s "$release/modules-"*".tar.zst" ]] && echo "Matching module archive included when validated."
+              module_assets=( "$release"/modules-*.tar.zst )
+              (( ${#module_assets[@]} == 0 )) || echo "Matching module archive included when validated."
             else
               echo "No complete custom kernel/initramfs bundle was supplied in /root/d630-boot-bundle."
             fi
