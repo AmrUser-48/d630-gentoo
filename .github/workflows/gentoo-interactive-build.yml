@@ -749,20 +749,3 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
           compression-level: 0
-\t' read -r name url; do
-            [[ "$name" == "SHA256SUMS" ]] && continue
-            [[ "$name" =~ ^binpkgs-part-[0-9]+\.tar\.zst$ ]] || continue
-            echo "Downloading prior binpkg shard: $name"
-            curl --fail --location --retry 3 --silent --show-error "$url" -o "$work/$name"
-            (cd "$work" && sha256sum --check --ignore-missing SHA256SUMS)
-            sudo tar --use-compress-program=unzstd -xf "$work/$name" -C "$GENTOO_ROOT/var/cache/binpkgs"
-            rm -f "$work/$name"
-            imported=$((imported + 1))
-          done < "$work/assets.tsv"
-
-          (( imported > 0 )) || { echo 'No binpkg shards imported.' >&2; exit 1; }
-          sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emaint binhost --fix'
-          {
-            echo "Imported $imported binary-package shard(s) from release binpkgs-$BINPKG_RUN_ID."
-            echo "Portage will reuse compatible packages with --usepkg and build missing/incompatible packages from source."
-          } | tee -a "$GITHUB_STEP_SUMMARY"
