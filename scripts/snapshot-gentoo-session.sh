@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="\${1:-/opt/gentoo}"
-OUT="\${2:?Usage: snapshot-gentoo-session.sh <gentoo-root> <output-directory>}"
+ROOT="${1:-/opt/gentoo}"
+OUT="${2:?Usage: snapshot-gentoo-session.sh <gentoo-root> <output-directory>}"
 CONFIG="$OUT/config/etc-portage"
 STATE="$OUT/state"
 
@@ -16,7 +16,7 @@ mkdir -p "$CONFIG" "$STATE"
 # credential-like lines before this snapshot is placed in a public Release.
 for item in "$ROOT"/etc/portage/*; do
   [[ -e "$item" || -L "$item" ]] || continue
-  base="\${item##*/}"
+  base="${item##*/}"
   case "$base" in
     make.conf|make.profile|package.*|repos.conf|profile|env|sets|package-sets|bashrc|dispatch-conf.conf|binrepos.conf)
       sudo cp -a "$item" "$CONFIG/$base" 2>/dev/null || true
@@ -42,8 +42,8 @@ done
 
 {
   echo "Captured UTC: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  echo "GitHub Actions run ID: \${GITHUB_RUN_ID:-unknown}"
-  echo "Git commit: \${GITHUB_SHA:-unknown}"
+  echo "GitHub Actions run ID: ${GITHUB_RUN_ID:-unknown}"
+  echo "Git commit: ${GITHUB_SHA:-unknown}"
   echo "Gentoo rootfs: $ROOT"
   echo "Target: amd64, glibc, OpenRC Stage 3"
   echo "Target CPU flags in repository: -O2 -pipe -march=core2 -mtune=core2"
