@@ -61,6 +61,9 @@ jobs:
             exit 1
           }
           mkdir -p "$release_dir"
+          if [[ -d "${RUNNER_TEMP}/source-artifact/session-snapshot" ]]; then
+            tar --zstd -cf "$release_dir/SESSION-SNAPSHOT.tar.zst" -C "${RUNNER_TEMP}/source-artifact" session-snapshot
+          fi
 
           if find "$source_dir" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) -print -quit | grep -q .; then
             bash scripts/package-binpkgs-release.sh "$source_dir" "$release_dir"
@@ -144,5 +147,6 @@ jobs:
           make_latest: false
           draft: false
           generate_release_notes: false
+          overwrite_files: true
           fail_on_unmatched_files: true
           files: "${{ runner.temp }}/release-assets/*"
