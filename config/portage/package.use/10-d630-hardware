@@ -21,3 +21,14 @@ sys-boot/grub GRUB_PLATFORMS: pc
 # Utilities installed in the temporary SSH builder.
 net-misc/openssh pam
 app-admin/sudo pam
+# Console mouse support for MC and framebuffer terminal.
+app-misc/mc gpm
+app-i18n/fbterm gpm
+
+# D630 audio: PipeWire + WirePlumber on OpenRC, without Bluetooth.
+media-video/pipewire sound-server pipewire-alsa -bluetooth dbus elogind -systemd -system-service -doc -test
+media-video/wireplumber elogind -systemd -system-service -doc -test
+media-sound/pulseaudio -daemon
+
+# Reduce optional Clang runtime components pulled by the Mesa build helper.
+llvm-runtimes/clang-runtime -sanitize -openmp
