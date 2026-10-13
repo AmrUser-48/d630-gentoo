@@ -7,7 +7,6 @@ on:
       - "config/kernel/**"
       - "initramfs/**"
       - "scripts/validate-kernel-config.sh"
-      - ".github/workflows/build-d630-kernel.yml"
   workflow_dispatch:
     inputs:
       kernel_version:
@@ -137,7 +136,7 @@ jobs:
               "$firmware_root/intel-ucode/06-17-06" \
               "$firmware_root/iwlwifi-3945-2.ucode"
           } > "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt"
-          cat "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt"
 
       - name: Configure for D630 and validate required symbols
         shell: bash
