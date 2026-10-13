@@ -1,0 +1,4 @@
+# Focused package closure for the standalone Openbox window manager and Thunar file manager.
+# Keep Xorg/Mesa and other desktop atoms separate so this set only builds the requested applications.
+x11-wm/openbox
+xfce-base/thunar
