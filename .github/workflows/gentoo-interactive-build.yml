@@ -115,26 +115,30 @@ jobs:
             swapon --show
           } | tee "$log"
 
-          # The chroot shares the Ubuntu runner kernel. zram must be configured
-          # on the host before entering Gentoo; compressed swap is a safety net,
-          # not extra CPU or a substitute for physical RAM.
-          if [[ ! -e /sys/block/zram0 ]]; then
-            sudo modprobe zram num_devices=1 >/dev/null 2>&1 ||
-              sudo modprobe zram >/dev/null 2>&1 || true
-          fi
+          # Do not consume CPU compressing swap on the standard ~16-GB runner.
+          # Only enable zram as a fallback on genuinely small-memory hosts.
+          mem_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+          if (( mem_kib < 8000000 )); then
+            if [[ ! -e /sys/block/zram0 ]]; then
+              sudo modprobe zram num_devices=1 >/dev/null 2>&1 ||
+                sudo modprobe zram >/dev/null 2>&1 || true
+            fi
 
-          if command -v zramctl >/dev/null 2>&1; then
-            zdev="$(sudo zramctl --find --size 4G --algorithm lz4 2>/dev/null || true)"
-            if [[ "$zdev" == /dev/zram* ]] &&
-               sudo mkswap "$zdev" >/dev/null 2>&1 &&
-               sudo swapon --priority 100 "$zdev" 2>/dev/null; then
-              echo "Enabled $zdev as 4 GiB LZ4 zram swap (priority 100)." | tee -a "$log"
+            if command -v zramctl >/dev/null 2>&1; then
+              zdev="$(sudo zramctl --find --size 4G --algorithm lz4 2>/dev/null || true)"
+              if [[ "$zdev" == /dev/zram* ]] &&
+                 sudo mkswap "$zdev" >/dev/null 2>&1 &&
+                 sudo swapon --priority 100 "$zdev" 2>/dev/null; then
+                echo "Enabled $zdev as 4 GiB LZ4 zram swap on a low-memory runner." | tee -a "$log"
+              else
+                echo "zram unavailable; continuing with existing swap." | tee -a "$log"
+              fi
             else
-              echo "zram is unavailable or could not be enabled; continuing with existing swap." |
-                tee -a "$log"
+              echo "zramctl unavailable; continuing with existing swap." | tee -a "$log"
             fi
           else
-            echo "zramctl is unavailable; continuing with existing swap." | tee -a "$log"
+            echo "Runner has ${mem_kib} KiB RAM; skipping zram to avoid needless compression overhead." |
+              tee -a "$log"
           fi
 
           {
@@ -258,12 +262,12 @@ jobs:
             fi
           fi
 
-          # Use aggressive in-package parallelism only on the 4-vCPU / ~16-GB
-          # runner. Optional host zram is a backstop if LLVM causes a memory spike.
-          if (( cpus >= 4 && mem_kib >= 13000000 )); then
-            jobs=12
-          elif (( cpus >= 4 && mem_kib >= 9000000 )); then
+          # Use moderate oversubscription on the standard 4-vCPU / ~16-GB
+          # runner. Start at -j8; don't increase to -j12 without measured benefit.
+          if (( cpus >= 4 && mem_kib >= 9000000 )); then
             jobs=8
+          elif (( cpus >= 4 && mem_kib >= 6000000 )); then
+            jobs=6
           elif (( cpus >= 2 && mem_kib >= 7000000 )); then
             jobs=4
           elif (( cpus >= 2 && mem_kib >= 3500000 )); then
