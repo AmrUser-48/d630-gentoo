@@ -199,6 +199,44 @@ jobs:
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Tune compile parallelism to runner resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          cpus="$(nproc)"
+          mem_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+
+          # Respect a cgroup v2 memory cap if the runner exposes one.
+          if [[ -r /sys/fs/cgroup/memory.max ]]; then
+            limit="$(cat /sys/fs/cgroup/memory.max)"
+            if [[ "$limit" =~ ^[0-9]+$ ]]; then
+              limit_kib=$((limit / 1024))
+              (( limit_kib < mem_kib )) && mem_kib="$limit_kib"
+            fi
+          fi
+
+          # Approximate a conservative memory budget of about 2 GB per compile
+          # job. On the standard public Ubuntu runner (4 vCPU / 16 GB), use -j8;
+          # on smaller runners, step down automatically to avoid OOM during LLVM.
+          if (( cpus >= 4 && mem_kib >= 15000000 )); then
+            jobs=8
+          elif (( cpus >= 2 && mem_kib >= 7000000 )); then
+            jobs=4
+          elif (( cpus >= 2 && mem_kib >= 3500000 )); then
+            jobs=2
+          else
+            jobs=1
+          fi
+
+          sudo sed -i '/^MAKEOPTS=/d' "$root/etc/portage/make.conf"
+          printf 'MAKEOPTS="-j%s"\n' "$jobs" |
+            sudo tee -a "$root/etc/portage/make.conf" >/dev/null
+
+          printf 'Runner resources: %s CPUs, %s KiB RAM; Portage MAKEOPTS=-j%s\n' \
+            "$cpus" "$mem_kib" "$jobs" | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo chroot "$root" /bin/bash -lc 'printf "Effective MAKEOPTS="; portageq envvar MAKEOPTS'
+
       - name: Verify effective D630 Portage and binary-package settings
         shell: bash
         run: |
@@ -210,13 +248,15 @@ jobs:
             pkgdir="$(portageq envvar PKGDIR)"
             video_cards="$(portageq envvar VIDEO_CARDS)"
             common_flags="$(portageq envvar COMMON_FLAGS)"
+            makeopts="$(portageq envvar MAKEOPTS)"
             accept_keywords="$(portageq envvar ACCEPT_KEYWORDS)"
-            printf "FEATURES=%s\nPKGDIR=%s\nVIDEO_CARDS=%s\nCOMMON_FLAGS=%s\nACCEPT_KEYWORDS=%s\n" "$features" "$pkgdir" "$video_cards" "$common_flags" "$accept_keywords"
+            printf "FEATURES=%s\nPKGDIR=%s\nVIDEO_CARDS=%s\nCOMMON_FLAGS=%s\nMAKEOPTS=%s\nACCEPT_KEYWORDS=%s\n" "$features" "$pkgdir" "$video_cards" "$common_flags" "$makeopts" "$accept_keywords"
             [[ " $features " == *" buildpkg "* ]] || { echo "ERROR: FEATURES lacks buildpkg." >&2; exit 1; }
             [[ "$pkgdir" == "/var/cache/binpkgs" ]] || { echo "ERROR: unexpected PKGDIR." >&2; exit 1; }
             [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
             [[ "$common_flags" == *"-march=core2"* && "$common_flags" == *"-mtune=core2"* ]] ||
               { echo "ERROR: compiler flags do not target Core 2." >&2; exit 1; }
+            [[ "$makeopts" =~ -j[1-8] ]] || { echo "ERROR: MAKEOPTS was not resource-tuned." >&2; exit 1; }
             grep -F -- "media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel" /etc/portage/package.use/10-d630-hardware >/dev/null ||
               { echo "ERROR: D630 Mesa package.use line missing." >&2; exit 1; }
             grep -R -F -- "LLVM_TARGETS:" /etc/portage/profile/package.use.force >/dev/null ||
