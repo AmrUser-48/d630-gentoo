@@ -15,7 +15,7 @@ Use these paths for the kernel, external initramfs archive, and SquashFS root. T
 └── squashfs
 ```
 
-This can be a Windows NTFS partition or another filesystem supported by GRUB. The sample entry in [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg) searches separately for `kernel` and `initramfs`, then passes no `d630.boot_uuid`. Consequently, the initramfs searches all partitions whose filesystems are built into the kernel for `/d630-gentoo/squashfs`. The initial supported set is NTFS3, VFAT/FAT, exFAT, ext2/3/4, and Btrfs; encrypted, LVM, RAID, or other unsupported storage layers are not automatically searched. Build these filesystem drivers into the kernel (`=y`), because initramfs cannot load a module from a root filesystem it has not mounted yet. If identical copies of `kernel` or `initramfs` exist on several partitions, GRUB will use its first match.
+This can be a Windows NTFS partition or another filesystem supported by GRUB. The sample entry in [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg) searches separately for `kernel` and `initramfs`, then passes no `d630.boot_uuid`. Consequently, the initramfs searches all partitions whose filesystems are built into the kernel for `/d630-gentoo/squashfs`. The initial supported set is NTFS3, VFAT/FAT, exFAT, ext4, and Btrfs; encrypted, LVM, RAID, or other unsupported storage layers are not automatically searched. Build these filesystem drivers into the kernel (`=y`), because initramfs cannot load a module from a root filesystem it has not mounted yet. If identical copies of `kernel` or `initramfs` exist on several partitions, GRUB will use its first match.
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
@@ -283,7 +283,7 @@ The installed root filesystem is the main product; the ISO is a way to test, ins
 1. A pinned Linux 6.18.y LTS kernel baseline (with 6.12.y LTS as a fallback test), compiled for Core 2.
 2. Required D630 drivers built into the kernel; no runtime kernel modules installed in the final image.
 3. A legacy-BIOS bootable ISO, with a **kernel-embedded initramfs** and Super Grub2 Disk-compatible `/boot/grub/loopback.cfg` so GRUB needs to load only the kernel file.
-4. A **minimal embedded initramfs** that exists only to initialize early userspace, run the configured early MSR hook, discover storage, and hand off to the full Gentoo root. Do not duplicate Bash, GNU utilities or `lf` in the initramfs when the main root already supplies them.
+4. A **minimal external initramfs** loaded by GRUB from `/d630-gentoo/initramfs`. It initializes early userspace, discovers the SquashFS root across supported partitions, and hands off to the full Gentoo root. Use static BusyBox and avoid duplicating the full userland.
 5. Filesystem and storage drivers built into the kernel so the embedded shell can discover and mount ext4, Btrfs, NTFS3 and FAT volumes without external modules.
 6. A legacy-BIOS GRUB bootloader and a straightforward boot menu.
 7. Persistent system configuration and user data on the installed disk. A live session may use a temporary overlay, but must not be presented as the daily-use installation.
@@ -356,7 +356,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Validate the initial package list, USE flags and firmware requirements.
 - Pin Linux 6.18.y LTS and keep 6.12.y LTS as a fallback.
 - Build and audit the Core 2 kernel with required drivers built in, including i915, iwl3945, USB RNDIS host, HDA and MSR.
-- Define the minimal embedded initramfs tree and `/init`; add a configurable early MSR hook and verify its timing, prerequisites and exact MSR values before enabling it by default.
+- Define and test the minimal external initramfs tree and `/init`; defer any early MSR hook until the basic three-file boot succeeds.
 - Keep Bash/GNU/`lf` configuration in the main Gentoo root, with only a minimal emergency shell and the early `wrmsr` hook in the initramfs.
 - Add checks for missing files, invalid package entries and required target settings.
 
@@ -371,7 +371,7 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 - Build the kernel with required drivers built in and install no runtime kernel modules.
 - Package the minimal early-boot userspace as a cpio initramfs and compile it into the kernel via `CONFIG_INITRAMFS_SOURCE`; do not publish or require a separate initramfs file.
 - Publish a compressed installable root filesystem and a legacy-BIOS GRUB ISO for testing/installation. The installed system must retain changes, preferences and user files across reboots.
-- Ensure the kernel can boot directly to `/init`, establish device nodes, run the early MSR hook only when explicitly configured and validated, and mount/handoff to the main Gentoo root with no external initramfs file.
+- Ensure GRUB can load the external initramfs, `/init` can mount device nodes and discover the SquashFS root, and the system can switch to the main Gentoo root. Keep any early MSR hook disabled until explicitly configured and validated.
 - Verify Bash, GNU utilities and `lf` are provided by the main root rather than duplicated in the embedded archive; keep a small emergency shell in initramfs for root-mount failures.
 - From the main root or emergency shell, test mounting ext4, Btrfs, NTFS3 and FAT volumes using the built-in kernel drivers and available userspace tools.
 - Assemble a legacy-BIOS ISO with GRUB and the self-contained kernel; publish only after integrity checks and boot tests pass.
