@@ -213,7 +213,8 @@ jobs:
           sudo mkdir -p "$root/etc/portage/package.use"
           sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
           # Override Gentoo's profile-forced LLVM targets for this deliberately minimal x86_64 builder.
-          sudo install -m 0644 config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force"
+          sudo mkdir -p "$root/etc/portage/profile/package.use.force"
+          sudo install -m 0644 config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force/zz-d630-llvm"
           sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh "$root/etc/bash/bashrc.d/10-portage-ask.sh"
           sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
           sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
