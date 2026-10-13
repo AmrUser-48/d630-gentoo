@@ -199,6 +199,35 @@ jobs:
             echo '- Gentoo Stage 3 is used as a chroot build environment; the Ubuntu host kernel is shared.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify effective D630 Portage and binary-package settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/portage-config-check.log"
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -euo pipefail
+            features="$(portageq envvar FEATURES)"
+            pkgdir="$(portageq envvar PKGDIR)"
+            video_cards="$(portageq envvar VIDEO_CARDS)"
+            common_flags="$(portageq envvar COMMON_FLAGS)"
+            accept_keywords="$(portageq envvar ACCEPT_KEYWORDS)"
+            printf "FEATURES=%s\\nPKGDIR=%s\\nVIDEO_CARDS=%s\\nCOMMON_FLAGS=%s\\nACCEPT_KEYWORDS=%s\\n" \\
+              "$features" "$pkgdir" "$video_cards" "$common_flags" "$accept_keywords"
+            [[ " $features " == *" buildpkg "* ]] || { echo "ERROR: FEATURES lacks buildpkg." >&2; exit 1; }
+            [[ "$pkgdir" == "/var/cache/binpkgs" ]] || { echo "ERROR: unexpected PKGDIR." >&2; exit 1; }
+            [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
+            [[ "$common_flags" == *"-march=core2"* && "$common_flags" == *"-mtune=core2"* ]] ||
+              { echo "ERROR: compiler flags do not target Core 2." >&2; exit 1; }
+            grep -F -- "media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel" /etc/portage/package.use/10-d630-hardware >/dev/null ||
+              { echo "ERROR: D630 Mesa package.use line missing." >&2; exit 1; }
+            grep -R -F -- "LLVM_TARGETS:" /etc/portage/profile/package.use.force >/dev/null ||
+              { echo "ERROR: local LLVM target override missing." >&2; exit 1; }
+            mkdir -p "$pkgdir"
+            test -w "$pkgdir" || { echo "ERROR: PKGDIR is not writable." >&2; exit 1; }
+            echo "Portage target and binpkg checks passed."
+          ' |& tee "$log"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+
       - name: Generate UTF-8 locale for Gentoo shell sessions
         shell: bash
         run: |
