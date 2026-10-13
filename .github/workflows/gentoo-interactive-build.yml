@@ -382,7 +382,305 @@ jobs:
 
           sudo mkdir -p "$GENTOO_ROOT/var/cache/binpkgs"
           imported=0
-          while IFS=$'\\t' read -r name url; do
+          while IFS= read -r name url; do
+            [[ "$name" == "SHA256SUMS" ]] && continue
+            [[ "$name" =~ ^binpkgs-part-[0-9]+\.tar\.zst$ ]] || continue
+            echo "Downloading prior binpkg shard: $name"
+            curl --fail --location --retry 3 --silent --show-error "$url" -o "$work/$name"
+            (cd "$work" && sha256sum --check --ignore-missing SHA256SUMS)
+            sudo tar --use-compress-program=unzstd -xf "$work/$name" -C "$GENTOO_ROOT/var/cache/binpkgs"
+            rm -f "$work/$name"
+            imported=$((imported + 1))
+          done < "$work/assets.tsv"
+
+          (( imported > 0 )) || { echo 'No binpkg shards imported.' >&2; exit 1; }
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emaint binhost --fix'
+          {
+            echo "Imported $imported binary-package shard(s) from release binpkgs-$BINPKG_RUN_ID."
+            echo "Portage will reuse compatible packages with --usepkg and build missing/incompatible packages from source."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Sync the Gentoo ebuild repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/portage-sync.log"
+          if ! sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$log"; then
+            echo 'emerge-webrsync failed; trying the configured Portage sync method.' | tee -a "$log"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet' |& tee -a "$log"
+          fi
+          tail -n 40 "$log" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Connect runner to private Tailscale network
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          use-cache: "true"
+
+      - name: Configure key-only SSH directly into the Gentoo chroot
+        shell: bash
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gentoo-builder"
+          ssh_key="${SSH_PUBLIC_KEY//$'\r'/}"
+          ssh_key="${ssh_key%$'\n'}"
+          tailnet_ip="$(tailscale ip -4 | awk '/^100\./ {print; exit}')"
+          [[ "$tailnet_ip" =~ ^100\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] ||
+            { echo 'Tailscale IPv4 address not found.' >&2; exit 1; }
+          printf 'TAILSCALE_IP=%s\n' "$tailnet_ip" >> "$GITHUB_ENV"
+
+          sudo useradd --create-home --shell /bin/bash gentoo 2>/dev/null || true
+          sudo install -d -o gentoo -g gentoo -m 0700 /home/gentoo/.ssh
+          printf 'from="100.64.0.0/10",no-agent-forwarding,no-X11-forwarding %s\n' "$ssh_key" |
+            sudo tee /home/gentoo/.ssh/authorized_keys >/dev/null
+          sudo chown gentoo:gentoo /home/gentoo/.ssh/authorized_keys
+          sudo chmod 0600 /home/gentoo/.ssh/authorized_keys
+
+          sudo tee /etc/ssh/sshd_config.d/00-gentoo-builder.conf >/dev/null <<'EOF'
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin no
+          AllowUsers gentoo
+          EOF
+
+          sudo tee /etc/sudoers.d/gentoo-chroot >/dev/null <<'EOF'
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          EOF
+          sudo chmod 0440 /etc/sudoers.d/gentoo-chroot
+          sudo visudo -cf /etc/sudoers.d/gentoo-chroot
+
+          # Force an SSH login into the Gentoo rootfs. The account is only
+          # reachable using the one public key over the private Tailscale IP.
+          sudo tee -a /etc/ssh/sshd_config >/dev/null <<'EOF'
+
+          Match User gentoo
+              ForceCommand /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+              PermitTTY yes
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTunnel no
+          EOF
+
+          # Ubuntu GitHub runners may not have sshd's privilege-separation dir.
+          # Create it before sshd -t so the daemon can validate and start.
+          sudo install -d -o root -g root -m 0755 /run/sshd
+          sudo sshd -t
+          sudo systemctl restart ssh
+          sudo systemctl is-active --quiet ssh
+          sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
+          sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" |
+            tee "$report/ssh-key-fingerprint.txt"
+          {
+            echo '## Gentoo SSH session ready'
+            echo "- Gentoo login: ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip"
+            echo '- SSH account password authentication is disabled; SSH is filtered to Tailscale IPv4 peers.'
+            echo '- The SSH login is forced directly into the Gentoo chroot as root.'
+            echo '- The session is temporary; the host and chroot disappear when the job ends.'
+          } | tee -a "$GITHUB_STEP_SUMMARY" | tee "$report/remote-access.txt"
+          echo '- Optional Gentoo builder utilities may still be compiling in the next step; SSH is already available. Check /var/log/emerge.log inside Gentoo. Utilities bootstrap is best-effort and capped at 35 minutes.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Gentoo builder utilities
+        id: builder-tools
+        continue-on-error: true
+        timeout-minutes: 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
+          if timeout 35m sudo chroot "$GENTOO_ROOT" /bin/bash -lc '/usr/local/sbin/gentoo-build-set runner-tools' |& tee "$log"; then
+            echo 'Builder utilities installed.' | tee -a "$GITHUB_STEP_SUMMARY"
+            sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'eix-update' |& tee -a "$log" || true
+          else
+            echo 'WARNING: one or more optional builder utilities failed to build. SSH remains available; inspect runner-tools.log.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            tail -n 60 "$log" || true
+          fi
+
+      - name: Verify Byobu permissions and Bash completion setup
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -u
+          log="$RUNNER_TEMP/gentoo-builder/runner-tools.log"
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -u
+            # Some package/archive paths can leave interpreter scripts without +x.
+            # Check the actual target for both symlinks and regular files.
+            found_byobu=0
+            for path in /usr/bin/byobu /usr/bin/byobu-*; do
+              [[ -e "$path" ]] || continue
+              found_byobu=1
+              target="$(readlink -f -- "$path" 2>/dev/null || true)"
+              if [[ -n "$target" && -f "$target" && ! -x "$target" ]]; then
+                echo "Repairing non-executable Byobu script: $path -> $target"
+                chmod 0755 "$target"
+              fi
+            done
+            if (( found_byobu )); then
+              ls -l /usr/bin/byobu /usr/bin/byobu-* 2>&1 || true
+            else
+              echo "Byobu is not installed in this runner yet."
+            fi
+            if [[ -f /etc/byobu/backend ]]; then
+              echo BYOBU_BACKEND=screen > /etc/byobu/backend
+              echo "Set Byobu default backend to Screen."
+            fi
+            if [[ -x /usr/bin/byobu-screen && -x /usr/bin/byobu-janitor ]]; then
+              echo "Byobu entry points and janitor are executable."
+            else
+              echo "ERROR: Byobu entry point or janitor is still not executable." >&2
+              ls -l /usr/bin/byobu* 2>&1 || true
+              findmnt -T /usr/bin/byobu-janitor -o TARGET,FSTYPE,OPTIONS 2>&1 || true
+            fi
+            echo "Byobu uses Screen by default; byobu-tmux explicitly requests tmux."
+            if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+              echo "bash-completion main script is installed."
+            else
+              echo "bash-completion main script not found; package installation may have failed."
+            fi
+            find /etc/bash/bashrc.d /etc/profile.d -maxdepth 1 -type f -iname "*completion*" -print 2>/dev/null || true
+          ' |& tee -a "$log" || true
+
+      - name: Keep interactive Gentoo session alive
+        shell: bash
+        timeout-minutes: 310
+        run: |
+          set -euo pipefail
+          session_minutes="${SESSION_MINUTES:-240}"
+          end_epoch=$(( $(date +%s) + session_minutes * 60 ))
+          log="$RUNNER_TEMP/gentoo-builder/session-heartbeat.log"
+
+          if [[ "$BUILD_SET_ON_START" == 'true' ]]; then
+            build_log="$GENTOO_ROOT/var/log/gentoo-build-set.log"
+            sudo install -o "$USER" -g "$(id -gn)" -m 0644 /dev/null "$build_log"
+            nohup sudo -n chroot "$GENTOO_ROOT" /usr/local/sbin/gentoo-build-set "$PACKAGE_SET" "$CUSTOM_ATOMS" \
+              >"$build_log" 2>&1 < /dev/null &
+            build_pid=$!
+            printf 'Started background Portage set: %s (host PID %s). Log inside Gentoo: /var/log/gentoo-build-set.log\n' \
+              "$PACKAGE_SET" "$build_pid" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No package set was auto-started. Log in and use emerge or gentoo-build-set manually.' |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          printf 'Session starts UTC=%s; requested minutes=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$session_minutes" | tee "$log"
+          while :; do
+            now="$(date +%s)"
+            remaining=$(( end_epoch - now ))
+            (( remaining > 0 )) || break
+            sleep_seconds=60
+            (( remaining >= sleep_seconds )) || sleep_seconds=$remaining
+            sleep "$sleep_seconds"
+            printf 'Heartbeat UTC=%s; remaining_seconds=%s\n' \
+              "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(( end_epoch - $(date +%s) ))" | tee -a "$log"
+          done
+          echo 'Interactive session timer expired.' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Gentoo binary packages and logs
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          out="$RUNNER_TEMP/gentoo-build-artifacts"
+          mkdir -p "$out/binpkgs" "$out/logs" "$out/config"
+          root="$GENTOO_ROOT"
+
+          if [[ -d "$root/var/cache/binpkgs" ]]; then
+            # Keep an index with the artifact for inspection; the receiver regenerates
+            # it after import so the resulting index matches the merged local cache.
+            sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix' 2>&1 |
+              tee -a "$out/logs/binhost-index.log" || true
+            sudo cp -a "$root/var/cache/binpkgs/." "$out/binpkgs/" 2>/dev/null || true
+          fi
+          if [[ -f "$root/var/log/emerge.log" ]]; then
+            sudo cp "$root/var/log/emerge.log" "$out/logs/emerge.log" || true
+          fi
+          if [[ -f "$root/var/log/gentoo-build-set.log" ]]; then
+            sudo cp "$root/var/log/gentoo-build-set.log" "$out/logs/gentoo-build-set.log" || true
+          fi
+          cp -a "$RUNNER_TEMP/gentoo-builder/." "$out/logs/" 2>/dev/null || true
+          sudo cp "$root/etc/portage/make.conf" "$out/config/make.conf" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package.use" "$out/config/" 2>/dev/null || true
+          sudo cp -a "$root/etc/portage/package-sets" "$out/config/" 2>/dev/null || true
+          {
+            echo "Target: amd64, glibc, OpenRC Stage 3"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Build host: GitHub-hosted Ubuntu 24.04 x86_64"
+            echo 'The binpkgs are for amd64 and compiled with Core 2 target flags where packages were built from source.'
+          } > "$out/BUILD-MANIFEST.txt"
+          sudo chown -R "$(id -u):$(id -g)" "$out"
+          chmod -R a+rX "$out"
+          du -sh "$out/binpkgs" 2>/dev/null || true
+
+      - name: Prepare persistent binpkg release assets
+        id: prepare-binpkgs-release
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/gentoo-build-artifacts"
+          release="$out/release"
+          mkdir -p "$release"
+          if [[ ! -d "$out/binpkgs" ]] ||
+             ! find "$out/binpkgs" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) -print -quit | grep -q .; then
+            echo 'No binary packages to publish in this session.'
+            echo 'has_packages=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          bash scripts/package-binpkgs-release.sh "$out/binpkgs" "$release"
+          {
+            echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
+            echo "CPU target: Intel Core 2 / Merom"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Source workflow run: $GITHUB_RUN_ID"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Release tag: binpkgs-$GITHUB_RUN_ID"
+            echo "Build session: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "The archives contain packages actually produced in this runner, preserving PKGDIR paths."
+            echo "They are not a complete Gentoo installation; Stage 3 packages are not rebuilt unless explicitly requested."
+          } > "$release/BUILD-MANIFEST.txt"
+          (
+            cd "$release"
+            sha256sum binpkgs-part-*.tar.zst PACKAGE-LIST.txt BUILD-MANIFEST.txt > SHA256SUMS
+          )
+          echo "has_packages=true" >> "$GITHUB_OUTPUT"
+          du -h "$release"/* | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish durable Gentoo binary package release
+        if: always() && steps.prepare-binpkgs-release.outputs.has_packages == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: binpkgs-${{ github.run_id }}
+          name: "D630 Gentoo binary packages — run ${{ github.run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/gentoo-build-artifacts/release/binpkgs-part-*.tar.zst
+            ${{ runner.temp }}/gentoo-build-artifacts/release/PACKAGE-LIST.txt
+            ${{ runner.temp }}/gentoo-build-artifacts/release/BUILD-MANIFEST.txt
+            ${{ runner.temp }}/gentoo-build-artifacts/release/SHA256SUMS
+
+      - name: Upload Gentoo binary packages and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gentoo-build-output-${{ github.run_id }}
+          path: ${{ runner.temp }}/gentoo-build-artifacts/
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+\t' read -r name url; do
             [[ "$name" == "SHA256SUMS" ]] && continue
             [[ "$name" =~ ^binpkgs-part-[0-9]+\.tar\.zst$ ]] || continue
             echo "Downloading prior binpkg shard: $name"
