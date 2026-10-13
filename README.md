@@ -55,7 +55,7 @@ This section records decisions and failure modes from the interactive Gentoo ses
 - `ACCEPT_KEYWORDS="amd64"`: stable amd64 ebuilds only. Do not add `~amd64` globally or add per-package testing keywords as a shortcut around a build problem.
 - `CFLAGS/CXXFLAGS/FCFLAGS/FFLAGS="-O2 -pipe -march=core2 -mtune=core2"`; Rust uses `RUSTFLAGS="-C target-cpu=core2"`. Never use `-march=native` on the GitHub runner.
 - `USE="X alsa dbus udev -systemd -wayland"`: an OpenRC/X11 target, not a global systemd/Wayland desktop.
-- `MAKEOPTS="-j4"`, one concurrent Portage job, `FEATURES="parallel-fetch buildpkg"`, and binpkgs under `/var/cache/binpkgs`.
+- `MAKEOPTS` is tuned per runner: the standard 4-vCPU runner with at least about 13 GB RAM uses `-j12`; lower-resource runners step down to `-j8`, `-j4`, `-j2`, or `-j1`. The workflow attempts to enable 4 GiB LZ4 zram swap on the Ubuntu host as a best-effort OOM safety net; it continues with the existing swap if zram is unavailable. This does not add CPU cores, and zram should not be treated as a replacement for RAM. Portage still merges one package at a time (`--jobs=1`), `FEATURES="parallel-fetch buildpkg"`, with binpkgs under `/var/cache/binpkgs`.
 
 `config/portage/package.use/00-core2-cpu` is intentionally not generated from the remote runner's CPUID:
 
