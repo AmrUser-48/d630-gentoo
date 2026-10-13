@@ -4,9 +4,9 @@ A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with
 
 **Current state:** the repository now defines the standalone three-file boot contract and has an initramfs discovery script plus a GRUB2 menu-entry example. It does not yet produce a finished kernel/initramfs/SquashFS payload automatically; the image-build workflow remains to be implemented.
 
-## Preferred boot: three files on one partition
+## Preferred boot: three files, root filesystem may be on another partition
 
-Place the kernel, external initramfs archive, and SquashFS root on the same partition:
+Use these paths for the kernel, external initramfs archive, and SquashFS root. The kernel and initramfs can be found by GRUB on any GRUB-readable partition; the SquashFS root may be on a different partition:
 
 ```text
 /d630-gentoo/
@@ -15,7 +15,7 @@ Place the kernel, external initramfs archive, and SquashFS root on the same part
 └── squashfs
 ```
 
-This can be a Windows NTFS partition or a supported Linux/FAT filesystem. GRUB loads `kernel` and `initramfs`; the initramfs then searches for `/d630-gentoo/squashfs`. The sample GRUB2 entry is in [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg). It passes the partition UUID to avoid accidentally finding a different copy of the directory. If that argument is omitted, initramfs scans supported partitions.
+This can be a Windows NTFS partition or another filesystem supported by GRUB. The sample entry in [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg) searches separately for `kernel` and `initramfs`, then passes no `d630.boot_uuid`. Consequently, the initramfs searches all partitions whose filesystems are built into the kernel for `/d630-gentoo/squashfs`. The initial supported set is NTFS3, VFAT/FAT, exFAT, ext2/3/4, and Btrfs; encrypted, LVM, RAID, or other unsupported storage layers are not automatically searched. Build these filesystem drivers into the kernel (`=y`), because initramfs cannot load a module from a root filesystem it has not mounted yet. If identical copies of `kernel` or `initramfs` exist on several partitions, GRUB will use its first match.
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
