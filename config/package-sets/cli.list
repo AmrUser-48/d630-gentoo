@@ -8,3 +8,4 @@ sys-process/htop
 sys-process/btop
 sys-apps/fd
 sys-apps/ripgrep
+sys-apps/man-db
