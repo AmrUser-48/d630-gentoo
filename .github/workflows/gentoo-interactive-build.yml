@@ -211,8 +211,7 @@ jobs:
             video_cards="$(portageq envvar VIDEO_CARDS)"
             common_flags="$(portageq envvar COMMON_FLAGS)"
             accept_keywords="$(portageq envvar ACCEPT_KEYWORDS)"
-            printf "FEATURES=%s\\nPKGDIR=%s\\nVIDEO_CARDS=%s\\nCOMMON_FLAGS=%s\\nACCEPT_KEYWORDS=%s\\n" \\
-              "$features" "$pkgdir" "$video_cards" "$common_flags" "$accept_keywords"
+            printf "FEATURES=%s\nPKGDIR=%s\nVIDEO_CARDS=%s\nCOMMON_FLAGS=%s\nACCEPT_KEYWORDS=%s\n" "$features" "$pkgdir" "$video_cards" "$common_flags" "$accept_keywords"
             [[ " $features " == *" buildpkg "* ]] || { echo "ERROR: FEATURES lacks buildpkg." >&2; exit 1; }
             [[ "$pkgdir" == "/var/cache/binpkgs" ]] || { echo "ERROR: unexpected PKGDIR." >&2; exit 1; }
             [[ "$video_cards" == "intel" ]] || { echo "ERROR: VIDEO_CARDS is not intel." >&2; exit 1; }
