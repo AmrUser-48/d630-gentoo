@@ -2,7 +2,24 @@
 
 A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with an optional live ISO for testing, installation and recovery. The goal is a fast, responsive, legacy-BIOS-compatible desktop you can use every day for web browsing, file management, development, media, Wi-Fi, Android tools and ordinary computing; disk repair and rescue tools are included as secondary capabilities.
 
-**Current state:** source scaffold only. The repository is not yet a bootable image. The current GitHub Actions workflow validates files; it does not bootstrap Gentoo or build an ISO.
+**Current state:** the repository now defines the standalone three-file boot contract and has an initramfs discovery script plus a GRUB2 menu-entry example. It does not yet produce a finished kernel/initramfs/SquashFS payload automatically; the image-build workflow remains to be implemented.
+
+## Preferred boot: three files on one partition
+
+Place the kernel, external initramfs archive, and SquashFS root on the same partition:
+
+```text
+/d630-gentoo/
+├── kernel
+├── initramfs
+└── squashfs
+```
+
+This can be a Windows NTFS partition or a supported Linux/FAT filesystem. GRUB loads `kernel` and `initramfs`; the initramfs then searches for `/d630-gentoo/squashfs`. The sample GRUB2 entry is in [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg). It passes the partition UUID to avoid accidentally finding a different copy of the directory. If that argument is omitted, initramfs scans supported partitions.
+
+The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
+
+The older ISO boot path remains available for testing/recovery, but it is not required for this direct-folder boot method. The files listed above must still be generated and packaged by a kernel/initramfs/SquashFS build workflow; source validation alone does not create them.
 
 ## Project goals
 
