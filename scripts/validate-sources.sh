@@ -68,4 +68,10 @@ grep -q 'rootfs.squashfs' iso/boot/grub/loopback.cfg
 grep -q 'gentoo-data.img' iso/boot/grub/loopback.cfg
 ! grep -q '@SHELL@' config/package-sets/daily-driver.list
 
+test -s grub2/d630-gentoo.cfg
+grep -Fq 'linux /d630-gentoo/kernel' grub2/d630-gentoo.cfg
+grep -Fq 'initrd /d630-gentoo/initramfs' grub2/d630-gentoo.cfg
+grep -Fq 'd630.boot_uuid' initramfs/init
+grep -Fq '/d630-gentoo/squashfs' initramfs/init
+
 echo "d630-gentoo source scaffold: validation passed"
