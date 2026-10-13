@@ -9,10 +9,16 @@ test -s initramfs/init
 test -s iso/boot/grub/loopback.cfg
 test -s config/kernel-cmdline.txt
 test -s config/portage/make.conf
-grep -Fq 'EMERGE_DEFAULT_OPTS="--ask --verbose --jobs=1 --load-average=4 --with-bdeps=y"' config/portage/make.conf
+test -s config/portage/binrepos.conf/gentoobinhost.conf
+grep -Fq 'https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/' config/portage/binrepos.conf/gentoobinhost.conf
+grep -Fq 'verify-signature = true' config/portage/binrepos.conf/gentoobinhost.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/portage/make.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/make.conf
+grep -Fq -- '--with-bdeps=n' config/portage/make.conf
+grep -Fq 'EMERGE_DEFAULT_OPTS="--ask --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg"' config/portage/make.conf
 test -s config/portage/profile/package.use.force
 grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.force
-grep -Fq 'config/portage/profile/package.use.force "$root/etc/portage/profile/package.use.force"' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'profile/package.use.force/zz-d630-llvm' .github/workflows/gentoo-interactive-build.yml
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
 
@@ -24,7 +30,7 @@ grep -Fq 'llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/
 grep -Fq 'llvm-core/clang LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
 grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel i915' config/portage/package.use/10-d630-hardware
-grep -Fq 'x11-base/xorg-drivers INPUT_DEVICES: -* evdev libinput synaptics' config/portage/package.use/10-d630-hardware
+grep -Fq 'x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics' config/portage/package.use/10-d630-hardware
 test -s config/xorg/99-synaptics.conf
 grep -Fq 'x11-base/xorg-server -minimal' config/portage/package.use/10-d630-hardware
 grep -Fxq 'x11-base/xorg-drivers' config/package.list
@@ -40,6 +46,8 @@ test -s .github/workflows/gentoo-interactive-build.yml
 test -s .github/workflows/publish-gentoo-binpkgs.yml
 test -s scripts/package-binpkgs-release.sh
 test -s scripts/install-binpkgs-release.sh
+test -s scripts/snapshot-gentoo-session.sh
+test -s scripts/build-squashfs.sh
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
@@ -62,6 +70,8 @@ sh -n scripts/create-persistence-image.sh
 bash -n scripts/gentoo-build-set
 bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh
+bash -n scripts/snapshot-gentoo-session.sh
+bash -n scripts/build-squashfs.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
 grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
 grep -q 'rootfs.squashfs' iso/boot/grub/loopback.cfg
