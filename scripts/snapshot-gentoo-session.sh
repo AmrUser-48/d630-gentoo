@@ -80,7 +80,7 @@ done
 # Record the effective values from inside Gentoo rather than assuming that
 # checked-in defaults survived all runtime edits.
 {
-  for key in ACCEPT_KEYWORDS CFLAGS CXXFLAGS FFLAGS FCFLAGS RUSTFLAGS MAKEOPTS EMERGE_DEFAULT_OPTS FEATURES PKGDIR PORT_LOGDIR USE VIDEO_CARDS INPUT_DEVICES LLVM_TARGETS; do
+  for key in ACCEPT_KEYWORDS CFLAGS CXXFLAGS FFLAGS FCFLAGS RUSTFLAGS MAKEOPTS NINJAOPTS EMERGE_DEFAULT_OPTS FEATURES PKGDIR PORT_LOGDIR USE VIDEO_CARDS INPUT_DEVICES LLVM_TARGETS; do
     value="$(sudo chroot "$ROOT" /bin/bash -lc "portageq envvar $key" 2>/dev/null || true)"
     printf '%s=%s\n' "$key" "$value"
   done
