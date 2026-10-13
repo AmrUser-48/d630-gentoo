@@ -109,7 +109,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl coreutils xz-utils zstd python3 tar rsync openssh-server iptables sudo
+            ca-certificates curl coreutils xz-utils zstd python3 tar rsync squashfs-tools openssh-server iptables sudo
           sudo apt-get clean
           df -h / | tee -a "$GITHUB_STEP_SUMMARY"
 
