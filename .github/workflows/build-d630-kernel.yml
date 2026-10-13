@@ -1,0 +1,251 @@
+name: Build D630 kernel and initramfs
+run-name: "D630 kernel ${{ inputs.kernel_version || '6.18.56' }} • build ${{ github.run_number }}"
+
+on:
+  push:
+    paths:
+      - "config/kernel/**"
+      - "initramfs/**"
+      - "scripts/validate-kernel-config.sh"
+      - ".github/workflows/build-d630-kernel.yml"
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: Stable Linux 6.18.y LTS point release (no rc versions)
+        required: true
+        type: string
+        default: "6.18.56"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: d630-kernel-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Configure and build Linux kernel + external initramfs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      KERNEL_VERSION: ${{ inputs.kernel_version || '6.18.56' }}
+      ARCH: x86_64
+      KBUILD_BUILD_USER: d630
+      KBUILD_BUILD_HOST: github-actions
+      KBUILD_BUILD_VERSION: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate requested stable version
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$KERNEL_VERSION" =~ ^6\.18\.[0-9]+$ ]] || {
+            echo "Only a pinned stable Linux 6.18.y LTS version is accepted, not a moving branch or -rc release." >&2
+            exit 2
+          }
+          echo "Kernel source version: $KERNEL_VERSION" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Target: Intel Core 2 Duo (CONFIG_MCORE2), legacy BIOS, Dell Latitude D630" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install kernel build and initramfs tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bc bison flex build-essential libelf-dev libssl-dev libncurses-dev \
+            dwarves cpio busybox-static xz-utils zstd gzip ca-certificates curl \
+            python3 perl rsync
+          sudo apt-get clean
+
+      - name: Download pinned kernel source
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/linux-$KERNEL_VERSION.tar.xz"
+          url="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz"
+          curl --fail --location --retry 4 --retry-all-errors "$url" -o "$archive"
+          tar -tJf "$archive" >/dev/null
+          sha="$(sha256sum "$archive" | awk '{print $1}')"
+          printf 'Version: %s\nURL: %s\nSHA256: %s\n' "$KERNEL_VERSION" "$url" "$sha" \
+            | tee "$RUNNER_TEMP/kernel-source.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          tar -xJf "$archive" -C "$RUNNER_TEMP" --no-same-owner
+          test -d "$RUNNER_TEMP/linux-$KERNEL_VERSION"
+
+      - name: Configure for D630 and validate required symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/linux-$KERNEL_VERSION"
+          cd "$source_dir"
+
+          make ARCH="$ARCH" x86_64_defconfig
+          scripts/kconfig/merge_config.sh -m .config \
+            "$GITHUB_WORKSPACE/config/kernel/d630-base.fragment" \
+            "$GITHUB_WORKSPACE/config/kernel/d630-live.fragment" \
+            2>&1 | tee "$GITHUB_WORKSPACE/kernel-config-merge.log"
+          make ARCH="$ARCH" olddefconfig
+          cp .config "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config"
+
+          required=(
+            CONFIG_MCORE2
+            CONFIG_X86_MSR
+            CONFIG_BLK_DEV_INITRD
+            CONFIG_BLK_DEV_LOOP
+            CONFIG_OVERLAY_FS
+            CONFIG_SQUASHFS
+            CONFIG_SQUASHFS_ZSTD
+            CONFIG_DEVTMPFS
+            CONFIG_TMPFS
+            CONFIG_EXT4_FS
+            CONFIG_BTRFS_FS
+            CONFIG_NTFS3_FS
+            CONFIG_EXFAT_FS
+            CONFIG_VFAT_FS
+            CONFIG_DRM_I915
+            CONFIG_IWL3945
+            CONFIG_USB_STORAGE
+            CONFIG_USB_NET_RNDIS_HOST
+            CONFIG_USB_NET_CDCETHER
+            CONFIG_BT
+            CONFIG_BT_HCIBTUSB
+            CONFIG_ZRAM
+            CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
+          )
+          failed=0
+          for symbol in "${required[@]}"; do
+            if ! grep -Fxq "${symbol}=y" .config; then
+              echo "ERROR: required target option did not resolve to built-in: $symbol" >&2
+              failed=1
+            fi
+          done
+          if grep -Fxq 'CONFIG_TIGON3=y' .config || grep -Fxq 'CONFIG_TIGON3=m' .config; then
+            echo "ERROR: wired Ethernet driver unexpectedly enabled for the D630 target." >&2
+            failed=1
+          fi
+          if grep -Fxq 'CONFIG_INITRAMFS_SOURCE=""' .config; then
+            :
+          elif grep -Fq 'CONFIG_INITRAMFS_SOURCE=' .config; then
+            echo "ERROR: this target requires an external initramfs, not an embedded copy." >&2
+            failed=1
+          fi
+          if (( failed )); then
+            echo "Effective config saved as d630-$KERNEL_VERSION.config for diagnosis." >&2
+            exit 1
+          fi
+
+          {
+            echo "Effective D630 kernel options:"
+            grep -E '^(CONFIG_(MCORE2|X86_MSR|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Compile the kernel image
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/linux-$KERNEL_VERSION"
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cd "$source_dir"
+          jobs="$(nproc)"
+          (( jobs > 4 )) && jobs=4
+          echo "Compiling bzImage using $jobs jobs."
+          make -j"$jobs" ARCH="$ARCH" bzImage 2>&1 | tee "$GITHUB_WORKSPACE/output/kernel-build.log"
+          test -s arch/x86/boot/bzImage
+          cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/kernel"
+          cp "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config" "$GITHUB_WORKSPACE/output/d630-$KERNEL_VERSION.config"
+          cp "$RUNNER_TEMP/kernel-source.txt" "$GITHUB_WORKSPACE/output/kernel-source.txt"
+          printf 'make -j%s ARCH=%s bzImage\n' "$jobs" "$ARCH" > "$GITHUB_WORKSPACE/output/build-command.txt"
+          file "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
+          du -h "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build external initramfs with static BusyBox
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v busybox
+          applets=(sh mount blkid find mkdir sleep switch_root tr umount cat)
+          for applet in "${applets[@]}"; do
+            if ! busybox --list | grep -Fxq "$applet"; then
+              echo "Required BusyBox applet missing from busybox-static: $applet" >&2
+              exit 1
+            fi
+          done
+
+          root="$RUNNER_TEMP/d630-initramfs-root"
+          rm -rf "$root"
+          mkdir -p "$root"/{bin,sbin,etc,proc,sys,dev,run,mnt/newroot}
+          cp "$(command -v busybox)" "$root/bin/busybox"
+          "$root/bin/busybox" --install -s "$root/bin"
+          cp initramfs/init "$root/init"
+          chmod 0755 "$root/init"
+          test -x "$root/bin/sh"
+          test -x "$root/bin/blkid" || test -L "$root/bin/blkid"
+
+          cd "$root"
+          find . -print0 | cpio --null --create --format=newc --owner=0:0 2>"$GITHUB_WORKSPACE/output/initramfs-cpio.log" \
+            | gzip -9n > "$GITHUB_WORKSPACE/output/initramfs"
+          gzip -t "$GITHUB_WORKSPACE/output/initramfs"
+          cpio -it < <(gzip -dc "$GITHUB_WORKSPACE/output/initramfs") > "$GITHUB_WORKSPACE/output/initramfs-file-list.txt"
+          grep -Fxq './init' "$GITHUB_WORKSPACE/output/initramfs-file-list.txt"
+          du -h "$GITHUB_WORKSPACE/output/initramfs" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Create checksums and build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > output/BUILD-MANIFEST.txt <<EOF
+          Project: AmrUser-48/d630-gentoo
+          Kernel source: Linux $KERNEL_VERSION (stable 6.18.y LTS)
+          Target CPU: Intel Core 2 Duo / Merom (CONFIG_MCORE2=y)
+          Boot: legacy BIOS / GRUB2
+          Boot files: kernel + external initramfs
+          Root discovery: initramfs scans supported filesystems for /d630-gentoo/squashfs
+          Root filesystem: SquashFS with Zstandard decompression enabled in the kernel
+          Runtime modules: none are built or packaged by this workflow
+          Build commit: $GITHUB_SHA
+          Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Note: the SquashFS root is a separate next-stage artifact and is not built by this workflow.
+          EOF
+          (cd output && sha256sum kernel initramfs "d630-$KERNEL_VERSION.config" BUILD-MANIFEST.txt kernel-source.txt > SHA256SUMS)
+          {
+            echo "Output sizes:"
+            ls -lh output/kernel output/initramfs "output/d630-$KERNEL_VERSION.config" output/BUILD-MANIFEST.txt output/SHA256SUMS
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload inspectable build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d630-kernel-initramfs-${{ inputs.kernel_version || '6.18.56' }}-run-${{ github.run_number }}
+          path: |
+            output/kernel
+            output/initramfs
+            output/d630-*.config
+            output/BUILD-MANIFEST.txt
+            output/SHA256SUMS
+            output/kernel-source.txt
+            output/build-command.txt
+            output/kernel-build.log
+            output/initramfs-file-list.txt
+            output/initramfs-cpio.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish persistent test release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: d630-kernel-${{ inputs.kernel_version || '6.18.56' }}-build-${{ github.run_number }}
+          name: "D630 Gentoo kernel ${{ inputs.kernel_version || '6.18.56' }} — build ${{ github.run_number }}"
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            output/kernel
+            output/initramfs
+            output/d630-*.config
+            output/BUILD-MANIFEST.txt
+            output/SHA256SUMS
