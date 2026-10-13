@@ -289,13 +289,13 @@ jobs:
             jobs=1
           fi
 
-          sudo sed -i '/^MAKEOPTS=/d' "$root/etc/portage/make.conf"
-          printf 'MAKEOPTS="-j%s"\n' "$jobs" |
+          sudo sed -i '/^MAKEOPTS=/d;/^NINJAOPTS=/d' "$root/etc/portage/make.conf"
+          printf 'MAKEOPTS="-j%s"\nNINJAOPTS="-j%s"\n' "$jobs" "$jobs" |
             sudo tee -a "$root/etc/portage/make.conf" >/dev/null
 
-          printf 'Runner resources: %s CPUs, %s KiB RAM; Portage MAKEOPTS=-j%s\n' \
-            "$cpus" "$mem_kib" "$jobs" | tee -a "$GITHUB_STEP_SUMMARY"
-          sudo chroot "$root" /bin/bash -lc 'printf "Effective MAKEOPTS="; portageq envvar MAKEOPTS'
+          printf 'Runner resources: %s CPUs, %s KiB RAM; MAKEOPTS=-j%s, NINJAOPTS=-j%s\n' \
+            "$cpus" "$mem_kib" "$jobs" "$jobs" | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo chroot "$root" /bin/bash -lc 'printf "Effective MAKEOPTS="; portageq envvar MAKEOPTS; printf "Effective NINJAOPTS="; portageq envvar NINJAOPTS'
 
       - name: Verify effective D630 Portage and binary-package settings
         shell: bash
