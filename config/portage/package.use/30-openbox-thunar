@@ -1,0 +1,5 @@
+# Keep the standalone Openbox + Thunar setup lean.
+# Thunar's panel trash plugin pulls xfce4-panel and its panel-only dependency tree.
+xfce-base/thunar -trash-panel-plugin
+# Avoid GVFS GCR integration, which pulls certificate/keyring/secret-service components.
+gnome-base/gvfs -gcr
