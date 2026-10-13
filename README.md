@@ -186,7 +186,7 @@ References: [Gentoo Handbook — base installation and VIDEO_CARDS](https://wiki
      gentoo@TAILSCALE_IP
    ```
 
-The login enters the Gentoo chroot as root, so you can run `emerge --sync`, `emerge -av category/package`, inspect `/etc/portage/make.conf`, and use `gentoo-build-set cli`, `gentoo-build-set development`, `gentoo-build-set desktop`, `gentoo-build-set multimedia`, or `gentoo-build-set daily-driver`. For a custom startup set, select `custom` and enter space- or comma-separated atoms such as `dev-vcs/git net-misc/curl`. Custom atoms are validated as package atoms; complex USE-dependency expressions should be added to Portage configuration explicitly.
+The login enters the Gentoo chroot as root, so you can run `emerge --sync`, `emerge -av category/package`, inspect `/etc/portage/make.conf`, and use `gentoo-build-set cli`, `gentoo-build-set development`, `gentoo-build-set desktop`, `gentoo-build-set openbox-thunar` (the focused Openbox + Thunar package closure), `gentoo-build-set multimedia`, or `gentoo-build-set daily-driver`. For a custom startup set, select `custom` and enter space- or comma-separated atoms such as `dev-vcs/git net-misc/curl`. Custom atoms are validated as package atoms; complex USE-dependency expressions should be added to Portage configuration explicitly.
 
 If a build was started automatically, watch it inside Gentoo with `tail -f /var/log/gentoo-build-set.log`; Portage's main log is `/var/log/emerge.log`. The runner can build for up to six hours total, including preparation and package compilation. Large sets such as `daily-driver` (Firefox, Xorg, Mesa and FFmpeg) can exceed that limit; start with smaller sets when you need to keep the interactive session available.
 
