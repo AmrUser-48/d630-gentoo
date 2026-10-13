@@ -148,7 +148,6 @@ else
             umount /run/d630/probe >/dev/null 2>&1 || fail "cannot unmount filesystem after checking $dev"
         done
         [ -n "$found_rootfs" ] && break
-        [ -n "$want_uuid" ] && break
         tries=$((tries + 1))
         sleep 1
     done
