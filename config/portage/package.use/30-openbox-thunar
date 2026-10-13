@@ -3,3 +3,5 @@
 xfce-base/thunar -trash-panel-plugin
 # Avoid GVFS GCR integration, which pulls certificate/keyring/secret-service components.
 gnome-base/gvfs -gcr
+# Pango used by Openbox requires HarfBuzz support in FreeType; persist Portage's required USE change.
+media-libs/freetype harfbuzz
