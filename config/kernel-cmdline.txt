@@ -5,11 +5,10 @@
 #   /d630-gentoo/initramfs
 #   /d630-gentoo/squashfs
 #
-# Recommended GRUB entry passes the filesystem UUID of the partition containing
-# the kernel. With no UUID argument, initramfs searches supported partitions.
-# The normal folder boot requires no custom arguments; 'quiet' is optional.
-d630.boot_uuid=<filesystem-uuid-containing-d630-gentoo>
-quiet
+# The GRUB entry finds kernel and initramfs separately, and intentionally does
+# NOT pass d630.boot_uuid. This lets initramfs search every supported partition
+# for the SquashFS root. The normal boot only needs 'quiet' (optional).
+d630.squashfs=/d630-gentoo/squashfs quiet
 #
 # Optional override if the SquashFS filename/location changes:
 d630.squashfs=/d630-gentoo/squashfs
