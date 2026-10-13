@@ -1,11 +1,12 @@
 # Last-wins live-root requirements for the standalone kernel + external initramfs.
 # Merge after d630-base.fragment and run make olddefconfig.
+# Linux 6.18 x86-64 has no MCORE2 processor-family Kconfig selector (that is 32-bit only).
+# Keep the generic x86-64 instruction baseline and tune scheduling with KCFLAGS=-mtune=core2.
 # The 500 MB boot partition is not where the conventional Gentoo root is built;
 # this config only needs to boot the external /d630-gentoo/squashfs image.
 
 CONFIG_64BIT=y
 CONFIG_X86_64=y
-CONFIG_MCORE2=y
 CONFIG_X86_MSR=y
 CONFIG_X86_CPUID=y
 

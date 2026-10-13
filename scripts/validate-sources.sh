@@ -77,7 +77,7 @@ grep -Fq '/d630-gentoo/squashfs' initramfs/init
 
 test -s config/kernel/d630-base.fragment
 test -s config/kernel/d630-live.fragment
-grep -Fq 'CONFIG_MCORE2=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_X86_64=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_BLK_DEV_INITRD=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_OVERLAY_FS=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_SQUASHFS_ZSTD=y' config/kernel/d630-live.fragment

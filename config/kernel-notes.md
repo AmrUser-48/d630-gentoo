@@ -59,7 +59,7 @@ All required hardware drivers should be built into the kernel (`=y`) for the int
 
 ## Kernel build strategy
 
-- Start from a known-good x86_64 configuration and run `make olddefconfig` against the exact pinned kernel source version.
+- Start from a known-good x86_64 configuration and run `make olddefconfig` against the exact pinned kernel source version; tune compiler scheduling with `KCFLAGS=-mtune=core2`, not `-march=native`.
 - Set Core 2 CPU tuning and `CONFIG_X86_MSR=y`.
 - Build all required hardware drivers into the kernel and install no runtime `.ko` files. Start with `CONFIG_MODULES=y` for diagnostics; consider disabling module support only after successful end-to-end testing.
 - Prefer built-in support for the complete boot/root path: storage, USB host controller, ISO9660, devtmpfs, and any other option needed before userspace can run.
@@ -81,7 +81,7 @@ That fragment needs explicit reconciliation before using it for this Gentoo targ
 - Enable the ISO/live-image path built in: `CONFIG_BLK_DEV_INITRD=y`, loop-device support, `CONFIG_OVERLAY_FS=y`, `CONFIG_SQUASHFS=y`, SquashFS Zstandard decompression, ISO9660/Joliet, devtmpfs, tmpfs, ext4, Btrfs, NTFS3 and VFAT. The existing generic D630 fragment currently has `CONFIG_SQUASHFS=n` and does not by itself enable the complete overlay path.
 - Build target-critical storage, USB host, USB mass storage, RNDIS/CDC tethering, joystick interface, Intel 3945ABG Wi-Fi stack, Intel i915 graphics, HDA/SigmaTel audio, ACPI and filesystems in (`=y`) where their Kconfig dependencies allow it. Do not leave a required early-boot driver as `=m`.
 - Disable the Broadcom `TIGON3` wired Ethernet driver; wired Ethernet is out of project scope. Do not carry it over just because it appears in the other repository's older fragment.
-- Set `CONFIG_MCORE2=y`, `CONFIG_X86_MSR=y`, the schedutil governor as the default, built-in zram with LZ4, and the required legacy BIOS/framebuffer path. Disable EFI/EFI stub for this legacy-BIOS target.
+- Set `CONFIG_X86_MSR=y`, the schedutil governor as the default, built-in zram with LZ4, and the required legacy BIOS/framebuffer path. For Linux 6.18 x86-64, the old `CONFIG_MCORE2` processor-family selector is unavailable (it is 32-bit-only); compile with `KCFLAGS=-mtune=core2` while retaining the generic x86-64 instruction baseline. Disable EFI/EFI stub for this legacy-BIOS target.
 - Keep unrelated DVB/video-capture, AMD/NVIDIA GPU, broad networking, and unused hardware-driver families disabled. Do not apply a blanket module-pruning script unless the built-in requirements have first been checked against the resulting config.
 
 ### Build procedure

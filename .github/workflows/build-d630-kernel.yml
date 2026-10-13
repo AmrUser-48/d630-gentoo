@@ -48,7 +48,7 @@ jobs:
             exit 2
           }
           echo "Kernel source version: $KERNEL_VERSION" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Target: Intel Core 2 Duo (CONFIG_MCORE2), legacy BIOS, Dell Latitude D630" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Target: Intel Core 2 Duo / Merom; generic x86-64 ISA baseline with -mtune=core2 scheduling, legacy BIOS, Dell Latitude D630" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Install kernel build and initramfs tools
         shell: bash
@@ -91,7 +91,7 @@ jobs:
           cp .config "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config"
 
           required=(
-            CONFIG_MCORE2
+            CONFIG_X86_64
             CONFIG_X86_MSR
             CONFIG_BLK_DEV_INITRD
             CONFIG_BLK_DEV_LOOP
@@ -139,7 +139,7 @@ jobs:
 
           {
             echo "Effective D630 kernel options:"
-            grep -E '^(CONFIG_(MCORE2|X86_MSR|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
+            grep -E '^(CONFIG_(X86_64|X86_MSR|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Compile the kernel image
@@ -152,12 +152,12 @@ jobs:
           jobs="$(nproc)"
           (( jobs > 4 )) && jobs=4
           echo "Compiling bzImage using $jobs jobs."
-          make -j"$jobs" ARCH="$ARCH" bzImage 2>&1 | tee "$GITHUB_WORKSPACE/output/kernel-build.log"
+          make -j"$jobs" ARCH="$ARCH" KCFLAGS=-mtune=core2 bzImage 2>&1 | tee "$GITHUB_WORKSPACE/output/kernel-build.log"
           test -s arch/x86/boot/bzImage
           cp arch/x86/boot/bzImage "$GITHUB_WORKSPACE/output/kernel"
           cp "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config" "$GITHUB_WORKSPACE/output/d630-$KERNEL_VERSION.config"
           cp "$RUNNER_TEMP/kernel-source.txt" "$GITHUB_WORKSPACE/output/kernel-source.txt"
-          printf 'make -j%s ARCH=%s bzImage\n' "$jobs" "$ARCH" > "$GITHUB_WORKSPACE/output/build-command.txt"
+          printf 'make -j%s ARCH=%s KCFLAGS=-mtune=core2 bzImage\n' "$jobs" "$ARCH" > "$GITHUB_WORKSPACE/output/build-command.txt"
           file "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
           du -h "$GITHUB_WORKSPACE/output/kernel" | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -199,7 +199,7 @@ jobs:
           cat > output/BUILD-MANIFEST.txt <<EOF
           Project: AmrUser-48/d630-gentoo
           Kernel source: Linux $KERNEL_VERSION (stable 6.18.y LTS)
-          Target CPU: Intel Core 2 Duo / Merom (CONFIG_MCORE2=y)
+          Target CPU: Intel Core 2 Duo / Merom; generic x86-64 ISA baseline, KCFLAGS=-mtune=core2
           Boot: legacy BIOS / GRUB2
           Boot files: kernel + external initramfs
           Root discovery: initramfs scans supported filesystems for /d630-gentoo/squashfs
