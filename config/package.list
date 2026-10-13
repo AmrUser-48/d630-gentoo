@@ -8,6 +8,7 @@
 app-shells/bash
 app-shells/bash-completion
 sys-apps/coreutils
+sys-apps/man-db
 sys-apps/findutils
 sys-apps/grep
 sys-apps/sed
