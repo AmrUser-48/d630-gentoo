@@ -27,7 +27,7 @@ done
 # Preserve the installed package selection, which is different from the list
 # of packages emitted into PKGDIR during this session.
 if [[ -d "$ROOT/var/db/pkg" ]]; then
-  find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' |
+  sudo find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' |
     LC_ALL=C sort > "$STATE/installed-packages.txt"
 else
   : > "$STATE/installed-packages.txt"
@@ -92,7 +92,7 @@ sudo chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' \
 {
   echo "PKGDIR contents at capture time:"
   if [[ -d "$ROOT/var/cache/binpkgs" ]]; then
-    find "$ROOT/var/cache/binpkgs" -type f \
+    sudo find "$ROOT/var/cache/binpkgs" -type f \
       \( -name '*.gpkg.tar' -o -name '*.tbz2' \) \
       -printf '%P\t%s bytes\n' | LC_ALL=C sort
   fi
