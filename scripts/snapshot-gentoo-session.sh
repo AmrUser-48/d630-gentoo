@@ -18,7 +18,7 @@ for item in "$ROOT"/etc/portage/*; do
   [[ -e "$item" || -L "$item" ]] || continue
   base="${item##*/}"
   case "$base" in
-    make.conf|make.profile|package.*|repos.conf|profile|env|sets|package-sets|bashrc|dispatch-conf.conf|binrepos.conf)
+    make.conf|make.profile|package.*|repos.conf|profile|env|sets|package-sets|dispatch-conf.conf|binrepos.conf)
       sudo cp -a "$item" "$CONFIG/$base" 2>/dev/null || true
       ;;
   esac
@@ -102,7 +102,9 @@ sudo chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' \
 # The snapshot is a reference for a later session, not an automatically applied
 # replacement for the repository's canonical configuration.
 sudo find "$OUT/config" "$STATE" -type f -size -5M \
-  -exec sed -E -i '/(password|passphrase|token|secret|api[_-]?key|access[_-]?key|authorization|client[_-]?secret|bearer)/I s@.*@# [redacted sensitive-looking setting line]@' {} + \
+  -exec sed -E -i \
+    -e '/(password|passphrase|token|secret|api[_-]?key|access[_-]?key|authorization|client[_-]?secret|bearer)/I s@.*@# [redacted sensitive-looking setting line]@' \
+    -e 's@((https?|ftp|rsync)://)[^/@[:space:]]+@([^/[:space:]]+)@\1\3@g' {} + \
   2>/dev/null || true
 
 cat > "$STATE/README.txt" <<'EOF'
