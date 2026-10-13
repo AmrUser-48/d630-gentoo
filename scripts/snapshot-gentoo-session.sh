@@ -104,7 +104,7 @@ sudo chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' \
 sudo find "$OUT/config" "$STATE" -type f -size -5M \
   -exec sed -E -i \
     -e '/(password|passphrase|token|secret|api[_-]?key|access[_-]?key|authorization|client[_-]?secret|bearer)/I s@.*@# [redacted sensitive-looking setting line]@' \
-    -e 's@((https?|ftp|rsync)://)[^/@[:space:]]+@([^/[:space:]]+)@\1\3@g' {} + \
+    -e 's~((https?|ftp|rsync)://)[^/@[:space:]]+@([^/[:space:]]+)~\1\3~g' {} + \
   2>/dev/null || true
 
 cat > "$STATE/README.txt" <<'EOF'
