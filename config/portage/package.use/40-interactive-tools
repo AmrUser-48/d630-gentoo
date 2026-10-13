@@ -3,3 +3,5 @@
 sys-process/htop lm-sensors
 # Enable sixel graphics support in xterm.
 x11-terms/xterm sixel
+# Terminus bitmap fonts: PSF for Linux console and Unicode PCF for X11; omit OTB/OTF fonts.
+media-fonts/terminus-font -otf pcf-unicode psf
