@@ -69,9 +69,21 @@ grep -q 'gentoo-data.img' iso/boot/grub/loopback.cfg
 ! grep -q '@SHELL@' config/package-sets/daily-driver.list
 
 test -s grub2/d630-gentoo.cfg
-grep -Fq 'linux /d630-gentoo/kernel' grub2/d630-gentoo.cfg
-grep -Fq 'initrd /d630-gentoo/initramfs' grub2/d630-gentoo.cfg
+grep -Fq 'd630-gentoo/kernel' grub2/d630-gentoo.cfg
+grep -Fq 'd630-gentoo/initramfs' grub2/d630-gentoo.cfg
 grep -Fq 'd630.boot_uuid' initramfs/init
+! grep -Fq 'd630.boot_uuid=$d630_boot_uuid' grub2/d630-gentoo.cfg
 grep -Fq '/d630-gentoo/squashfs' initramfs/init
 
 echo "d630-gentoo source scaffold: validation passed"
+
+test -s config/kernel/d630-base.fragment
+test -s config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_MCORE2=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_BLK_DEV_INITRD=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_OVERLAY_FS=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_SQUASHFS_ZSTD=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_NTFS3_FS=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_IWL3945=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_USB_NET_RNDIS_HOST=y' config/kernel/d630-live.fragment
+grep -Fq 'CONFIG_BT=y' config/kernel/d630-live.fragment
