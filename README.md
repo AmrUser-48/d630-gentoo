@@ -19,7 +19,7 @@ This can be a Windows NTFS partition or another filesystem supported by GRUB. Th
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
-The older ISO boot path remains available for testing/recovery, but it is not required for this direct-folder boot method. The kernel and external initramfs are built by the new workflow; the SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
+The old ISO loopback configuration remains in the repository as a reference, but the current build targets direct-folder boot. The kernel and external initramfs are built by the new workflow; the SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
 
 ## Project goals
 

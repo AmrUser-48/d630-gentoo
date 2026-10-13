@@ -71,9 +71,9 @@ grep -q 'gentoo-data.img' iso/boot/grub/loopback.cfg
 test -s grub2/d630-gentoo.cfg
 grep -Fq 'd630-gentoo/kernel' grub2/d630-gentoo.cfg
 grep -Fq 'd630-gentoo/initramfs' grub2/d630-gentoo.cfg
-grep -Fq 'd630.boot_uuid' initramfs/init
 ! grep -Fq 'd630.boot_uuid=$d630_boot_uuid' grub2/d630-gentoo.cfg
 grep -Fq '/d630-gentoo/squashfs' initramfs/init
+! grep -Fq 'blkid' initramfs/init
 
 test -s config/kernel/d630-base.fragment
 test -s config/kernel/d630-live.fragment

@@ -1,31 +1,18 @@
-# D630 Gentoo kernel command-line contract.
+# D630 Gentoo direct-folder boot command line.
 #
-# Preferred three-file directory boot:
-#   /d630-gentoo/kernel
-#   /d630-gentoo/initramfs
-#   /d630-gentoo/squashfs
+# GRUB independently locates kernel and initramfs. No partition UUID or custom
+# argument is required for normal boot.
+quiet
 #
-# The GRUB entry finds kernel and initramfs separately, and intentionally does
-# NOT pass d630.boot_uuid. This lets initramfs search every supported partition
-# for the SquashFS root. The normal boot only needs 'quiet' (optional).
-d630.squashfs=/d630-gentoo/squashfs quiet
-#
-# Optional override if the SquashFS filename/location changes:
+# Optional root path override; default is /d630-gentoo/squashfs:
 d630.squashfs=/d630-gentoo/squashfs
 #
-# Folder boot uses a temporary tmpfs OverlayFS upper layer: changes vanish on
-# reboot. Do not silently use NTFS as OverlayFS upperdir. Persistent folder boot
-# can be added later with a separate ext4 data image on a writable partition.
+# The initramfs tries NTFS3, exFAT, VFAT, ext4 and Btrfs against block devices.
+# Filesystem drivers must be built into the kernel because there is no rootfs
+# yet from which to load modules. No blkid/udev dependency is required.
 #
-# Legacy ISO boot remains supported for the existing ISO layout:
-d630.iso_uuid=<filesystem-uuid-containing-iso>
-d630.iso_path=/path/without-spaces/d630-gentoo.iso
-d630.persistence=auto
-d630.datafile=gentoo-data.img
-d630.rootfs=/LiveOS/rootfs.squashfs
+# Three-file mode uses a temporary RAM OverlayFS upper/work. Changes vanish
+# at reboot; persistent overlay support is a separate later task.
 #
-# Temporary ISO session:
-d630.persistence=volatile
-#
-# Verbose early boot:
+# Verbose early-boot diagnostics:
 d630.debug=1 loglevel=7 ignore_loglevel

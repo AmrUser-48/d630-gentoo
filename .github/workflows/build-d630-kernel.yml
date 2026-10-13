@@ -166,7 +166,7 @@ jobs:
         run: |
           set -euo pipefail
           command -v busybox
-          applets=(sh mount blkid find mkdir sleep switch_root tr umount cat)
+          applets=(sh mount find mkdir sleep switch_root umount cat)
           for applet in "${applets[@]}"; do
             if ! busybox --list | grep -Fxq "$applet"; then
               echo "Required BusyBox applet missing from busybox-static: $applet" >&2
@@ -182,7 +182,6 @@ jobs:
           cp initramfs/init "$root/init"
           chmod 0755 "$root/init"
           test -x "$root/bin/sh"
-          test -x "$root/bin/blkid" || test -L "$root/bin/blkid"
 
           cd "$root"
           find . -print0 | cpio --null --create --format=newc --owner=0:0 2>"$GITHUB_WORKSPACE/output/initramfs-cpio.log" \
@@ -202,7 +201,7 @@ jobs:
           Target CPU: Intel Core 2 Duo / Merom; generic x86-64 ISA baseline, KCFLAGS=-mtune=core2
           Boot: legacy BIOS / GRUB2
           Boot files: kernel + external initramfs
-          Root discovery: initramfs scans supported filesystems for /d630-gentoo/squashfs
+          Root discovery: initramfs tries NTFS3, exFAT, VFAT, ext4 and Btrfs on block devices for /d630-gentoo/squashfs
           Root filesystem: SquashFS with Zstandard decompression enabled in the kernel
           Runtime modules: none are built or packaged by this workflow
           Build commit: $GITHUB_SHA
