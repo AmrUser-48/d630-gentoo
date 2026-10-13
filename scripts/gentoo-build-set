@@ -19,6 +19,7 @@ case "$SET_NAME" in
     cli) SET_FILES+=(cli.list) ;;
     development) SET_FILES+=(development.list) ;;
     desktop) SET_FILES+=(desktop.list) ;;
+    openbox-thunar) SET_FILES+=(openbox-thunar.list) ;;
     multimedia) SET_FILES+=(multimedia.list) ;;
     daily-driver) SET_FILES+=(daily-driver.list) ;;
     custom)
@@ -34,7 +35,7 @@ case "$SET_NAME" in
             fi
         done
         ;;
-    *) die "unknown set '$SET_NAME'; choose runner-tools, cli, development, desktop, multimedia, daily-driver, custom, or none." ;;
+    *) die "unknown set '$SET_NAME'; choose runner-tools, cli, development, desktop, openbox-thunar, multimedia, daily-driver, custom, or none." ;;
 esac
 
 for file in "${SET_FILES[@]}"; do
