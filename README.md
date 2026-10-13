@@ -189,6 +189,7 @@ The interactive runner now publishes packages that were built during its session
 - Each runner run with at least one built Gentoo binary package creates a prerelease tagged `binpkgs-<RUN_ID>`.
 - Release assets include `binpkgs-part-NNN.tar.zst` shards, `PACKAGE-LIST.txt`, `BUILD-MANIFEST.txt`, and `SHA256SUMS`. Each shard is kept below 2 GB and preserves the category/package paths from Portage's `PKGDIR`.
 - Only packages actually built on that runner are included. The untouched stage3 base packages are not magically rebuilt. A release is a durable package export, not a complete installable Gentoo root and not yet an always-online Portage binhost.
+- On a new interactive run, enter the previous numeric run ID in the optional `binpkg_run_id` field to import that release before building. Portage uses matching packages with `--usepkg` and compiles anything missing or incompatible. A release that did not build Mesa or LLVM cannot skip those packages, though it may provide their other dependencies.
 - After extraction, the importer runs `emaint binhost --fix` to rebuild the local `Packages` index, then you can use normal Portage dependency resolution with `--usepkgonly`.
 
 #### Save the currently running session's packages
