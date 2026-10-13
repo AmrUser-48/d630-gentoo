@@ -18,6 +18,7 @@ on:
           - cli
           - development
           - desktop
+          - openbox-thunar
           - multimedia
           - daily-driver
           - custom
