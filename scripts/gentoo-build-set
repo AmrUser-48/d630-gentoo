@@ -71,4 +71,4 @@ else
     ASK_OPT=(--ignore-default-opts --ask=n --verbose)
 fi
 
-exec emerge "${ASK_OPT[@]}" --jobs=1 --load-average=4 --buildpkg --with-bdeps=y "${ATOMS[@]}"
+exec emerge "${ASK_OPT[@]}" --jobs=1 --load-average=4 --usepkg --buildpkg --with-bdeps=y "${ATOMS[@]}"
