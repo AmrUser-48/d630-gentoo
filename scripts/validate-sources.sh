@@ -75,8 +75,6 @@ grep -Fq 'd630.boot_uuid' initramfs/init
 ! grep -Fq 'd630.boot_uuid=$d630_boot_uuid' grub2/d630-gentoo.cfg
 grep -Fq '/d630-gentoo/squashfs' initramfs/init
 
-echo "d630-gentoo source scaffold: validation passed"
-
 test -s config/kernel/d630-base.fragment
 test -s config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_MCORE2=y' config/kernel/d630-live.fragment
@@ -87,3 +85,7 @@ grep -Fq 'CONFIG_NTFS3_FS=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_IWL3945=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_USB_NET_RNDIS_HOST=y' config/kernel/d630-live.fragment
 grep -Fq 'CONFIG_BT=y' config/kernel/d630-live.fragment
+
+test -s scripts/validate-kernel-config.sh
+bash scripts/validate-kernel-config.sh
+echo "d630-gentoo source scaffold: validation passed"
