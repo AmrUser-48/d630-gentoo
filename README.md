@@ -43,7 +43,7 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - The workflow copies the D630-specific USE flags in `config/portage/package.use/`, including console GPM support and the OpenRC PipeWire/WirePlumber audio stack without Bluetooth.
 - The interactive workflow now captures a redacted `SESSION-SNAPSHOT.tar.zst` with effective Portage settings, package configuration, the installed-package list, `emerge --info`, and runner resource details in the same persistent release as the binpkgs. On the next run, provide that release run ID in `binpkg_run_id`: compatible binpkgs are imported and the previous snapshot is placed under `/var/log/gentoo-bootstrap/previous-session-<RUN_ID>` for reference. The snapshot is not blindly applied over the canonical configuration.
 - Workflow edits do not alter runs that are already in progress. The current run, if started before the snapshot change, can still publish reusable binpkgs but may not contain `SESSION-SNAPSHOT.tar.zst`; snapshot assets will be included by newly started runs.
-- Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, `--load-average=4`, parallel fetch, and `FEATURES=buildpkg`. Each interactive package plan is visible before it is applied. Built packages are retained in `/var/cache/binpkgs`, exported in persistent `binpkgs-<RUN_ID>` Releases, and also included in a short-lived Actions artifact for recovery.
+- Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, runner-tuned `MAKEOPTS`, parallel fetch, local binpkg creation, and the official signed Gentoo generic x86-64 binhost. The default is `--with-bdeps=n`: build-time dependencies are not pulled in when compatible binary packages make them unnecessary. Source builds still require their declared build dependencies. Portage verifies official binpkg signatures using `getuto`; it does not accept incompatible USE flags just to force a binary package. Packages are retained in `/var/cache/binpkgs` and exported in persistent releases.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
 ### D630 USE flags and Mesa/LLVM troubleshooting
@@ -56,8 +56,8 @@ This section records decisions and failure modes from the interactive Gentoo ses
 
 - `ACCEPT_KEYWORDS="amd64"`: stable amd64 ebuilds only. Do not add `~amd64` globally or add per-package testing keywords as a shortcut around a build problem.
 - `CFLAGS/CXXFLAGS/FCFLAGS/FFLAGS="-O2 -pipe -march=core2 -mtune=core2"`; Rust uses `RUSTFLAGS="-C target-cpu=core2"`. Never use `-march=native` on the GitHub runner.
-- `USE="X alsa dbus elogind udev -systemd -wayland"`: an OpenRC/X11 target, not a global systemd/Wayland desktop.
-- `MAKEOPTS` is tuned per runner: the standard 4-vCPU runner with at least about 9 GB RAM uses `-j8`; smaller runners step down to `-j6`, `-j4`, `-j2`, or `-j1`. The workflow only attempts 4 GiB LZ4 zram swap on hosts with under 8 GB RAM, and continues with existing swap if zram is unavailable. Zram is an OOM safety net, not a source of CPU or physical RAM; keeping it disabled on the standard runner avoids unnecessary compression overhead. Portage still merges one package at a time (`--jobs=1`), `FEATURES="parallel-fetch buildpkg"`, with binpkgs under `/var/cache/binpkgs`.
+- `USE="X alsa dbus elogind man udev -systemd -wayland"`: an OpenRC/X11 target with elogind sessions and optional man-page generation, not systemd or Wayland.
+- `MAKEOPTS` is tuned per runner: the standard 4-vCPU runner with at least about 9 GB RAM uses `-j8`; smaller runners step down to `-j6`, `-j4`, `-j2`, or `-j1`. The workflow only attempts 4 GiB LZ4 zram swap on hosts with under 8 GB RAM, and continues with existing swap if zram is unavailable. Zram is an OOM safety net, not a source of CPU or physical RAM; keeping it disabled on the standard runner avoids unnecessary compression overhead. Portage still merges one package at a time (`--jobs=1`), `FEATURES="parallel-fetch buildpkg getbinpkg binpkg-request-signature"`, and stores local binpkgs under `/var/cache/binpkgs`. The official fallback host is the generic x86-64 tree; do not use x86-64-v3 on the Core 2 Duo.
 
 `config/portage/package.use/00-core2-cpu` is intentionally not generated from the remote runner's CPUID:
 
@@ -120,6 +120,14 @@ Notes and risks:
 - Keep the `LLVM_SLOT` selection for `dev-util/mesa_clc`. Setting the whole package to `dev-util/mesa_clc -*` is wrong: it removes the required slot choice and can produce a `REQUIRED_USE` error such as `exactly-one-of ( llvm_slot_18 ... llvm_slot_22 )`. The intended current setting is `LLVM_SLOT: -* 22`; re-check the available slot if the Gentoo tree has moved to a newer Mesa/LLVM generation.
 - `llvm-runtimes/libclc` may still show `USE="spirv"`. That is not evidence that AMD or NVIDIA drivers are enabled; the important check is that its `VIDEO_CARDS` list does not enable `radeonsi`, `r600`, `nvidia`, or other unwanted targets.
 - A local `VIDEO_CARDS: -* intel` setting selects requested options; it does not guarantee that every build dependency is absent. Ebuild `DEPEND`/`BDEPEND` declarations still determine what Portage must build.
+
+#### LLVM is a build-toolchain dependency, not the desired graphics runtime
+
+LLVM is compiler infrastructure (including the Clang frontend and code-generation libraries), not a desktop service that D630 needs to run. The D630's GM965/GMA X3100 uses Mesa's Crocus hardware driver. With Mesa's `-llvm -vulkan` and no OpenCL runtime requirement, the goal is to omit LLVM and Clang from the **final runtime image**.
+
+The current Gentoo Mesa ebuild's helper dependency `dev-util/mesa_clc` can still pull Clang, LLVM, libclc and SPIR-V tooling when building Mesa from source. Therefore, do not interrupt a running Mesa build or manually delete LLVM libraries from the build chroot. Let the build complete and preserve its binpkgs. For future runs, the official generic x86-64 binhost and this repository's previous binpkg release are both available; Portage will use binaries when their ABI, dependency metadata and USE configuration are compatible. The official tree uses a conservative `-march=x86-64 -mtune=generic` baseline, which is compatible with the T7250, unlike x86-64-v3. Some binaries may still be rejected because our USE flags are intentionally narrower.
+
+For the final root, use a separate clean Stage 3 root and install only the selected runtime package sets from binpkgs, with build-time dependencies excluded (`--with-bdeps=n`). Keep the desired desktop and core package atoms in that root's world set, inspect `emerge --depclean --with-bdeps=n --pretend`, and review the proposed removals before applying them. Do not force-remove LLVM packages if `scanelf`/link-level checks show a runtime consumer still needs a library. The temporary runner/build root and the final SquashFS root must remain separate.
 
 #### Past mistakes: do not repeat
 
@@ -227,6 +235,20 @@ emerge --ask --verbose --usepkgonly app-misc/mc sys-apps/ripgrep
 ```
 
 `--usepkgonly` prevents falling back to compiling missing packages. If Portage reports a missing binary, its dependency was not built/published in that release, or its USE/profile/ABI settings do not match the target. Use a package set that builds the required dependency closure, or compile only the missing pieces deliberately.
+
+### Compact runtime SquashFS
+
+Build the image from a **clean runtime root**, not from the interactive compiler chroot. The latter contains compilers, LLVM helpers, build caches and headers that should not be present in the laptop's final image.
+
+The repository's `scripts/build-squashfs.sh ROOTFS OUTPUT.squashfs` makes a staging copy and removes `/usr/share/doc`, `/usr/share/info`, GTK/desktop help trees, Portage build/download caches, the checked-out ebuild repository, headers, pkg-config/CMake development metadata, static archives and libtool files. It preserves `/usr/share/man`, `/usr/share/licenses`, and `/var/db/pkg`; if `man-db` is installed, it attempts to rebuild the index used by `whatis`. The package sets include `sys-apps/man-db`, and global USE keeps optional man-page generation enabled, so the intended offline interface is `man ls` and `whatis ls`. A TLDR client is optional, not a replacement for offline manual pages.
+
+The packer uses Zstandard compression at a 1 MiB block size and level 15. The target kernel must have SquashFS and its Zstandard decompressor built in (e.g. `CONFIG_SQUASHFS=y` and `CONFIG_SQUASHFS_ZSTD=y`). The script does not rewrite the source root and will warn if LLVM/Clang package records are still present. It deliberately does not delete LLVM files blindly; keep them out by constructing the final runtime root from runtime dependencies only.
+
+Example, after creating the clean runtime root at `/opt/d630-runtime-root`:
+
+```bash
+sudo scripts/build-squashfs.sh /opt/d630-runtime-root /path/to/d630-gentoo/squashfs
+```
 
 ### SquashFS naming is separate from persistence
 
