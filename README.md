@@ -196,9 +196,9 @@ Download the `gentoo-build-output-...` artifact before it expires (retention is 
 
 The interactive runner now publishes packages that were built during its session to a persistent GitHub Release. This avoids putting large binary files into Git history and avoids relying on the one-day Actions artifact retention.
 
-- Each runner run with at least one built Gentoo binary package creates a prerelease tagged `binpkgs-<RUN_ID>`.
-- Release assets include `binpkgs-part-NNN.tar.zst` shards, `PACKAGE-LIST.txt`, `BUILD-MANIFEST.txt`, and `SHA256SUMS`. Each shard is kept below 2 GB and preserves the category/package paths from Portage's `PKGDIR`.
-- Only packages actually built on that runner are included. The untouched stage3 base packages are not magically rebuilt. A release is a durable package export, not a complete installable Gentoo root and not yet an always-online Portage binhost.
+- Each new runner run publishes a prerelease tagged `binpkgs-<RUN_ID>` containing a redacted session snapshot and any binary packages produced by that run, even if no new package was built.
+- Release assets include `SESSION-SNAPSHOT.tar.zst`, `BUILD-MANIFEST.txt`, `PACKAGE-LIST.txt`, `SHA256SUMS`, and (when produced) `binpkgs-part-NNN.tar.zst` shards. Each binpkg shard is kept below 2 GB and preserves the category/package paths from Portage's `PKGDIR`.
+- Only packages actually built on that runner are included. The untouched Stage 3 base packages are not magically rebuilt. The official generic x86-64 Gentoo binhost is a separate fallback; Portage uses it only when package ABI, dependencies and USE settings match. This release is not a complete installable Gentoo root.
 - On a new interactive run, enter the previous numeric run ID in the optional `binpkg_run_id` field to import that release before building. Portage uses matching packages with `--usepkg` and compiles anything missing or incompatible. A release that did not build Mesa or LLVM cannot skip those packages, though it may provide their other dependencies.
 - After extraction, the importer runs `emaint binhost --fix` to rebuild the local `Packages` index, then you can use normal Portage dependency resolution with `--usepkgonly`.
 
@@ -247,7 +247,7 @@ The packer uses Zstandard compression at a 1 MiB block size and level 15. The ta
 Example, after creating the clean runtime root at `/opt/d630-runtime-root`:
 
 ```bash
-sudo scripts/build-squashfs.sh /opt/d630-runtime-root /path/to/d630-gentoo/squashfs
+sudo bash scripts/build-squashfs.sh /opt/d630-runtime-root /path/to/d630-gentoo/squashfs
 ```
 
 ### SquashFS naming is separate from persistence
