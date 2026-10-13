@@ -40,3 +40,4 @@ media-sound/mpd
 media-sound/ncmpcpp
 media-sound/lame
 media-sound/alsa-utils
+sys-apps/man-db
