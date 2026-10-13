@@ -382,7 +382,7 @@ jobs:
 
           sudo mkdir -p "$GENTOO_ROOT/var/cache/binpkgs"
           imported=0
-          while IFS=
+          while IFS=$'\t' read -r name url; do
             [[ "$name" == "SHA256SUMS" ]] && continue
             [[ "$name" =~ ^binpkgs-part-[0-9]+\.tar\.zst$ ]] || continue
             echo "Downloading prior binpkg shard: $name"
