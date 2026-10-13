@@ -51,6 +51,8 @@ test -s scripts/package-binpkgs-release.sh
 test -s scripts/install-binpkgs-release.sh
 test -s scripts/snapshot-gentoo-session.sh
 test -s scripts/build-squashfs.sh
+test -s scripts/build-runtime-squashfs.sh
+test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
@@ -75,6 +77,9 @@ bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh
 bash -n scripts/snapshot-gentoo-session.sh
 bash -n scripts/build-squashfs.sh
+bash -n scripts/build-runtime-squashfs.sh
+grep -Fq -- "--getbinpkg --usepkgonly" scripts/build-runtime-squashfs.sh
+grep -Fq "net-wireless/wireless-regdb" scripts/build-runtime-squashfs.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
 grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
 grep -q 'rootfs.squashfs' iso/boot/grub/loopback.cfg
