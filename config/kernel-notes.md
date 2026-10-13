@@ -19,7 +19,7 @@ This is a reasoned starting choice, not a claim that 6.18 has been tested on thi
 - Host bridge Intel PM965/GM965/GL960 `8086:2a00`; ICH8M LPC `8086:2815`.
 - Compile for Core 2 (`-march=core2 -mtune=core2`); never `-march=native` in CI.
 
-## Boot architecture: minimal embedded initramfs, read-only SquashFS plus persistent OverlayFS
+## Boot architecture: external initramfs, read-only SquashFS plus writable OverlayFS
 
 The preferred boot target is a standalone three-file directory on one partition: `/d630-gentoo/kernel`, `/d630-gentoo/initramfs`, and `/d630-gentoo/squashfs`. GRUB loads the kernel and the external initramfs; `/init` locates the SquashFS file on the backing partition, mounts it read-only, then creates a writable OverlayFS root. The GRUB entry may pass `d630.boot_uuid` so initramfs checks the same partition that GRUB used. Without that argument, initramfs scans supported partitions. The previous ISO design remains an optional legacy/recovery path: in that mode the same `/init` can be embedded with `CONFIG_INITRAMFS_SOURCE` and receives `d630.iso_uuid` plus `d630.iso_path`.
 
@@ -96,7 +96,7 @@ That fragment needs explicit reconciliation before using it for this Gentoo targ
 
 3. Enable the Gentoo kernel integration options for Gentoo and script-based init systems (including OpenRC) that are offered by the exact `gentoo-sources` version. Keep the configuration buildable with that exact source version; symbol names and dependencies can change.
 
-4. Pass the repository's `initramfs/init` into the kernel build through `CONFIG_INITRAMFS_SOURCE` (or the build system's equivalent reproducible cpio-input step), so the ISO can boot with a single kernel file. Validate that the archive contains an executable `/init` and all tools/files needed before handing off to the SquashFS/OverlayFS root.
+4. Build the repository's `initramfs/init` as a separate gzip-compressed `newc` cpio archive named `initramfs`, including a static BusyBox and the required applets. The direct-folder GRUB entry loads it with `initrd`. Keep `CONFIG_INITRAMFS_SOURCE` empty for this target; embedding the archive is reserved for the optional legacy ISO variant. Validate that the archive contains an executable `/init` and all tools/files needed before handing off to the SquashFS/OverlayFS root.
 
 5. Build the kernel and verify `arch/x86/boot/bzImage`, the effective `.config`, its size, and the generated initramfs contents. Publish these as artifacts for inspection. The Gentoo builder chroot shares the Ubuntu runner's kernel, so **do not attempt to install or boot the target kernel inside that chroot**.
 
@@ -113,7 +113,7 @@ Initial debug-friendly build policy: keep `CONFIG_MODULES=y` while validating th
 ## Image-size and reliability rules
 
 - No Portage, compiler, headers, source trees or build cache in the final runtime root.
-- No external initramfs file in the target design; embed the cpio initramfs in the kernel and test that GRUB can load the kernel alone.
+- Keep the target initramfs external as `/d630-gentoo/initramfs`, loaded by GRUB alongside `/d630-gentoo/kernel`. Do not embed it in the kernel for the direct-folder target.
 - No runtime kernel modules installed in the final image. Firmware is still included where hardware requires it.
 - Strip unrelated drivers only after checking dependencies and the resulting kernel config.
 - Document measured kernel and ISO sizes; do not guess or promise size targets before a build.
