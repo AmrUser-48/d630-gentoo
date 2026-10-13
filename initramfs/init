@@ -1,10 +1,22 @@
 #!/bin/sh
-# Minimal embedded early userspace for the D630 loopback live ISO.
-# Build BusyBox static with: ash, blkid, cat, find, mount+loop, mkdir,
-# sleep, switch_root, tr. Build all boot-path storage/filesystem drivers in.
+# D630 early userspace.
+#
+# Preferred three-file boot:
+#   /d630-gentoo/kernel
+#   /d630-gentoo/initramfs
+#   /d630-gentoo/squashfs
+#
+# With no ISO arguments, find the squashfs file on a supported partition and
+# boot it with a volatile OverlayFS upper layer. If d630.boot_uuid is supplied
+# by GRUB, inspect only that filesystem; otherwise scan supported partitions.
+#
+# Legacy ISO mode is retained when d630.iso_uuid and d630.iso_path are passed.
+# BusyBox should provide: ash, blkid, cat, find, mount (loop), mkdir, sleep,
+# switch_root, tr, and umount. Required kernel drivers must be built in.
 PATH=/bin:/sbin
 export PATH
 export LC_ALL=C
+set -f
 
 cmdline="$(cat /proc/cmdline 2>/dev/null || true)"
 debug=0
@@ -21,6 +33,7 @@ getarg() {
     done
     return 1
 }
+
 log() { echo "[d630-init] $*"; }
 fail() {
     log "FATAL: $*"
@@ -35,85 +48,141 @@ mount -t proc proc /proc 2>/dev/null || fail "cannot mount proc"
 mount -t sysfs sysfs /sys 2>/dev/null || fail "cannot mount sysfs"
 mount -t tmpfs -o mode=0755 tmpfs /run 2>/dev/null || fail "cannot mount temporary /run"
 
-mkdir -p /run/d630/bootdev /run/d630/iso /run/d630/lower
+mkdir -p /run/d630/probe /run/d630/bootdev /run/d630/iso /run/d630/lower
 mkdir -p /run/d630/persist /run/d630/volatile /mnt/newroot
 
 iso_uuid="$(getarg d630.iso_uuid || true)"
 iso_path="$(getarg d630.iso_path || true)"
-persistence="$(getarg d630.persistence || echo auto)"
+boot_uuid="$(getarg d630.boot_uuid || true)"
+persistence=""
 datafile="$(getarg d630.datafile || echo gentoo-data.img)"
-rootfs="$(getarg d630.rootfs || echo /LiveOS/rootfs.squashfs)"
+rootfs_arg="$(getarg d630.rootfs || true)"
+squash_arg="$(getarg d630.squashfs || echo /d630-gentoo/squashfs)"
+boot_mode=folder
+rootfs_file=""
 
-[ -n "$iso_uuid" ] || fail "missing d630.iso_uuid; boot through Super Grub2 Disk loopback.cfg"
-[ -n "$iso_path" ] || fail "missing d630.iso_path; boot through Super Grub2 Disk loopback.cfg"
-case "$iso_path" in
-    *' '*) fail "ISO paths containing spaces are not supported yet" ;;
-esac
-case "$datafile" in
-    ""|*/*|*..*) fail "d630.datafile must be a filename beside the ISO" ;;
-esac
-case "$persistence" in
-    auto|volatile) ;;
-    *) fail "unsupported d630.persistence value: $persistence" ;;
-esac
+# Translate blkid filesystem names to kernel mount types supported by this
+# initramfs. The target kernel must compile each desired driver in (=y).
+fs_mount_type() {
+    case "$1" in
+        ntfs|ntfs3) echo ntfs3 ;;
+        fat|msdos|vfat) echo vfat ;;
+        ext2|ext3|ext4|btrfs|exfat) echo "$1" ;;
+        *) return 1 ;;
+    esac
+}
 
-want_uuid="$(printf '%s' "$iso_uuid" | tr '[:upper:]' '[:lower:]')"
-bootdev=''
-tries=0
-while [ "$tries" -lt 20 ] && [ -z "$bootdev" ]; do
-    for dev in $(find /dev -type b 2>/dev/null); do
-        got_uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
-        if [ -n "$got_uuid" ] && [ "$got_uuid" = "$want_uuid" ]; then
-            bootdev=$dev
-            break
-        fi
+if [ -n "$iso_uuid" ] || [ -n "$iso_path" ]; then
+    # Compatibility with the older ISO + gentoo-data.img boot method.
+    boot_mode=iso
+    [ -n "$iso_uuid" ] || fail "missing d630.iso_uuid"
+    [ -n "$iso_path" ] || fail "missing d630.iso_path"
+    case "$iso_path" in
+        *' '*) fail "ISO paths containing spaces are not supported" ;;
+    esac
+    case "$datafile" in
+        ""|*/*|*..*) fail "d630.datafile must be a filename beside the ISO" ;;
+    esac
+    persistence="$(getarg d630.persistence || echo auto)"
+    rootfs_arg="${rootfs_arg:-/LiveOS/rootfs.squashfs}"
+    want_uuid="$(printf '%s' "$iso_uuid" | tr '[:upper:]' '[:lower:]')"
+    bootdev=""
+    tries=0
+    while [ "$tries" -lt 25 ] && [ -z "$bootdev" ]; do
+        for dev in $(find /dev -type b 2>/dev/null); do
+            got_uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+            if [ -n "$got_uuid" ] && [ "$got_uuid" = "$want_uuid" ]; then
+                bootdev=$dev
+                break
+            fi
+        done
+        [ -n "$bootdev" ] && break
+        tries=$((tries + 1))
+        sleep 1
     done
-    [ -n "$bootdev" ] && break
-    tries=$((tries + 1))
-    sleep 1
-done
-[ -n "$bootdev" ] || fail "could not find backing filesystem UUID $iso_uuid"
+    [ -n "$bootdev" ] || fail "could not find ISO backing filesystem UUID $iso_uuid"
+    raw_type="$(blkid -s TYPE -o value "$bootdev" 2>/dev/null || true)"
+    host_type="$(fs_mount_type "$raw_type" 2>/dev/null || true)"
+    [ -n "$host_type" ] || fail "unsupported ISO backing filesystem type: $raw_type"
+    log "Mounting ISO backing device $bootdev ($host_type, UUID $iso_uuid)"
+    mount -t "$host_type" -o rw "$bootdev" /run/d630/bootdev ||
+        fail "cannot mount ISO backing filesystem read-write"
+    iso_rel="${iso_path#/}"
+    iso_file="/run/d630/bootdev/$iso_rel"
+    [ -f "$iso_file" ] || fail "ISO path not found: $iso_path"
+    log "Mounting ISO file $iso_path"
+    mount -t iso9660 -o loop,ro "$iso_file" /run/d630/iso ||
+        fail "cannot loop-mount ISO; check ISO9660 and loop support"
+    rootfs_rel="${rootfs_arg#/}"
+    rootfs_file="/run/d630/iso/$rootfs_rel"
+    [ -s "$rootfs_file" ] || fail "missing SquashFS root in ISO: $rootfs_arg"
+else
+    # Simple directory boot: the payload file is on the same partition as
+    # GRUB loaded the kernel/initramfs from. GRUB may pass d630.boot_uuid to
+    # avoid ambiguity when several partitions contain a d630-gentoo directory.
+    persistence="$(getarg d630.persistence || echo volatile)"
+    case "$squash_arg" in
+        *' '*) fail "SquashFS paths containing spaces are not supported" ;;
+        *../*|../*|*/..) fail "SquashFS path must not traverse parent directories" ;;
+    esac
+    squash_rel="${squash_arg#/}"
+    want_uuid="$(printf '%s' "$boot_uuid" | tr '[:upper:]' '[:lower:]')"
+    found_rootfs=""
+    tries=0
+    while [ "$tries" -lt 25 ] && [ -z "$found_rootfs" ]; do
+        for dev in $(find /dev -type b 2>/dev/null); do
+            raw_type="$(blkid -s TYPE -o value "$dev" 2>/dev/null || true)"
+            host_type="$(fs_mount_type "$raw_type" 2>/dev/null || true)"
+            [ -n "$host_type" ] || continue
+            if [ -n "$want_uuid" ]; then
+                got_uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+                [ "$got_uuid" = "$want_uuid" ] || continue
+            fi
+            mount -t "$host_type" -o ro "$dev" /run/d630/probe >/dev/null 2>&1 || continue
+            candidate="/run/d630/probe/$squash_rel"
+            if [ -s "$candidate" ]; then
+                found_rootfs="$candidate"
+                log "Found $squash_arg on $dev ($host_type${want_uuid:+, UUID $boot_uuid})"
+                break
+            fi
+            umount /run/d630/probe >/dev/null 2>&1 || fail "cannot unmount filesystem after checking $dev"
+        done
+        [ -n "$found_rootfs" ] && break
+        [ -n "$want_uuid" ] && break
+        tries=$((tries + 1))
+        sleep 1
+    done
+    [ -n "$found_rootfs" ] ||
+        fail "cannot find $squash_arg on supported partitions; check d630.boot_uuid and built-in filesystem drivers"
+    rootfs_file="$found_rootfs"
+    case "$persistence" in
+        volatile) ;;
+        auto) fail "three-file folder boot is volatile; persistence requires a separate writable ext4 data image and explicit setup" ;;
+        *) fail "unsupported d630.persistence value: $persistence" ;;
+    esac
+fi
 
-host_type="$(blkid -s TYPE -o value "$bootdev" 2>/dev/null || true)"
-[ -n "$host_type" ] || fail "could not determine filesystem type on $bootdev"
-case "$host_type" in
-    ntfs) host_type=ntfs3 ;;
-    ext2|ext3|ext4|btrfs|ntfs3|vfat) ;;
-    *) fail "unsupported ISO/persistence backing filesystem: $host_type" ;;
-esac
-log "Mounting ISO backing device $bootdev ($host_type, UUID $iso_uuid)"
-mount -t "$host_type" -o rw "$bootdev" /run/d630/bootdev ||
-    fail "cannot mount backing filesystem read-write; it stores persistent data"
-
-iso_rel=${iso_path#/}
-iso_file="/run/d630/bootdev/$iso_rel"
-[ -f "$iso_file" ] || fail "ISO path not found on backing filesystem: $iso_path"
-log "Mounting ISO file $iso_path"
-mount -t iso9660 -o loop,ro "$iso_file" /run/d630/iso ||
-    fail "cannot loop-mount ISO; check kernel ISO9660 and loop support"
-
-rootfs_rel=${rootfs#/}
-[ -f "/run/d630/iso/$rootfs_rel" ] || fail "missing SquashFS root in ISO: $rootfs"
-log "Mounting read-only SquashFS root: $rootfs"
-mount -t squashfs -o loop,ro "/run/d630/iso/$rootfs_rel" /run/d630/lower ||
-    fail "cannot mount SquashFS; check CONFIG_SQUASHFS and its compressor"
+log "Mounting read-only SquashFS root: $rootfs_file"
+mount -t squashfs -o loop,ro "$rootfs_file" /run/d630/lower ||
+    fail "cannot mount SquashFS; enable loop and the matching SquashFS compressor in the kernel"
 
 if [ "$persistence" = auto ]; then
-    iso_dir=${iso_rel%/*}
-    if [ "$iso_dir" = "$iso_rel" ]; then iso_dir=''; fi
+    # ISO mode only: the ext4 data image is stored beside the ISO.
+    iso_rel="${iso_path#/}"
+    iso_dir="${iso_rel%/*}"
+    if [ "$iso_dir" = "$iso_rel" ]; then iso_dir=""; fi
     if [ -n "$iso_dir" ]; then data_rel="$iso_dir/$datafile"; else data_rel="$datafile"; fi
     data_img="/run/d630/bootdev/$data_rel"
-    [ -f "$data_img" ] ||
-        fail "persistent image not found: $data_rel. Create it with scripts/create-persistence-image.sh"
+    [ -f "$data_img" ] || fail "persistent image not found: $data_rel"
     log "Mounting persistent ext4 image: $data_rel"
     mount -t ext4 -o loop,rw "$data_img" /run/d630/persist ||
-        fail "cannot mount $datafile as ext4; check it with fsck.ext4 on another system"
+        fail "cannot mount $datafile as ext4"
     mkdir -p /run/d630/persist/upper /run/d630/persist/work ||
-        fail "cannot create OverlayFS upper/work directories in $datafile"
+        fail "cannot create OverlayFS upper/work directories"
     upper=/run/d630/persist/upper
     work=/run/d630/persist/work
 else
-    log "Using temporary tmpfs overlay; all changes will be lost at reboot"
+    log "Using temporary tmpfs overlay; changes are lost at reboot"
     mount -t tmpfs -o mode=0755,size=50% tmpfs /run/d630/volatile ||
         fail "cannot allocate volatile OverlayFS storage"
     mkdir -p /run/d630/volatile/upper /run/d630/volatile/work
@@ -121,18 +190,18 @@ else
     work=/run/d630/volatile/work
 fi
 
-log "Creating merged writable root (persistence=$persistence)"
+log "Creating merged writable root"
 mount -t overlay overlay -o "lowerdir=/run/d630/lower,upperdir=$upper,workdir=$work" /mnt/newroot ||
-    fail "OverlayFS mount failed; check CONFIG_OVERLAY_FS and ext4 upper/work support"
+    fail "OverlayFS mount failed; check CONFIG_OVERLAY_FS and suitable upper/work filesystem support"
 [ -x /mnt/newroot/sbin/init ] || fail "SquashFS root has no executable /sbin/init"
 
-# Keep all backing filesystems alive across switch_root by moving the single
-# /run tmpfs, with its child mounts, into the newly mounted root.
+# Preserve the discovered partition, lower SquashFS, overlay data, and any ISO
+# mounts by moving the one /run tmpfs below the new root before switch_root.
 mkdir -p /mnt/newroot/dev /mnt/newroot/proc /mnt/newroot/sys /mnt/newroot/run
 mount -o move /dev /mnt/newroot/dev || fail "cannot move /dev into new root"
 mount -o move /proc /mnt/newroot/proc || fail "cannot move /proc into new root"
 mount -o move /sys /mnt/newroot/sys || fail "cannot move /sys into new root"
-mount -o move /run /mnt/newroot/run || fail "cannot preserve ISO/persistence mounts under new root /run"
+mount -o move /run /mnt/newroot/run || fail "cannot preserve boot filesystem mounts under new root /run"
 
 log "Switching to Gentoo userspace"
 exec switch_root /mnt/newroot /sbin/init
