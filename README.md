@@ -238,7 +238,11 @@ emerge --ask --verbose --usepkgonly app-misc/mc sys-apps/ripgrep
 
 ### Compact runtime SquashFS
 
-Build the image from a **clean runtime root**, not from the interactive compiler chroot. The latter contains compilers, LLVM helpers, build caches and headers that should not be present in the laptop's final image.
+**Automated build:** open **Actions → Build D630 Gentoo runtime SquashFS → Run workflow**. This workflow downloads and verifies a fresh Gentoo amd64 glibc/OpenRC Stage 3, applies the repository's Core 2 Portage settings, imports requested durable `binpkgs-<run-id>` releases, installs a runtime package set, and emits a compressed SquashFS named exactly `squashfs`. Select `console` for the first build, `desktop` for Xorg/Openbox, or `daily-driver` for the broader application set. Enter one or more numeric package-run IDs that actually published binary shards. With `source_fallback=false` (default), missing/incompatible binaries stop the build instead of compiling; set it to `true` only when source builds are acceptable. The workflow does not build the kernel or initramfs.
+
+**Exporting a boot bundle from the interactive Gentoo runner:** inside the Gentoo chroot, place files in `/root/d630-boot-bundle/`. Required files are `kernel` and `initramfs`. If building modules, also provide `KERNELRELEASE.txt` containing the exact output of `make -s kernelrelease` and `modules-<exact-kernelrelease>.tar.zst`. Optional files are `d630-firmware.tar.zst`, `d630-*.config`, `FIRMWARE-SOURCES.txt` and `KERNEL-BUILD-MANIFEST.txt`. New interactive runner jobs publish these assets alongside their `binpkgs-<run-id>` release and check that the module archive's directory matches `KERNELRELEASE.txt`. Use the same release tag (for example, `binpkgs-<run-id>`) in the runtime workflow's `kernel_bundle_tag` input. This export change does not alter runner jobs that were already in progress when it was committed.
+
+The first SquashFS boot flow uses a volatile RAM OverlayFS, so account and system changes are lost at reboot. A persistent overlay / installed-system target remains unfinished. Do not mistake source validation for a successful image build or a successful boot on the physical D630.
 
 The repository's `scripts/build-squashfs.sh ROOTFS OUTPUT.squashfs` makes a staging copy and removes `/usr/share/doc`, `/usr/share/info`, GTK/desktop help trees, Portage build/download caches, the checked-out ebuild repository, headers, pkg-config/CMake development metadata, static archives and libtool files. It preserves `/usr/share/man`, `/usr/share/licenses`, and `/var/db/pkg`; if `man-db` is installed, it attempts to rebuild the index used by `whatis`. The package sets include `sys-apps/man-db`, and global USE keeps optional man-page generation enabled, so the intended offline interface is `man ls` and `whatis ls`. A TLDR client is optional, not a replacement for offline manual pages.
 
@@ -353,6 +357,8 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 - `scripts/validate-sources.sh`: source/configuration checks.
 - `scripts/package-binpkgs-release.sh`: shard built packages into persistent GitHub Release assets.
 - `scripts/install-binpkgs-release.sh`: verify and import a package release into the target's configured Portage `PKGDIR`.
+- `scripts/build-runtime-squashfs.sh`: bootstrap a clean Gentoo OpenRC runtime from verified binpkgs and build the direct-folder SquashFS root.
+- `.github/workflows/build-d630-runtime-squashfs.yml`: manually triggered runtime-root/SquashFS builder; it does not compile the kernel or initramfs.
 - `.github/workflows/publish-gentoo-binpkgs.yml`: publish packages from an existing, still-retained runner artifact.
 - `.github/workflows/validate.yml`: source validation only, not a Gentoo build.
 
