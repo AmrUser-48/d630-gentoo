@@ -95,7 +95,7 @@ jobs:
               kernel_release="$(tr -d '\r\n' < "$release_dir/KERNELRELEASE.txt")"
               [[ "$kernel_release" =~ ^[A-Za-z0-9._+-]+$ ]] || { echo "Invalid KERNELRELEASE.txt." >&2; exit 1; }
               tar --use-compress-program=unzstd -tf "$module_archive" |
-                grep -Fxq "lib/modules/$kernel_release/" || {
+                grep -Fx "lib/modules/$kernel_release/" >/dev/null || {
                   echo "Module archive does not contain lib/modules/$kernel_release/." >&2; exit 1;
                 }
             fi
