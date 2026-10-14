@@ -5,9 +5,15 @@ log() { echo; echo "[d630-runtime-rootfs] $*"; }
 
 [[ "$EUID" -eq 0 ]] || die "run as root"
 [[ "$RUNTIME_PROFILE" =~ ^(console|desktop|daily-driver)$ ]] || die "invalid runtime profile"
-[[ "$BINPKG_RUN_IDS" =~ ^[0-9,\ ]+$ ]] || die "binpkg_run_ids must be numeric IDs separated by commas or spaces"
+[[ -z "$BINPKG_RUN_IDS" || "$BINPKG_RUN_IDS" =~ ^[0-9,[:space:]]+$ ]] || die "binpkg_run_ids must be numeric IDs separated by commas or spaces"
 [[ "$SOURCE_FALLBACK" == true || "$SOURCE_FALLBACK" == false ]] || die "SOURCE_FALLBACK must be true or false"
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
+LOCAL_RELEASE_ASSETS_DIR="${LOCAL_RELEASE_ASSETS_DIR:-}"
+[[ -n "$BINPKG_RUN_IDS" || -n "$LOCAL_RELEASE_ASSETS_DIR" ]] || die "provide binpkg_run_ids or prepared_assets_run_id"
+if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
+  [[ -d "$LOCAL_RELEASE_ASSETS_DIR" ]] || die "prepared assets directory not found: $LOCAL_RELEASE_ASSETS_DIR"
+  [[ -s "$LOCAL_RELEASE_ASSETS_DIR/SHA256SUMS" ]] || die "prepared assets have no SHA256SUMS"
+fi
 
 IDS="$(printf '%s' "$BINPKG_RUN_IDS" | tr ',' ' ')"
 ROOT="$RUNNER_TEMP/d630-runtime-root"
@@ -24,8 +30,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf 'Profile: %s\nBinpkg releases: %s\nSource fallback: %s\nKernel bundle: %s\n' \
-  "$RUNTIME_PROFILE" "$IDS" "$SOURCE_FALLBACK" "$KERNEL_BUNDLE_TAG" > "$OUT/BUILD-INPUTS.txt"
+printf 'Profile: %s\nBinpkg releases: %s\nPrepared assets directory: %s\nSource fallback: %s\nKernel bundle tag: %s\n' \
+  "$RUNTIME_PROFILE" "$IDS" "$LOCAL_RELEASE_ASSETS_DIR" "$SOURCE_FALLBACK" "$KERNEL_BUNDLE_TAG" > "$OUT/BUILD-INPUTS.txt"
 
 log "Fetch and verify official Gentoo amd64 OpenRC Stage 3"
 BASE='https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc'
@@ -92,11 +98,23 @@ if ! chroot "$ROOT" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$OUT/portage
 fi
 chroot "$ROOT" /bin/bash -lc 'getuto' |& tee -a "$OUT/portage-bootstrap.log"
 
-log "Import binary package releases"
-for ID in $IDS; do
-  curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
-    "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/binpkgs-$ID" -o "$WORK/release.json"
-  python3 - "$WORK/release.json" "$WORK/assets.tsv" <<'PY'
+log "Import binary package assets"
+if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
+  log "Verify recovered publisher artifact and import package shards"
+  (cd "$LOCAL_RELEASE_ASSETS_DIR" && sha256sum --check SHA256SUMS) |& tee "$OUT/PREPARED-ASSET-CHECK.log"
+  shopt -s nullglob
+  PARTS=( "$LOCAL_RELEASE_ASSETS_DIR"/binpkgs-part-*.tar.zst )
+  shopt -u nullglob
+  (( ${#PARTS[@]} > 0 )) || die "prepared assets have no binpkgs-part-*.tar.zst package shards"
+  for PART in "${PARTS[@]}"; do
+    tar --use-compress-program=unzstd -xf "$PART" -C "$ROOT/var/cache/binpkgs"
+  done
+  printf 'Source: prepared Actions artifact\nPackage shards: %s\n' "${#PARTS[@]}" > "$OUT/LOCAL-BINPKG-IMPORT.txt"
+else
+  for ID in $IDS; do
+    curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+      "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/binpkgs-$ID" -o "$WORK/release.json"
+    python3 - "$WORK/release.json" "$WORK/assets.tsv" <<'PY'
 import json, re, sys
 with open(sys.argv[1], encoding="utf-8") as f: r = json.load(f)
 assets = r.get("assets", [])
@@ -107,16 +125,17 @@ with open(sys.argv[2], "w", encoding="utf-8") as f:
     f.write("SHA256SUMS\t" + sums[0]["browser_download_url"] + "\n")
     for a in parts: f.write(a["name"] + "\t" + a["browser_download_url"] + "\n")
 PY
-  SUMS_URL="$(awk -F '\t' '$1=="SHA256SUMS"{print $2; exit}' "$WORK/assets.tsv")"
-  curl -fsSL --retry 3 "$SUMS_URL" -o "$WORK/SHA256SUMS"
-  while IFS=$'\t' read -r NAME URL; do
-    [[ "$NAME" == SHA256SUMS ]] && continue
-    curl -fL --retry 3 "$URL" -o "$WORK/$NAME"
-    (cd "$WORK" && grep -F "  $NAME" SHA256SUMS | sha256sum --check)
-    tar --use-compress-program=unzstd -xf "$WORK/$NAME" -C "$ROOT/var/cache/binpkgs"
-    rm -f "$WORK/$NAME"
-  done < "$WORK/assets.tsv"
-done
+    SUMS_URL="$(awk -F '\t' '$1=="SHA256SUMS"{print $2; exit}' "$WORK/assets.tsv")"
+    curl -fsSL --retry 3 "$SUMS_URL" -o "$WORK/SHA256SUMS"
+    while IFS=$'\t' read -r NAME URL; do
+      [[ "$NAME" == SHA256SUMS ]] && continue
+      curl -fL --retry 3 "$URL" -o "$WORK/$NAME"
+      (cd "$WORK" && grep -F "  $NAME" SHA256SUMS | sha256sum --check)
+      tar --use-compress-program=unzstd -xf "$WORK/$NAME" -C "$ROOT/var/cache/binpkgs"
+      rm -f "$WORK/$NAME"
+    done < "$WORK/assets.tsv"
+  done
+fi
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
 log "Select package atoms"
@@ -227,8 +246,30 @@ if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
   chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
 fi
 
-log "Add matching kernel modules and firmware if a bundle tag was supplied"
-if [[ -n "$KERNEL_BUNDLE_TAG" ]]; then
+log "Install matching kernel modules and preserve the recovered boot files"
+if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
+  [[ -s "$LOCAL_RELEASE_ASSETS_DIR/kernel" && -s "$LOCAL_RELEASE_ASSETS_DIR/initramfs" ]] ||
+    die "prepared assets do not contain both kernel and initramfs"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/kernel" "$OUT/kernel"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/initramfs" "$OUT/initramfs"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/KERNELRELEASE.txt" "$OUT/KERNELRELEASE.txt" 2>/dev/null || true
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/KERNEL-BUILD-MANIFEST.txt" "$OUT/KERNEL-BUILD-MANIFEST.txt" 2>/dev/null || true
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/BUILD-MANIFEST.txt" "$OUT/SOURCE-BUILD-MANIFEST.txt" 2>/dev/null || true
+  MOD_ARCHIVE="$(find "$LOCAL_RELEASE_ASSETS_DIR" -maxdepth 1 -name 'modules-*.tar.zst' -print -quit)"
+  [[ -n "$MOD_ARCHIVE" ]] || die "prepared assets do not contain a matching modules-*.tar.zst archive"
+  MOD_DIR="$(tar --use-compress-program=unzstd -tf "$MOD_ARCHIVE" | awk '/^(\.\/)?lib\/modules\/[^/]+\/$/ && !found { print; found = 1 }')"
+  [[ -n "$MOD_DIR" ]] || die "module archive has no /lib/modules tree"
+  MOD_REL="$(printf '%s\n' "$MOD_DIR" | sed -E 's#^(\./)?lib/modules/([^/]+)/$#\2#')"
+  REL_FILE="$LOCAL_RELEASE_ASSETS_DIR/KERNELRELEASE.txt"
+  [[ -s "$REL_FILE" ]] || REL_FILE="$LOCAL_RELEASE_ASSETS_DIR/kernel-release.txt"
+  if [[ -s "$REL_FILE" ]]; then
+    [[ "$(tr -d '\r\n' < "$REL_FILE")" == "$MOD_REL" ]] || die "module release mismatch"
+  fi
+  tar --use-compress-program=unzstd -xf "$MOD_ARCHIVE" -C "$ROOT"
+  [[ ! -f "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" ]] ||
+    tar --use-compress-program=unzstd -xf "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" -C "$ROOT"
+  printf 'Source: recovered Actions artifact\nKernel release: %s\nModules: %s\n' "$MOD_REL" "$(basename "$MOD_ARCHIVE")" > "$OUT/KERNEL-MODULES.txt"
+elif [[ -n "$KERNEL_BUNDLE_TAG" ]]; then
   mkdir -p "$WORK/kernel"
   curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$KERNEL_BUNDLE_TAG" -o "$WORK/kernel/release.json"
@@ -262,7 +303,7 @@ PY
   [[ ! -f "$WORK/kernel/d630-firmware.tar.zst" ]] || tar --use-compress-program=unzstd -xf "$WORK/kernel/d630-firmware.tar.zst" -C "$ROOT"
   printf 'Release: %s\nKernel release: %s\n' "$KERNEL_BUNDLE_TAG" "$MOD_REL" > "$OUT/KERNEL-MODULES.txt"
 else
-  echo "No kernel bundle tag supplied; optional modules are not bundled." > "$OUT/KERNEL-MODULES.txt"
+  echo "No kernel bundle supplied; optional modules are not bundled." > "$OUT/KERNEL-MODULES.txt"
 fi
 
 log "Validate runtime root and build SquashFS"
@@ -300,7 +341,7 @@ bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
 [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
-(cd "$OUT" && sha256sum squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt > SHA256SUMS)
+(cd "$OUT" && sha256sum squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt kernel initramfs KERNELRELEASE.txt 2>/dev/null > SHA256SUMS)
 du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
 cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
 log "Runtime image completed"
