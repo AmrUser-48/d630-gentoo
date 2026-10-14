@@ -52,7 +52,7 @@ jobs:
       RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
       BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
-      SOURCE_FALLBACK: ${{ inputs.source_fallback }}
+      SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
 
@@ -88,7 +88,7 @@ jobs:
           set -Eeuo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl python3 tar xz-utils zstd rsync squashfs-tools \
+            ca-certificates curl git python3 tar xz-utils zstd rsync squashfs-tools \
             e2fsprogs util-linux gzip
           sudo apt-get clean
           df -h / | tee -a "$GITHUB_STEP_SUMMARY"
