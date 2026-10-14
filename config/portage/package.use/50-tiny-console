@@ -1,0 +1,5 @@
+# Tiny D630 console profile: ALSA-only, no FFmpeg/PulseAudio/extra format stacks.
+app-shells/zsh -doc -examples
+media-sound/sox alsa encode id3tag mad opus png -ffmpeg -ao -dolbyb -fftw -flac -ladspa -loudness -ogg -openmp -oss -pulseaudio -sndfile -sndio -speexdsp -twolame -wavpack -amr
+media-sound/lame frontend
+media-sound/alsa-utils -doc -nls
