@@ -9,10 +9,11 @@ on:
         required: true
         type: choice
         options:
+          - tiny-console
           - console
           - desktop
           - daily-driver
-        default: console
+        default: tiny-console
       prepared_assets_run_id:
         description: "Actions run ID of Prepare existing Gentoo assets; downloads its d630-gentoo-assets artifact"
         required: false
