@@ -1,0 +1,3 @@
+# Keep the base repository stable-only; allow selected GURU applications individually.
+# app-misc/lf is keyworded ~amd64 in GURU.
+app-misc/lf ~amd64
