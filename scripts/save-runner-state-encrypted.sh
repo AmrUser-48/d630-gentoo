@@ -135,7 +135,7 @@ print(json.dumps({
     "tag_name": tag,
     "name": "Gentoo runner state (encrypted) — " + tag,
     "body": "Full Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted. Configure the Actions secret STATE_ENCRYPTION_PASSPHRASE to restore this state.",
-    "draft": False,
+    "draft": True,
     "prerelease": True,
     "generate_release_notes": False,
 }))
@@ -165,20 +165,41 @@ for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
     --data-binary "@$asset" "$UPLOAD_URL?name=$name" -o "$WORK/upload-response.json"
 done
 
+: > "$WORK/expected-assets.tsv"
+for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
+  printf '%s\t%s\n' "$(basename "$asset")" "$(stat -c '%s' "$asset")" >> "$WORK/expected-assets.tsv"
+done
 curl --config "$CURL_CONFIG" --fail --silent --show-error \
   "$API/repos/$REPO/releases/tags/$TAG" -o "$WORK/verify-release.json"
-python3 - "$WORK/verify-release.json" <<'PY' > "$WORK/uploaded-assets.txt"
+RELEASE_ID="$(python3 - "$WORK/verify-release.json" "$WORK/expected-assets.tsv" <<'PY'
+import json, sys
+release=json.load(open(sys.argv[1], encoding="utf-8"))
+expected={}
+for line in open(sys.argv[2], encoding="utf-8"):
+    name,size=line.rstrip("\n").split("\t")
+    expected[name]=int(size)
+assets={a.get("name"):a for a in release.get("assets", [])}
+if set(assets) != set(expected):
+    raise SystemExit("Uploaded asset names do not match the encrypted local snapshot.")
+for name,size in expected.items():
+    asset=assets[name]
+    if asset.get("state") != "uploaded" or int(asset.get("size",-1)) != size:
+        raise SystemExit("Uploaded asset failed state/size verification: "+name)
+print(release["id"])
+PY
+)" || die "Uploaded release assets failed verification"
+
+# Publish only after all encrypted chunks, manifest and hashes are present and size-verified.
+printf '{"draft":false}\n' > "$WORK/publish.json"
+curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
+  -H 'Content-Type: application/json' -X PATCH --data-binary "@$WORK/publish.json" \
+  "$API/repos/$REPO/releases/$RELEASE_ID" -o "$WORK/published-release.json"
+python3 - "$WORK/published-release.json" <<'PY' || die "Release was uploaded but could not be published."
 import json, sys
 data=json.load(open(sys.argv[1], encoding="utf-8"))
-for asset in data.get("assets", []):
-    print(asset.get("name", ""))
+if data.get("draft") is not False:
+    raise SystemExit("Release remains a draft.")
 PY
-(
-  printf '%s\n' "$(basename "$WORK/manifest.txt")" "$(basename "$WORK/SHARD-SHA256SUMS")"
-  printf '%s\n' "${PARTS[@]##*/}"
-) | sort > "$WORK/expected-assets.txt"
-sort -o "$WORK/uploaded-assets.txt" "$WORK/uploaded-assets.txt"
-diff -u "$WORK/expected-assets.txt" "$WORK/uploaded-assets.txt" || die "release was created but the asset list did not verify"
 
 unset GH_TOKEN_FOUND
 echo "Encrypted state published: $RELEASE_URL"
