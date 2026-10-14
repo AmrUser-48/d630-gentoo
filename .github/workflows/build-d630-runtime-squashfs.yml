@@ -51,7 +51,6 @@ jobs:
       RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
       BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
-      LOCAL_RELEASE_ASSETS_DIR: ${{ inputs.prepared_assets_run_id != '' && format('{0}/prepared-release-assets', runner.temp) || '' }}
       SOURCE_FALLBACK: ${{ inputs.source_fallback }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
@@ -95,6 +94,8 @@ jobs:
 
       - name: Assemble Gentoo runtime and build SquashFS
         shell: bash
+        env:
+          LOCAL_RELEASE_ASSETS_DIR: ${{ inputs.prepared_assets_run_id != '' && format('{0}/prepared-release-assets', runner.temp) || '' }}
         run: |
           set -Eeuo pipefail
           sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,LOCAL_RELEASE_ASSETS_DIR,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
@@ -141,8 +142,8 @@ jobs:
           {
             echo "### D630 Gentoo boot bundle is ready"
             echo
-            echo "Download artifact `d630-squashfs-${{ inputs.runtime_profile }}-run-${{ github.run_number }}` from this workflow run."
-            echo "It contains `kernel`, `initramfs`, and `squashfs`, plus checksums and build manifests."
+            echo "Download Actions artifact d630-squashfs-${{ inputs.runtime_profile }}-run-${{ github.run_number }} from this workflow run."
+            echo "It contains kernel, initramfs, and squashfs, plus checksums and build manifests."
             echo
             echo "No GitHub Release API is used; delivery uses Actions artifacts."
           } >> "$GITHUB_STEP_SUMMARY"
