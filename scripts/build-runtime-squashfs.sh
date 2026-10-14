@@ -252,7 +252,7 @@ PY
     (cd "$WORK/kernel" && grep -F "  $NAME" SHA256SUMS | sha256sum --check)
   done < "$WORK/kernel/assets.tsv"
   MOD_ARCHIVE="$(find "$WORK/kernel" -maxdepth 1 -name 'modules-*.tar.zst' -print -quit)"
-  MOD_DIR="$(tar --use-compress-program=unzstd -tf "$MOD_ARCHIVE" | grep -m1 -E '^(\./)?lib/modules/[^/]+/$' || true)"
+  MOD_DIR="$(tar --use-compress-program=unzstd -tf "$MOD_ARCHIVE" | awk '/^(\.\/)?lib\/modules\/[^/]+\/$/ && !found { print; found = 1 }')"
   [[ -n "$MOD_DIR" ]] || die "module archive has no /lib/modules tree"
   MOD_REL="$(printf '%s\n' "$MOD_DIR" | sed -E 's#^(\./)?lib/modules/([^/]+)/$#\2#')"
   REL_FILE="$WORK/kernel/KERNELRELEASE.txt"
