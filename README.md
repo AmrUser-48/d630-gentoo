@@ -137,6 +137,10 @@ The current Gentoo Mesa ebuild's helper dependency `dev-util/mesa_clc` can still
 
 For the final root, use a separate clean Stage 3 root and install only the selected runtime package sets from binpkgs, with build-time dependencies excluded (`--with-bdeps=n`). Keep the desired desktop and core package atoms in that root's world set, inspect `emerge --depclean --with-bdeps=n --pretend`, and review the proposed removals before applying them. Do not force-remove LLVM packages if `scanelf`/link-level checks show a runtime consumer still needs a library. The temporary runner/build root and the final SquashFS root must remain separate.
 
+#### Tiny console SquashFS profile
+
+The manual SquashFS workflow defaults to `tiny-console`: a minimal runtime application set of `lf`, Bash, Zsh (`-doc -examples`), fbterm, SoX-ng, LAME's frontend, and ALSA utilities. SoX-ng keeps the requested ALSA, MP3/Opus, PNG, ID3, FLAC/Ogg and other selected audio features while explicitly disabling its FFmpeg backend; the image does not add scrcpy, PipeWire, Xorg, network managers or the broad CLI/desktop sets. It still retains the OpenRC/Portage/account-management base needed to boot and create a user. The builder imports package-specific keyword acceptance so GURU's `lf` and testing-keyworded SoX can resolve, and checks out the GURU ebuild tree temporarily for dependency resolution.
+
 #### Past mistakes: do not repeat
 
 1. **Do not mask `>=media-libs/mesa-24.0.0` to get the desired driver.** That masks Mesa 24.0.0 and newer, including later stable releases; it can leave Portage with no acceptable Mesa candidate. Remove that mask unless the deliberate intent is to block every version in that range.
