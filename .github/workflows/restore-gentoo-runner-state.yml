@@ -122,8 +122,8 @@ jobs:
           {
             echo "### Restoring saved Gentoo state"
             echo
-            echo "- Release tag: `$tag`"
-            echo "- Root destination: `$GENTOO_ROOT`"
+            echo "- Release tag: $tag"
+            echo "- Root destination: $GENTOO_ROOT"
             echo
             cat "$metadata/manifest.txt"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -343,8 +343,8 @@ jobs:
           {
             echo "### Restored Gentoo SSH session ready"
             echo
-            echo "- Address: `$tailnet_ip`"
-            echo "- Connect: `ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip`"
+            echo "- Address: $tailnet_ip"
+            echo "- Connect command: ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip"
             echo "- SSH accepts the configured public key only and is filtered to Tailscale IPv4 peers."
             echo "- Login is forced into the Gentoo chroot; it cannot open a host shell."
           } | tee "$report/remote-access.txt" | tee -a "$GITHUB_STEP_SUMMARY"
