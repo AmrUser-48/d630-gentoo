@@ -100,6 +100,22 @@ bash -n scripts/install-binpkgs-release.sh
 bash -n scripts/snapshot-gentoo-session.sh
 bash -n scripts/save-runner-state-encrypted.sh
 bash -n scripts/publish-pending-state-save.sh
+
+# bash -n does not parse Python embedded in quoted heredocs. Compile those
+# snippets too, so malformed recovery-helper Python is caught before use.
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+for filename in ("scripts/save-runner-state-encrypted.sh", "scripts/publish-pending-state-save.sh"):
+    source = Path(filename).read_text(encoding="utf-8")
+    snippets = re.findall(r"(?m)^[ \t]*<<'PY'[ \t]*\n(.*?)^[ \t]*PY[ \t]*$", source, re.S)
+    if not snippets:
+        raise SystemExit(f"No embedded Python heredocs found in {filename}")
+    for index, snippet in enumerate(snippets, start=1):
+        compile(snippet, f"{filename}:python-heredoc-{index}", "exec")
+print("embedded Python syntax: passed")
+PY
 bash -n scripts/build-squashfs.sh
 bash -n scripts/build-runtime-squashfs.sh
 bash -n scripts/build-runtime-squashfs-local.sh
