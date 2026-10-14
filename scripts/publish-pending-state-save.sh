@@ -99,8 +99,8 @@ UPLOAD_URL="$(python3 - "$WORK/current-release.json" "$TAG" "$REPO" <<'PY'
 import json, re, sys
 r=json.load(open(sys.argv[1], encoding="utf-8"))
 tag, repo=sys.argv[2:]
-if r.get("tag_name") != tag or r.get("draft") is not True:
-    raise SystemExit("Remote release does not match the expected unpublished draft.")
+if r.get("tag_name") != tag:
+    raise SystemExit("Remote release tag does not match the pending snapshot.")
 u=r.get("upload_url", "").split("{",1)[0]
 if not u.startswith(f"https://uploads.github.com/repos/{repo}/releases/{r.get('id')}/assets"):
     raise SystemExit("Remote upload URL is invalid.")
