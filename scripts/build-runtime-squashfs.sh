@@ -119,7 +119,7 @@ if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
 elif [[ -n "$LOCAL_BINPKG_ARCHIVE" ]]; then
   log "Import local binpkg bundle: $LOCAL_BINPKG_ARCHIVE"
   tar --use-compress-program=unzstd -xf "$LOCAL_BINPKG_ARCHIVE" -C "$ROOT/var/cache/binpkgs"
-  PKG_COUNT="$(find "$ROOT/var/cache/binpkgs" -type f \\( -name '*.gpkg.tar' -o -name '*.tbz2' \\) | wc -l)"
+  PKG_COUNT="$(find "$ROOT/var/cache/binpkgs" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) | wc -l)"
   (( PKG_COUNT > 0 )) || die "local binpkg archive contained no .gpkg.tar/.tbz2 files under PKGDIR"
   printf 'Source: local archive\nArchive: %s\nPackage files: %s\n' "$LOCAL_BINPKG_ARCHIVE" "$PKG_COUNT" > "$OUT/LOCAL-BINPKG-IMPORT.txt"
 else
