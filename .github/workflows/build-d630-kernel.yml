@@ -276,12 +276,39 @@ jobs:
           mkdir -p "$root"/{bin,sbin,etc,proc,sys,dev,run,mnt/newroot,lib/firmware/intel-ucode}
           cp "$(command -v busybox)" "$root/bin/busybox"
           "$root/bin/busybox" --install -s "$root/bin"
+
+          # Debian's BusyBox may write absolute symlinks to this temporary runner path.
+          # Normalize all applet links to the in-archive relative binary path.
+          while IFS= read -r -d '' link; do
+            ln -sfn busybox "$link"
+          done < <(find "$root/bin" -mindepth 1 -maxdepth 1 -type l -print0)
+          # Explicitly guarantee both shell names used by initramfs/rescue paths.
+          ln -sfn busybox "$root/bin/sh"
+          ln -sfn busybox "$root/bin/static-sh"
+
           cp initramfs/init "$root/init"
           chmod 0755 "$root/init"
           cp "$firmware_root/iwlwifi-3945-2.ucode" "$root/lib/firmware/"
           cp "$firmware_root/intel-ucode/"* "$root/lib/firmware/intel-ucode/"
+
+          # Fail the build if any shell/applet link escapes the archive or is dangling.
+          test -x "$root/bin/busybox"
           test -x "$root/bin/sh"
+          test -x "$root/bin/static-sh"
           test -x "$root/bin/cp"
+          [[ "$(readlink "$root/bin/sh")" == "busybox" ]]
+          [[ "$(readlink "$root/bin/static-sh")" == "busybox" ]]
+          while IFS= read -r -d '' link; do
+            target="$(readlink "$link")"
+            [[ "$target" != /* ]] || {
+              echo "ERROR: absolute initramfs symlink: $link -> $target" >&2
+              exit 1
+            }
+            test -x "$(dirname "$link")/$target" || {
+              echo "ERROR: dangling initramfs symlink: $link -> $target" >&2
+              exit 1
+            }
+          done < <(find "$root/bin" -mindepth 1 -maxdepth 1 -type l -print0)
 
           (
             cd "$root"
