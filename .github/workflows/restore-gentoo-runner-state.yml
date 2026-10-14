@@ -284,19 +284,29 @@ jobs:
             df -h / | sed 's/^/    /'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install permanent manual state-save command
+      - name: Install manual state-save and recovery commands
         shell: bash
         run: |
           set -euo pipefail
-          target="$GENTOO_ROOT/usr/local/sbin/save-gentoo-state"
           sudo install -d -m 0755 "$GENTOO_ROOT/usr/local/sbin"
+
           curl --fail --location --retry 3 --retry-all-errors \
             "https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/scripts/save-runner-state-encrypted.sh" \
             -o "$RUNNER_TEMP/save-gentoo-state"
           bash -n "$RUNNER_TEMP/save-gentoo-state"
-          sudo install -o root -g root -m 0750 "$RUNNER_TEMP/save-gentoo-state" "$target"
-          sudo chroot "$GENTOO_ROOT" /bin/bash -lc 'test -x /usr/local/sbin/save-gentoo-state'
-          echo "Installed /usr/local/sbin/save-gentoo-state inside the restored Gentoo root." | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo install -o root -g root -m 0750 "$RUNNER_TEMP/save-gentoo-state" \
+            "$GENTOO_ROOT/usr/local/sbin/save-gentoo-state"
+
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/scripts/publish-pending-state-save.sh" \
+            -o "$RUNNER_TEMP/publish-pending-state-save"
+          bash -n "$RUNNER_TEMP/publish-pending-state-save"
+          sudo install -o root -g root -m 0750 "$RUNNER_TEMP/publish-pending-state-save" \
+            "$GENTOO_ROOT/usr/local/sbin/publish-pending-state-save"
+
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
+            'test -x /usr/local/sbin/save-gentoo-state && test -x /usr/local/sbin/publish-pending-state-save'
+          echo "Installed save-gentoo-state and publish-pending-state-save inside the restored Gentoo root." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Connect restored runner to private Tailscale network
         uses: tailscale/github-action@v4
