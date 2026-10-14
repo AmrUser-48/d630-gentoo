@@ -789,7 +789,9 @@ jobs:
         if: always() && steps.prepare-binpkgs-release.outputs.has_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a fine-grained PAT when the built-in GITHUB_TOKEN is blocked by repository/org policy.
+          # Add repository secret RELEASE_TOKEN with Contents: Read and write.
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
           tag_name: binpkgs-${{ github.run_id }}
           name: "D630 Gentoo build state and binary packages — run ${{ github.run_id }}"
           target_commitish: ${{ github.sha }}
