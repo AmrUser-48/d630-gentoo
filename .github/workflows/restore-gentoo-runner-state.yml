@@ -1,0 +1,371 @@
+name: Gentoo — Restore saved runner state
+run-name: "Gentoo restored runner • ${{ inputs.state_tag || 'latest state' }} • ${{ inputs.session_minutes || 240 }} min"
+
+on:
+  workflow_dispatch:
+    inputs:
+      state_tag:
+        description: "Optional exact runner-state-* release tag; blank selects the newest runner-state release"
+        required: false
+        type: string
+        default: ""
+      session_minutes:
+        description: "SSH session duration after restore (1–300 minutes)"
+        required: true
+        type: number
+        default: 240
+      runner_label:
+        description: "Runner label; use a runner with enough disk space for the restored Gentoo root"
+        required: true
+        type: string
+        default: ubuntu-24.04
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gentoo-restored-state-runner
+  cancel-in-progress: true
+
+jobs:
+  restore:
+    name: Restore Gentoo root and start private SSH
+    runs-on: ${{ inputs.runner_label }}
+    timeout-minutes: 360
+    env:
+      GENTOO_ROOT: /opt/gentoo
+      SESSION_MINUTES: ${{ inputs.session_minutes }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Validate secrets and session inputs
+        shell: bash
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+          STATE_TAG_INPUT: ${{ inputs.state_tag }}
+        run: |
+          set -euo pipefail
+          [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || { echo "Missing repository secret TAILSCALE_AUTHKEY." >&2; exit 1; }
+          [[ -n "${SSH_PUBLIC_KEY:-}" ]] || { echo "Missing repository secret SSH_PUBLIC_KEY." >&2; exit 1; }
+
+          [[ "${SESSION_MINUTES:-}" =~ ^[0-9]+$ ]] || { echo "session_minutes must be an integer." >&2; exit 1; }
+          (( SESSION_MINUTES >= 1 && SESSION_MINUTES <= 300 )) || {
+            echo "session_minutes must be between 1 and 300." >&2
+            exit 1
+          }
+
+          if [[ -n "${STATE_TAG_INPUT:-}" && ! "$STATE_TAG_INPUT" =~ ^runner-state-[A-Za-z0-9._-]+$ ]]; then
+            echo "state_tag must be a runner-state-* tag without slashes or spaces." >&2
+            exit 1
+          fi
+
+          key="${SSH_PUBLIC_KEY//$'\r'/}"
+          key="${key%$'\n'}"
+          [[ "$key" != *$'\n'* ]] || { echo "SSH_PUBLIC_KEY must contain exactly one key line." >&2; exit 1; }
+          printf '%s\n' "$key" > "$RUNNER_TEMP/ssh_public_key.pub"
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" >/dev/null ||
+            { echo "SSH_PUBLIC_KEY is not a valid OpenSSH public key." >&2; exit 1; }
+
+      - name: Install host restore and SSH tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates coreutils curl diffutils openssh-server tar zstd iptables sudo
+          sudo apt-get clean
+          mkdir -p "$RUNNER_TEMP/gentoo-state"
+          df -h / | tee "$RUNNER_TEMP/gentoo-state/host-disk-before.txt"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/gentoo-state/host-disk-before.txt"
+
+      - name: Select saved-state release and download metadata
+        id: state
+        shell: bash
+        env:
+          STATE_TAG_INPUT: ${{ inputs.state_tag }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gentoo-state"
+          metadata="$report/metadata"
+          mkdir -p "$metadata"
+
+          tag="${STATE_TAG_INPUT:-}"
+          if [[ -z "$tag" ]]; then
+            tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+              --json tagName,publishedAt \
+              --jq '[.[] | select(.tagName | startswith("runner-state-"))] | sort_by(.publishedAt) | last | .tagName // empty')"
+          fi
+          [[ -n "$tag" ]] || {
+            echo "No published runner-state-* release exists yet. The full-state snapshot must finish and be uploaded first." >&2
+            exit 1
+          }
+          [[ "$tag" =~ ^runner-state-[A-Za-z0-9._-]+$ ]] || {
+            echo "Invalid saved-state tag: $tag" >&2
+            exit 1
+          }
+
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null || {
+            echo "Cannot read release $tag." >&2
+            exit 1
+          }
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+            --pattern manifest.txt --pattern SHARD-SHA256SUMS --dir "$metadata"
+
+          [[ -s "$metadata/manifest.txt" && -s "$metadata/SHARD-SHA256SUMS" ]] || {
+            echo "Release $tag is missing manifest.txt or SHARD-SHA256SUMS." >&2
+            exit 1
+          }
+
+          printf 'STATE_TAG=%s\n' "$tag" >> "$GITHUB_ENV"
+          printf 'state_tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Restoring saved Gentoo state"
+            echo
+            echo "- Release tag: `$tag`"
+            echo "- Root destination: `$GENTOO_ROOT`"
+            echo
+            cat "$metadata/manifest.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cp "$metadata/manifest.txt" "$report/manifest.txt"
+
+      - name: Verify and stream-restore root filesystem
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gentoo-state"
+          metadata="$report/metadata"
+          chunks="$report/chunks"
+          fifo="$report/rootfs-stream.fifo"
+          mkdir -p "$chunks"
+
+          mapfile -t parts < <(
+            gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.part-")) | .name' |
+              sort
+          )
+          (( ${#parts[@]} > 0 )) || {
+            echo "Release $STATE_TAG has no uploaded gentoo-rootfs.tar.zst.part-* assets." >&2
+            exit 1
+          }
+
+          # The checksum manifest must list exactly the archive chunks attached to the release.
+          diff -u \
+            <(printf '%s\n' "${parts[@]}") \
+            <(awk 'NF >= 2 {name=$2; sub(/^\*/, "", name); print name}' "$metadata/SHARD-SHA256SUMS" | sort) || {
+              echo "Release asset list does not match SHARD-SHA256SUMS." >&2
+              exit 1
+            }
+
+          if [[ -e "$GENTOO_ROOT" ]] && find "$GENTOO_ROOT" -mindepth 1 -print -quit | grep -q .; then
+            echo "$GENTOO_ROOT already exists and is not empty; refusing to overwrite it." >&2
+            exit 1
+          fi
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+
+          avail_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+          if [[ ! "$avail_kib" =~ ^[0-9]+$ ]] || (( avail_kib < 3145728 )); then
+            echo "Less than 3 GiB free for the verified chunk download. Choose a runner with more disk." >&2
+            df -h / >&2
+            exit 1
+          fi
+          df -h / | tee "$report/host-disk-before-extract.txt"
+
+          mkfifo "$fifo"
+          extract_pid=""
+          cleanup_restore() {
+            exec 3>&- 2>/dev/null || true
+            if [[ -n "${extract_pid:-}" ]]; then
+              kill "$extract_pid" 2>/dev/null || true
+            fi
+            rm -f "$fifo"
+          }
+          trap cleanup_restore EXIT
+
+          # Keep one FIFO writer open across all chunks; otherwise each part-close
+          # would look like end-of-file to zstd before the following chunk arrives.
+          (
+            set -euo pipefail
+            zstd --decompress --stdout < "$fifo" |
+              sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+          ) > "$report/extract.log" 2>&1 &
+          extract_pid=$!
+          exec 3>"$fifo"
+
+          for part in "${parts[@]}"; do
+            echo "Downloading and verifying $part"
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$part" --dir "$chunks"
+
+            expected="$(awk -v name="$part" '$2 == name {print $1}' "$metadata/SHARD-SHA256SUMS")"
+            [[ "$expected" =~ ^[[:xdigit:]]{64}$ ]] || {
+              echo "No valid SHA-256 for $part." >&2
+              exit 1
+            }
+            (
+              cd "$chunks"
+              printf '%s  %s\n' "$expected" "$part" | sha256sum --check -
+            )
+
+            cat "$chunks/$part" >&3
+            rm -f "$chunks/$part"
+          done
+
+          exec 3>&-
+          if ! wait "$extract_pid"; then
+            echo "Root filesystem extraction failed; last archive log lines:" >&2
+            tail -n 100 "$report/extract.log" >&2 || true
+            exit 1
+          fi
+          extract_pid=""
+          trap - EXIT
+          rm -f "$fifo"
+
+          # These are runtime pseudo-filesystems, not snapshot content.
+          sudo install -d -m 0755 "$GENTOO_ROOT/dev" "$GENTOO_ROOT/proc" \
+            "$GENTOO_ROOT/sys" "$GENTOO_ROOT/run" "$GENTOO_ROOT/mnt" "$GENTOO_ROOT/media"
+          sudo install -d -m 1777 "$GENTOO_ROOT/tmp"
+          sudo mount --rbind /dev "$GENTOO_ROOT/dev"
+          sudo mount --make-rslave "$GENTOO_ROOT/dev"
+          sudo mount --rbind /proc "$GENTOO_ROOT/proc"
+          sudo mount --make-rslave "$GENTOO_ROOT/proc"
+          sudo mount --rbind /sys "$GENTOO_ROOT/sys"
+          sudo mount --make-rslave "$GENTOO_ROOT/sys"
+          sudo mount --rbind /run "$GENTOO_ROOT/run"
+          sudo mount --make-rslave "$GENTOO_ROOT/run"
+
+          # Avoid restoring a dead/stub resolver link from the prior host.
+          sudo rm -f "$GENTOO_ROOT/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$GENTOO_ROOT/etc/resolv.conf"
+
+          sudo chroot "$GENTOO_ROOT" /bin/bash --login -c 'test -s /etc/gentoo-release && command -v emerge >/dev/null && emerge --version'
+          {
+            echo
+            echo "### Restore validation"
+            echo "- Verified ${#parts[@]} archive chunks."
+            echo "- Extracted and validated the Gentoo root filesystem."
+            echo "- Mounted /dev, /proc, /sys and /run; refreshed resolver configuration."
+            df -h / | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Connect restored runner to private Tailscale network
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          use-cache: "true"
+
+      - name: Configure key-only SSH into restored Gentoo
+        shell: bash
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gentoo-state"
+          ssh_key="${SSH_PUBLIC_KEY//$'\r'/}"
+          ssh_key="${ssh_key%$'\n'}"
+          tailnet_ip="$(tailscale ip -4 | awk '/^100\./ {print; exit}')"
+          [[ "$tailnet_ip" =~ ^100\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || {
+            echo "Tailscale IPv4 address not found." >&2
+            exit 1
+          }
+          printf 'TAILSCALE_IP=%s\n' "$tailnet_ip" >> "$GITHUB_ENV"
+
+          sudo useradd --create-home --shell /bin/bash gentoo 2>/dev/null || true
+          sudo install -d -o gentoo -g gentoo -m 0700 /home/gentoo/.ssh
+          printf 'from="100.64.0.0/10",no-agent-forwarding,no-X11-forwarding %s\n' "$ssh_key" |
+            sudo tee /home/gentoo/.ssh/authorized_keys >/dev/null
+          sudo chown gentoo:gentoo /home/gentoo/.ssh/authorized_keys
+          sudo chmod 0600 /home/gentoo/.ssh/authorized_keys
+
+          sudo tee /etc/ssh/sshd_config.d/00-gentoo-builder.conf >/dev/null <<'EOF'
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin no
+          AllowUsers gentoo
+          EOF
+
+          sudo install -d -m 0755 "$GENTOO_ROOT/usr/local/sbin"
+          sudo tee "$GENTOO_ROOT/usr/local/sbin/d630-sftp-server" >/dev/null <<'EOF'
+          #!/bin/sh
+          for server in \
+              /usr/lib64/misc/sftp-server \
+              /usr/lib/misc/sftp-server \
+              /usr/lib/openssh/sftp-server \
+              /usr/libexec/openssh/sftp-server; do
+              if [ -x "$server" ]; then exec "$server"; fi
+          done
+          echo "SFTP server is not installed inside Gentoo." >&2
+          exit 127
+          EOF
+          sudo chmod 0755 "$GENTOO_ROOT/usr/local/sbin/d630-sftp-server"
+
+          sudo tee /usr/local/sbin/gentoo-ssh-force-command >/dev/null <<'EOF'
+          #!/bin/sh
+          set -eu
+          original="${SSH_ORIGINAL_COMMAND:-}"
+          case "$original" in
+            sftp|internal-sftp|sftp-server|sftp-server\ *|*/sftp-server|*/sftp-server\ *)
+              exec /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /usr/local/sbin/d630-sftp-server
+              ;;
+            *)
+              exec /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+              ;;
+          esac
+          EOF
+          sudo chmod 0755 /usr/local/sbin/gentoo-ssh-force-command
+
+          sudo tee /etc/sudoers.d/gentoo-chroot >/dev/null <<'EOF'
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /usr/local/sbin/d630-sftp-server
+          EOF
+          sudo chmod 0440 /etc/sudoers.d/gentoo-chroot
+          sudo visudo -cf /etc/sudoers.d/gentoo-chroot
+
+          sudo tee -a /etc/ssh/sshd_config >/dev/null <<'EOF'
+
+          Match User gentoo
+              ForceCommand /usr/local/sbin/gentoo-ssh-force-command
+              PermitTTY yes
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTunnel no
+          EOF
+          sudo install -d -o root -g root -m 0755 /run/sshd
+          sudo sshd -t
+          sudo systemctl restart ssh
+          sudo systemctl is-active --quiet ssh
+          sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
+          sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" | tee "$report/ssh-key-fingerprint.txt"
+
+          {
+            echo "### Restored Gentoo SSH session ready"
+            echo
+            echo "- Address: `$tailnet_ip`"
+            echo "- Connect: `ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip`"
+            echo "- SSH accepts the configured public key only and is filtered to Tailscale IPv4 peers."
+            echo "- Login is forced into the Gentoo chroot; it cannot open a host shell."
+          } | tee "$report/remote-access.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep SSH session available
+        shell: bash
+        run: |
+          set -euo pipefail
+          remaining=$((SESSION_MINUTES * 60))
+          echo "Keeping the restored Gentoo environment available for $SESSION_MINUTES minutes."
+          while (( remaining > 0 )); do
+            sleep 60
+            remaining=$((remaining - 60))
+          done
+
+      - name: Upload restore diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gentoo-state-restore-run-${{ github.run_id }}
+          path: ${{ runner.temp }}/gentoo-state/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
