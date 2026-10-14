@@ -37,11 +37,9 @@ if [[ -z "$GH_TOKEN_FOUND" ]]; then
   GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 fi
 [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; expected gh auth in hosts.yml or an existing GH_TOKEN/GITHUB_TOKEN environment variable"
-export GH_TOKEN="$GH_TOKEN_FOUND"
-unset GH_TOKEN_FOUND
-
-# Verify that the token can reach the target repository before creating the archive.
-gh api "repos/$REPO" --jq '.full_name' >/dev/null || die "GitHub token cannot access $REPO"
+# Validate the token without exporting it to the snapshot/compression processes.
+GH_TOKEN="$GH_TOKEN_FOUND" gh api "repos/$REPO" --jq '.full_name' >/dev/null ||
+  die "GitHub token cannot access $REPO"
 
 printf 'Archive passphrase must be saved OUTSIDE this runner and entered as the repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not use your GitHub token as the passphrase.\n' > /dev/tty
 IFS= read -r -s -p "New archive passphrase (minimum 16 characters): " PASS1 </dev/tty
@@ -87,8 +85,6 @@ tar --create --file=- --directory="$ROOT" --numeric-owner --acls --xattrs --xatt
       --cipher-algo AES256 --s2k-digest-algo SHA512 --output "$ARCHIVE"
 exec 3<&-
 [[ -s "$ARCHIVE" ]] || die "encrypted archive is empty"
-unset GH_TOKEN
-
 split -b 1800M -d -a 3 "$ARCHIVE" "$PART_PREFIX"
 shopt -s nullglob
 PARTS=( "$PART_PREFIX"* )
@@ -120,18 +116,19 @@ echo "Verifying local chunk checksums..."
 (cd "$WORK" && sha256sum --check SHARD-SHA256SUMS)
 
 echo "Publishing encrypted state as $TAG..."
-gh release create "$TAG" "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS" \
+GH_TOKEN="$GH_TOKEN_FOUND" gh release create "$TAG" "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS" \
   --repo "$REPO" \
   --title "Gentoo runner state (encrypted) — $(date -u +%F)" \
   --notes "Full restored Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted; set the Actions secret STATE_ENCRYPTION_PASSPHRASE to the passphrase used during capture before restoring." \
   --prerelease
 
-gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' | sort > "$WORK/uploaded-assets.txt"
+GH_TOKEN="$GH_TOKEN_FOUND" gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' | sort > "$WORK/uploaded-assets.txt"
 (
   printf '%s\n' "$(basename "$WORK/manifest.txt")" "$(basename "$WORK/SHARD-SHA256SUMS")"
   printf '%s\n' "${PARTS[@]##*/}"
 ) | sort > "$WORK/expected-assets.txt"
 diff -u "$WORK/expected-assets.txt" "$WORK/uploaded-assets.txt" || die "release was created but the asset list did not verify"
 
+unset GH_TOKEN_FOUND
 echo "Encrypted state published: https://github.com/$REPO/releases/tag/$TAG"
 echo "Now save the same passphrase as repository Actions secret STATE_ENCRYPTION_PASSPHRASE."
