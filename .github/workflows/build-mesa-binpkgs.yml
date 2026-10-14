@@ -1,0 +1,297 @@
+name: Build Mesa and dependency binpkgs (Core 2)
+
+run-name: "Mesa Core 2 binpkgs • run ${{ github.run_number }}"
+
+on:
+  # Creating/updating this workflow starts the first build automatically.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-mesa-binpkgs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: d630-gentoo-mesa-binpkgs
+  cancel-in-progress: false
+
+jobs:
+  build-mesa:
+    name: Build Mesa for Intel GMA X3100 and publish dependency binpkgs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GENTOO_ROOT: /opt/gentoo
+      PKGDIR_HOST: /opt/gentoo/var/cache/binpkgs
+
+    steps:
+      - name: Check out D630 Gentoo configuration
+        uses: actions/checkout@v4
+
+      - name: Install host-side archive tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl coreutils file python3 rsync tar xz-utils zstd
+          sudo apt-get clean
+          mkdir -p "$RUNNER_TEMP/mesa-build-report" "$RUNNER_TEMP/mesa-release"
+          df -h / | tee "$RUNNER_TEMP/mesa-build-report/host-disk-before.txt"
+
+      - name: Download and verify official Gentoo amd64 OpenRC Stage 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc'
+          work="$RUNNER_TEMP/gentoo-stage3"
+          mkdir -p "$work"
+
+          curl -fsSL --retry 3 "$base/latest-stage3-amd64-openrc.txt" -o "$work/latest.txt"
+          line="$(grep -E '^stage3-amd64-openrc-[0-9]{8}T[0-9]{6}Z\.tar\.xz [0-9]+$' "$work/latest.txt" | head -n 1)"
+          [[ -n "$line" ]] || { echo "Could not parse the official Gentoo Stage 3 manifest." >&2; exit 1; }
+          archive="${line%% *}"
+          expected_size="${line##* }"
+
+          curl -fL --retry 3 "$base/$archive" -o "$work/$archive"
+          actual_size="$(stat -c '%s' "$work/$archive")"
+          [[ "$actual_size" == "$expected_size" ]] || {
+            echo "Stage 3 size mismatch: expected $expected_size bytes, got $actual_size." >&2
+            exit 1
+          }
+
+          curl -fsSL --retry 3 "$base/$archive.sha256" -o "$work/$archive.sha256"
+          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/$archive.sha256" | sed -n '1p')"
+          [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { echo "Could not read Stage 3 SHA-256." >&2; exit 1; }
+          printf '%s  %s\n' "$expected_sha" "$work/$archive" | sha256sum --check -
+
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+          sudo tar --extract --file "$work/$archive" --directory "$GENTOO_ROOT" \
+            --numeric-owner --xattrs --xattrs-include='*' --preserve-permissions
+          printf 'Stage 3 archive: %s\nSHA256: %s\n' "$archive" "$expected_sha" |
+            tee "$RUNNER_TEMP/mesa-build-report/stage3.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo readlink "$GENTOO_ROOT/etc/portage/make.profile" |
+            tee "$RUNNER_TEMP/mesa-build-report/profile.txt" || true
+
+      - name: Configure the Core 2 64-bit-only Portage profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          sudo mkdir -p "$root/etc/portage" "$root/etc/portage/repos.conf" \
+            "$root/etc/portage/binrepos.conf" "$root/etc/portage/profile" \
+            "$root/etc/portage/package-sets" "$root/etc/portage/package.use" \
+            "$root/var/cache/binpkgs" "$root/var/log/portage" \
+            "$root/dev" "$root/proc" "$root/sys" "$root/run"
+
+          if [[ -f "$root/etc/portage/package.use" ]]; then
+            sudo mv "$root/etc/portage/package.use" "$root/etc/portage/package.use.stage3"
+            sudo mkdir -p "$root/etc/portage/package.use"
+          fi
+          sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
+          sudo install -m 0644 config/portage/profile/package.use.force \
+            "$root/etc/portage/profile/package.use.force.d630"
+          sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
+          sudo mkdir -p "$root/etc/portage/package.accept_keywords"
+          sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
+          sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
+          sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
+
+          # Enforce the intended ABI regardless of the downloaded Stage 3 defaults.
+          sudo sed -i '/^ABI_X86=/d' "$root/etc/portage/make.conf"
+          printf '\n# D630 x86_64-only profile; do not build 32-bit ABI packages.\nABI_X86="64"\n' |
+            sudo tee -a "$root/etc/portage/make.conf" >/dev/null
+
+          if [[ ! -f "$root/etc/portage/repos.conf/gentoo.conf" ]]; then
+            sudo tee "$root/etc/portage/repos.conf/gentoo.conf" >/dev/null <<'EOF'
+          [gentoo]
+          location = /var/db/repos/gentoo
+          sync-type = rsync
+          sync-uri = rsync://rsync.gentoo.org/gentoo-portage
+          auto-sync = yes
+          EOF
+          fi
+
+          # Make DNS work inside the chroot even if the host uses a stub resolver.
+          sudo rm -f "$root/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$root/etc/resolv.conf"
+
+          for mountpoint in dev proc sys run; do
+            sudo mount --rbind "/$mountpoint" "$root/$mountpoint"
+            sudo mount --make-rslave "$root/$mountpoint"
+          done
+
+          {
+            echo "Target CPU: Intel Core 2 / Merom (T7250)"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "ABI_X86: 64 only"
+            echo "Video: intel only; Mesa USE: -llvm -vulkan"
+            echo "LLVM target USE: X86 and SPIRV; unrelated backends unforced"
+            echo "Binpkg destination: /var/cache/binpkgs"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Tune build parallelism to runner resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          cpus="$(nproc)"
+          mem_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+          if [[ -r /sys/fs/cgroup/memory.max ]]; then
+            limit="$(cat /sys/fs/cgroup/memory.max)"
+            if [[ "$limit" =~ ^[0-9]+$ ]]; then
+              limit_kib=$((limit / 1024))
+              (( limit_kib < mem_kib )) && mem_kib="$limit_kib"
+            fi
+          fi
+
+          if (( cpus >= 4 && mem_kib >= 9000000 )); then jobs=8
+          elif (( cpus >= 4 && mem_kib >= 6000000 )); then jobs=6
+          elif (( cpus >= 2 && mem_kib >= 7000000 )); then jobs=4
+          elif (( cpus >= 2 && mem_kib >= 3500000 )); then jobs=2
+          else jobs=1
+          fi
+          sudo sed -i '/^MAKEOPTS=/d;/^NINJAOPTS=/d' "$root/etc/portage/make.conf"
+          printf 'MAKEOPTS="-j%s"\nNINJAOPTS="-j%s"\n' "$jobs" "$jobs" |
+            sudo tee -a "$root/etc/portage/make.conf" >/dev/null
+          printf 'Runner resources: %s CPUs, %s KiB RAM; MAKEOPTS/NINJAOPTS=-j%s\n' \
+            "$cpus" "$mem_kib" "$jobs" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Sync Gentoo repository and initialize binhost signature trust
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          log="$RUNNER_TEMP/mesa-build-report/repository-sync.log"
+          if ! sudo chroot "$root" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$log"; then
+            echo "emerge-webrsync failed; trying regular sync." | tee -a "$log"
+            sudo chroot "$root" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet' |& tee -a "$log"
+          fi
+          sudo chroot "$root" /bin/bash -lc 'getuto' |& tee "$RUNNER_TEMP/mesa-build-report/getuto.log"
+          {
+            echo "## Effective Portage target"
+            sudo chroot "$root" /bin/bash -lc '
+              set -e
+              printf "CFLAGS="; portageq envvar CFLAGS
+              printf "ABI_X86="; portageq envvar ABI_X86
+              printf "VIDEO_CARDS="; portageq envvar VIDEO_CARDS
+              printf "PKGDIR="; portageq envvar PKGDIR
+              grep -F "media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel" /etc/portage/package.use/10-d630-hardware
+            '
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve Mesa and its dependencies
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          log="$RUNNER_TEMP/mesa-build-report/emerge-plan.log"
+          # Do not consume the incompatible generic-binhost LLVM/Clang builds.
+          # Portage will build these helpers from source with the Core 2 profile,
+          # ABI_X86=64, and only the configured X86/SPIRV LLVM targets.
+          sudo chroot "$root" /bin/bash -lc '
+            set -euo pipefail
+            emerge --ignore-default-opts --ask=n --verbose --tree --pretend \
+              --jobs=1 --load-average=4 --usepkg --getbinpkg --with-bdeps=n \
+              --usepkg-exclude="llvm-core/llvm llvm-core/clang llvm-runtimes/compiler-rt llvm-runtimes/clang-runtime llvm-runtimes/libclc dev-util/mesa_clc dev-util/spirv-llvm-translator" \
+              media-libs/mesa
+          ' |& tee "$log"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+
+      - name: Build Mesa and only the dependencies Portage requires
+        id: build-mesa
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root="$GENTOO_ROOT"
+          log="$RUNNER_TEMP/mesa-build-report/emerge-build.log"
+          sudo chroot "$root" /bin/bash -lc '
+            set -Eeuo pipefail
+            emerge --ignore-default-opts --ask=n --verbose --tree \
+              --jobs=1 --load-average=4 --usepkg --getbinpkg --buildpkg --with-bdeps=n \
+              --usepkg-exclude="llvm-core/llvm llvm-core/clang llvm-runtimes/compiler-rt llvm-runtimes/clang-runtime llvm-runtimes/libclc dev-util/mesa_clc dev-util/spirv-llvm-translator" \
+              media-libs/mesa
+          ' |& tee "$log"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+
+          # Fail clearly if Portage succeeded without producing the Mesa binpkg.
+          if ! find "$PKGDIR_HOST" -type f \( -name 'mesa-*.gpkg.tar' -o -name 'mesa-*.tbz2' \) -print -quit | grep -q .; then
+            echo "Portage completed but no Mesa binary package was found in $PKGDIR_HOST." >&2
+            exit 1
+          fi
+          df -h / | tee "$RUNNER_TEMP/mesa-build-report/host-disk-after-build.txt"
+
+      - name: Package the Mesa dependency binpkgs for a GitHub Release
+        id: prepare-release
+        if: steps.build-mesa.outcome == 'success'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root="$GENTOO_ROOT"
+          input="$PKGDIR_HOST"
+          release="$RUNNER_TEMP/mesa-release"
+          mkdir -p "$release"
+
+          mesa_vdb="$(find "$root/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)"
+          [[ -n "$mesa_vdb" ]] || { echo "Mesa is not present in the installed package database." >&2; exit 1; }
+
+          bash scripts/package-binpkgs-release.sh "$input" "$release" 1500000000
+          {
+            echo "Build: D630 Gentoo Mesa binary package set"
+            echo "Target: media-libs/mesa"
+            echo "Installed Mesa package: $mesa_vdb"
+            echo "Hardware target: Intel GM965 / GMA X3100 (Gen 4), Core 2 Merom"
+            echo "Compiler flags: -O2 -pipe -march=core2 -mtune=core2"
+            echo "ABI_X86: 64 only"
+            echo "Mesa USE: -llvm -vulkan VIDEO_CARDS: -* intel"
+            echo "Build helpers: LLVM/Clang/mesa_clc source-built when selected; LLVM targets restricted to X86 and SPIRV."
+            echo "Build workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Release tag: mesa-binpkgs-$GITHUB_RUN_ID"
+            echo "Contains Portage binary packages created in this run for Mesa and dependencies that were built from source."
+            echo "Compatible with the configured D630 Gentoo profile; already installed dependencies and reused remote binpkgs are not repackaged."
+          } > "$release/BUILD-MANIFEST.txt"
+
+          (
+            cd "$release"
+            sha256sum PACKAGE-LIST.txt BUILD-MANIFEST.txt binpkgs-part-*.tar.zst > SHA256SUMS
+          )
+          {
+            echo "has_release=true"
+            echo "release_files<<EOF"
+            find "$release" -maxdepth 1 -type f -print | sort
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          du -h "$release"/* | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish Mesa and dependency binpkgs
+        if: steps.build-mesa.outcome == 'success' && steps.prepare-release.outputs.has_release == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          tag_name: mesa-binpkgs-${{ github.run_id }}
+          name: "D630 Gentoo Mesa + dependency binpkgs — run ${{ github.run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          body_path: ${{ runner.temp }}/mesa-release/BUILD-MANIFEST.txt
+          files: ${{ steps.prepare-release.outputs.release_files }}
+
+      - name: Collect build logs and release assets as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesa-core2-build-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/mesa-build-report/
+            ${{ runner.temp }}/mesa-release/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
