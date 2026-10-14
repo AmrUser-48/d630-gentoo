@@ -55,8 +55,12 @@ test -s scripts/build-runtime-squashfs.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
-grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
-grep -Fq 'name: Publish existing Gentoo binpkgs artifact' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'uses: actions/upload-artifact@v4' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'name: Prepare existing Gentoo assets for SquashFS build' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/build-d630-runtime-squashfs.yml
+grep -Fq 'LOCAL_RELEASE_ASSETS_DIR' scripts/build-runtime-squashfs.sh
+! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
+! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/build-d630-runtime-squashfs.yml
 
 grep -q 'march=core2' config/make.conf
 grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
