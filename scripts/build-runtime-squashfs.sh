@@ -10,8 +10,9 @@ log() { echo; echo "[d630-runtime-rootfs] $*"; }
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
 LOCAL_RELEASE_ASSETS_DIR="${LOCAL_RELEASE_ASSETS_DIR:-}"
 LOCAL_BINPKG_ARCHIVE="${LOCAL_BINPKG_ARCHIVE:-}"
-[[ -n "$BINPKG_RUN_IDS" || -n "$LOCAL_RELEASE_ASSETS_DIR" || -n "$LOCAL_BINPKG_ARCHIVE" ]] ||
-  die "provide binpkg_run_ids, prepared assets, or LOCAL_BINPKG_ARCHIVE"
+if [[ -z "$BINPKG_RUN_IDS" && -z "$LOCAL_RELEASE_ASSETS_DIR" && -z "$LOCAL_BINPKG_ARCHIVE" && "$SOURCE_FALLBACK" != true ]]; then
+  die "no binpkgs supplied; provide a package source or enable SOURCE_FALLBACK"
+fi
 if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
   [[ -d "$LOCAL_RELEASE_ASSETS_DIR" ]] || die "prepared assets directory not found: $LOCAL_RELEASE_ASSETS_DIR"
   [[ -s "$LOCAL_RELEASE_ASSETS_DIR/SHA256SUMS" ]] || die "prepared assets have no SHA256SUMS"
