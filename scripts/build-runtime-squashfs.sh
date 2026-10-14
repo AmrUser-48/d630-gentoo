@@ -4,7 +4,7 @@ die() { echo "d630-runtime-rootfs: ERROR: $*" >&2; exit 2; }
 log() { echo; echo "[d630-runtime-rootfs] $*"; }
 
 [[ "$EUID" -eq 0 ]] || die "run as root"
-[[ "$RUNTIME_PROFILE" =~ ^(console|desktop|daily-driver)$ ]] || die "invalid runtime profile"
+[[ "$RUNTIME_PROFILE" =~ ^(tiny-console|console|desktop|daily-driver)$ ]] || die "invalid runtime profile"
 [[ -z "$BINPKG_RUN_IDS" || "$BINPKG_RUN_IDS" =~ ^[0-9,[:space:]]+$ ]] || die "binpkg_run_ids must be numeric IDs separated by commas or spaces"
 [[ "$SOURCE_FALLBACK" == true || "$SOURCE_FALLBACK" == false ]] || die "SOURCE_FALLBACK must be true or false"
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
@@ -71,6 +71,8 @@ install -m 0644 "$GITHUB_WORKSPACE/config/locale.gen" "$ROOT/etc/locale.gen"
 install -m 0644 "$GITHUB_WORKSPACE/config/env.d/02locale" "$ROOT/etc/env.d/02locale"
 install -m 0644 "$GITHUB_WORKSPACE/config/xorg/99-synaptics.conf" "$ROOT/etc/X11/xorg.conf.d/99-synaptics.conf"
 rm -rf "$ROOT/etc/portage/package.accept_keywords" "$ROOT/etc/portage/package.keywords"
+mkdir -p "$ROOT/etc/portage/package.accept_keywords"
+cp -a "$GITHUB_WORKSPACE/config/portage/package.accept_keywords/." "$ROOT/etc/portage/package.accept_keywords/"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.use/." "$ROOT/etc/portage/package.use/"
 cp -a "$GITHUB_WORKSPACE/config/portage/binrepos.conf/." "$ROOT/etc/portage/binrepos.conf/"
 cp -a "$GITHUB_WORKSPACE/config/package-sets/." "$ROOT/etc/portage/package-sets/"
@@ -103,6 +105,19 @@ if ! chroot "$ROOT" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$OUT/portage
   chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet' |& tee -a "$OUT/portage-bootstrap.log"
 fi
 chroot "$ROOT" /bin/bash -lc 'getuto' |& tee -a "$OUT/portage-bootstrap.log"
+
+if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
+  log "Fetch GURU ebuilds required by the lf package"
+  mkdir -p "$ROOT/var/db/repos"
+  cat > "$ROOT/etc/portage/repos.conf/guru.conf" <<'EOF'
+[guru]
+location = /var/db/repos/guru
+sync-type = git
+sync-uri = https://github.com/gentoo-mirror/guru.git
+auto-sync = no
+EOF
+  git clone --depth 1 https://github.com/gentoo-mirror/guru.git "$ROOT/var/db/repos/guru"
+fi
 
 log "Import binary package assets"
 if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
@@ -151,7 +166,21 @@ fi
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
 log "Select package atoms"
-cat > "$WORK/atoms.txt" <<'EOF'
+if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
+  # A deliberately narrow runtime atop the official OpenRC Stage 3.
+  # Keep only account/boot/package-manager essentials plus the requested tools.
+  cat > "$WORK/atoms.txt" <<'EOF'
+app-admin/sudo
+sys-apps/openrc
+sys-apps/portage
+sys-apps/coreutils
+sys-apps/util-linux
+sys-apps/shadow
+sys-apps/kmod
+EOF
+  cat "$GITHUB_WORKSPACE/config/package-sets/tiny-console.list" >> "$WORK/atoms.txt"
+else
+  cat > "$WORK/atoms.txt" <<'EOF'
 app-admin/sudo
 app-shells/bash
 sys-apps/openrc
@@ -177,11 +206,12 @@ net-wireless/wpa_supplicant
 net-wireless/wireless-regdb
 net-wireless/bluez
 EOF
-case "$RUNTIME_PROFILE" in
-  console) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
-  desktop) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" "$GITHUB_WORKSPACE/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
-  daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
-esac
+  case "$RUNTIME_PROFILE" in
+    console) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
+    desktop) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" "$GITHUB_WORKSPACE/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
+    daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
+  esac
+fi
 sed -i 's/#.*$//; /^[[:space:]]*$/d' "$WORK/atoms.txt"
 sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
 if grep -Evq '^[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
@@ -326,7 +356,7 @@ if [[ "$RUNTIME_PROFILE" != console ]]; then
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
-rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo"
+rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
 
 cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
