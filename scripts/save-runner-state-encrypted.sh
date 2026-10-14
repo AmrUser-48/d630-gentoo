@@ -9,7 +9,7 @@ ROOT="${1:-/}"
 [[ "$REPO" == "AmrUser-48/d630-gentoo" ]] || die "unexpected target repository: $REPO"
 [[ "$(realpath "$ROOT")" == "/" ]] || die "the snapshot root must be / inside the restored Gentoo environment"
 
-for tool in tar zstd gpg split sha256sum gh python3 realpath; do
+for tool in tar zstd gpg split sha256sum curl python3 realpath; do
   command -v "$tool" >/dev/null || die "missing required tool: $tool"
 done
 [[ -r /dev/tty && -w /dev/tty ]] || die "run from an interactive SSH terminal so GPG can ask for the archive passphrase"
@@ -37,10 +37,6 @@ if [[ -z "$GH_TOKEN_FOUND" ]]; then
   GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 fi
 [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; expected gh auth in hosts.yml or an existing GH_TOKEN/GITHUB_TOKEN environment variable"
-# Validate the token without exporting it to the snapshot/compression processes.
-GH_TOKEN="$GH_TOKEN_FOUND" gh api "repos/$REPO" --jq '.full_name' >/dev/null ||
-  die "GitHub token cannot access $REPO"
-
 printf 'Archive passphrase must be saved OUTSIDE this runner and entered as the repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not use your GitHub token as the passphrase.\n' > /dev/tty
 IFS= read -r -s -p "New archive passphrase (minimum 16 characters): " PASS1 </dev/tty
 printf '\n' > /dev/tty
@@ -51,6 +47,18 @@ printf '\n' > /dev/tty
 unset PASS2
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/gentoo-state-save.XXXXXXXX")"
+API="https://api.github.com"
+CURL_CONFIG="$WORK/curl-auth.conf"
+printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
+chmod 0600 "$CURL_CONFIG"
+curl --config "$CURL_CONFIG" --fail --silent --show-error "$API/repos/$REPO" -o "$WORK/repository.json" ||
+  die "GitHub token cannot access $REPO"
+python3 - "$WORK/repository.json" "$REPO" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if data.get("full_name", "").lower() != sys.argv[2].lower():
+    raise SystemExit("GitHub API returned a different repository.")
+PY
 cleanup() {
   status=$?
   if (( status == 0 )); then
@@ -115,20 +123,59 @@ EOF
 echo "Verifying local chunk checksums..."
 (cd "$WORK" && sha256sum --check SHARD-SHA256SUMS)
 
-echo "Publishing encrypted state as $TAG..."
-GH_TOKEN="$GH_TOKEN_FOUND" gh release create "$TAG" "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS" \
-  --repo "$REPO" \
-  --title "Gentoo runner state (encrypted) — $(date -u +%F)" \
-  --notes "Full restored Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted; set the Actions secret STATE_ENCRYPTION_PASSPHRASE to the passphrase used during capture before restoring." \
-  --prerelease
+echo "Creating encrypted state release $TAG..."
+python3 - "$TAG" <<'PY' > "$WORK/release.json"
+import json, sys
+tag = sys.argv[1]
+print(json.dumps({
+    "tag_name": tag,
+    "name": "Gentoo runner state (encrypted) — " + tag,
+    "body": "Full Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted. Configure the Actions secret STATE_ENCRYPTION_PASSPHRASE to restore this state.",
+    "draft": False,
+    "prerelease": True,
+    "generate_release_notes": False,
+}))
+PY
+curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
+  -H 'Content-Type: application/json' -X POST --data-binary "@$WORK/release.json" \
+  "$API/repos/$REPO/releases" -o "$WORK/release-response.json"
+UPLOAD_URL="$(python3 - "$WORK/release-response.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(data.get("upload_url", "").split("{", 1)[0])
+PY
+)"
+RELEASE_URL="$(python3 - "$WORK/release-response.json" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("html_url", ""))
+PY
+)"
+[[ "$UPLOAD_URL" == https://uploads.github.com/* && "$RELEASE_URL" == "https://github.com/$REPO/releases/tag/$TAG" ]] ||
+  die "GitHub did not return a valid upload/release URL"
 
-GH_TOKEN="$GH_TOKEN_FOUND" gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' | sort > "$WORK/uploaded-assets.txt"
+for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
+  name="$(basename "$asset")"
+  echo "Uploading encrypted state asset: $name"
+  curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 --retry-all-errors \
+    -H 'Content-Type: application/octet-stream' -X POST \
+    --data-binary "@$asset" "$UPLOAD_URL?name=$name" -o "$WORK/upload-response.json"
+done
+
+curl --config "$CURL_CONFIG" --fail --silent --show-error \
+  "$API/repos/$REPO/releases/tags/$TAG" -o "$WORK/verify-release.json"
+python3 - "$WORK/verify-release.json" <<'PY' > "$WORK/uploaded-assets.txt"
+import json, sys
+data=json.load(open(sys.argv[1], encoding="utf-8"))
+for asset in data.get("assets", []):
+    print(asset.get("name", ""))
+PY
 (
   printf '%s\n' "$(basename "$WORK/manifest.txt")" "$(basename "$WORK/SHARD-SHA256SUMS")"
   printf '%s\n' "${PARTS[@]##*/}"
 ) | sort > "$WORK/expected-assets.txt"
+sort -o "$WORK/uploaded-assets.txt" "$WORK/uploaded-assets.txt"
 diff -u "$WORK/expected-assets.txt" "$WORK/uploaded-assets.txt" || die "release was created but the asset list did not verify"
 
 unset GH_TOKEN_FOUND
-echo "Encrypted state published: https://github.com/$REPO/releases/tag/$TAG"
+echo "Encrypted state published: $RELEASE_URL"
 echo "Now save the same passphrase as repository Actions secret STATE_ENCRYPTION_PASSPHRASE."
