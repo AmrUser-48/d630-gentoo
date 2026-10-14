@@ -61,10 +61,14 @@ if data.get("full_name", "").lower() != sys.argv[2].lower():
 PY
 cleanup() {
   status=$?
+  # Never leave the credential-bearing curl config on disk, including on failure.
+  rm -f "$WORK/curl-auth.conf"
+  unset GH_TOKEN_FOUND GH_TOKEN GITHUB_TOKEN
   if (( status == 0 )); then
     rm -rf "$WORK"
   else
     echo "Encrypted snapshot files (if created) remain at: $WORK" >&2
+    echo "The temporary token header file was removed." >&2
   fi
 }
 trap cleanup EXIT
