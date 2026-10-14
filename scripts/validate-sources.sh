@@ -56,6 +56,7 @@ test -s scripts/install-binpkgs-release.sh
 test -s scripts/snapshot-gentoo-session.sh
 test -s scripts/build-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
+test -s scripts/build-runtime-squashfs-local.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
@@ -89,6 +90,9 @@ bash -n scripts/install-binpkgs-release.sh
 bash -n scripts/snapshot-gentoo-session.sh
 bash -n scripts/build-squashfs.sh
 bash -n scripts/build-runtime-squashfs.sh
+bash -n scripts/build-runtime-squashfs-local.sh
+grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
+grep -Fq 'OUTPUT_DIR' scripts/build-runtime-squashfs.sh
 grep -Fq -- "--getbinpkg --usepkgonly" scripts/build-runtime-squashfs.sh
 grep -Fq "net-wireless/wireless-regdb" scripts/build-runtime-squashfs.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
