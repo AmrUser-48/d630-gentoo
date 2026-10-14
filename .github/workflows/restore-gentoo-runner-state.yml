@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates coreutils curl diffutils openssh-server tar zstd iptables sudo
+            ca-certificates coreutils curl diffutils gnupg openssh-server tar zstd iptables sudo
           sudo apt-get clean
           mkdir -p "$RUNNER_TEMP/gentoo-state"
           df -h / | tee "$RUNNER_TEMP/gentoo-state/host-disk-before.txt"
@@ -128,9 +128,16 @@ jobs:
             cat "$metadata/manifest.txt"
           } >> "$GITHUB_STEP_SUMMARY"
           cp "$metadata/manifest.txt" "$report/manifest.txt"
+          if grep -Fxq 'Archive format: gpg-aes256-encrypted-zstd-tar' "$metadata/manifest.txt"; then
+            printf 'STATE_ENCRYPTED=true\n' >> "$GITHUB_ENV"
+          else
+            printf 'STATE_ENCRYPTED=false\n' >> "$GITHUB_ENV"
+          fi
 
       - name: Verify and stream-restore root filesystem
         shell: bash
+        env:
+          STATE_ENCRYPTION_PASSPHRASE: ${{ secrets.STATE_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/gentoo-state"
@@ -139,13 +146,22 @@ jobs:
           fifo="$report/rootfs-stream.fifo"
           mkdir -p "$chunks"
 
+          if [[ "${STATE_ENCRYPTED:-false}" == true ]]; then
+            [[ -n "${STATE_ENCRYPTION_PASSPHRASE:-}" ]] || {
+              echo "This state is encrypted. Configure repository Actions secret STATE_ENCRYPTION_PASSPHRASE with the passphrase used when saving it." >&2
+              exit 1
+            }
+            part_prefix="gentoo-rootfs.tar.zst.gpg.part-"
+          else
+            part_prefix="gentoo-rootfs.tar.zst.part-"
+          fi
           mapfile -t parts < <(
             gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
-              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.part-")) | .name' |
+              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith(env.part_prefix)) | .name' |
               sort
           )
           (( ${#parts[@]} > 0 )) || {
-            echo "Release $STATE_TAG has no uploaded gentoo-rootfs.tar.zst.part-* assets." >&2
+            echo "Release $STATE_TAG has no uploaded state chunks matching $part_prefix." >&2
             exit 1
           }
 
@@ -184,12 +200,23 @@ jobs:
 
           # Keep one FIFO writer open across all chunks; otherwise each part-close
           # would look like end-of-file to zstd before the following chunk arrives.
-          (
-            set -euo pipefail
-            zstd --decompress --stdout < "$fifo" |
-              sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
-                --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
-          ) > "$report/extract.log" 2>&1 &
+          if [[ "${STATE_ENCRYPTED:-false}" == true ]]; then
+            (
+              set -euo pipefail
+              gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --decrypt \
+                < "$fifo" 3< <(printf '%s\n' "$STATE_ENCRYPTION_PASSPHRASE") |
+                zstd --decompress --stdout |
+                sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                  --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+            ) > "$report/extract.log" 2>&1 &
+          else
+            (
+              set -euo pipefail
+              zstd --decompress --stdout < "$fifo" |
+                sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                  --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+            ) > "$report/extract.log" 2>&1 &
+          fi
           extract_pid=$!
           exec 3>"$fifo"
 
