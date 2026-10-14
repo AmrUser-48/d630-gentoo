@@ -681,7 +681,7 @@ jobs:
                 [[ -s "$boot_out/KERNELRELEASE.txt" ]] && rel="$(tr -d '\r\n' < "$boot_out/KERNELRELEASE.txt")"
                 if [[ -z "$rel" || ! "$rel" =~ ^[A-Za-z0-9._+-]+$ ]] ||
                    ! tar --use-compress-program=unzstd -tf "${modules[0]}" |
-                     grep -Fxq "lib/modules/$rel/"; then
+                     grep -Fx "lib/modules/$rel/" >/dev/null; then
                   echo "WARNING: dropping module archive because KERNELRELEASE.txt does not match its /lib/modules tree." |
                     tee -a "$out/logs/boot-bundle-warning.log"
                   rm -f "${modules[@]}"
