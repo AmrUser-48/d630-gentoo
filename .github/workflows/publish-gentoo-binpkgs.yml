@@ -81,7 +81,7 @@ jobs:
             echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
             echo "has_release=true" >> "$GITHUB_OUTPUT"
             echo "Reused prepared release assets; no package rebuilding or re-archiving required."
-            find "$release_dir" -maxdepth 1 -type f -printf '%f (%s bytes)\\n' | sort
+            find "$release_dir" -maxdepth 1 -type f -printf '%f (%s bytes)\n' | sort
             exit 0
           fi
 
