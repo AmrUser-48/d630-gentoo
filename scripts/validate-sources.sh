@@ -73,7 +73,7 @@ grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/bui
 grep -Fq 'LOCAL_RELEASE_ASSETS_DIR' scripts/build-runtime-squashfs.sh
 grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
 grep -Fq 'Archive format: gpg-aes256-encrypted-zstd-tar' scripts/save-runner-state-encrypted.sh
-grep -Fq 'Remote release does not match the expected unpublished draft.' scripts/publish-pending-state-save.sh
+grep -Fq 'Remote release tag does not match the pending snapshot.' scripts/publish-pending-state-save.sh
 grep -Fq 'releases/$RELEASE_ID' scripts/publish-pending-state-save.sh
 grep -Fq 'STATE_ENCRYPTION_PASSPHRASE' .github/workflows/restore-gentoo-runner-state.yml
 grep -Fq 'gpg --batch --yes --pinentry-mode loopback' .github/workflows/restore-gentoo-runner-state.yml
