@@ -224,6 +224,9 @@ jobs:
           # testing keyword exceptions from the downloaded Stage 3.
           sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
           sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
+          # Add only explicitly selected GURU keyword exceptions; all other packages remain stable-only.
+          sudo mkdir -p "$root/etc/portage/package.accept_keywords"
+          sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
           sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
           sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
           sudo install -m 0755 scripts/gentoo-build-set "$root/usr/local/sbin/gentoo-build-set"
@@ -450,6 +453,48 @@ jobs:
           else
             echo 'Could not initialize Gentoo binary-package trust; stopping instead of silently accepting unsigned packages.' |
               tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Enable and sync GURU overlay for additional applications
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          log="$RUNNER_TEMP/gentoo-builder/guru-overlay.log"
+          if sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -Eeuo pipefail
+            # The package USE config enables Git sync support for eselect-repository.
+            emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 \
+              --usepkg --getbinpkg --buildpkg --with-bdeps=n --noreplace \
+              app-eselect/eselect-repository dev-vcs/git
+
+            # The chroot is freshly extracted each run, but tolerate a previous
+            # manual enable if the session was customized before this step.
+            if [[ ! -s /etc/portage/repos.conf/guru.conf ]]; then
+              eselect repository enable guru
+            fi
+            emaint sync -r guru
+
+            repo_path="$(portageq get_repo_path / guru)"
+            [[ -d "$repo_path" ]] || {
+              echo "GURU repository path was not created: $repo_path" >&2
+              exit 1
+            }
+            find "$repo_path/app-misc/lf" -maxdepth 1 -type f -name "*.ebuild" -print -quit |
+              grep -q . || {
+                echo "Expected GURU package app-misc/lf was not found after sync." >&2
+                exit 1
+              }
+
+            echo "GURU enabled and synced at $repo_path"
+            echo "Selected GURU keyword exception: app-misc/lf ~amd64"
+            eselect repository list
+          ' |& tee "$log"; then
+            tee -a "$GITHUB_STEP_SUMMARY" < "$log"
+          else
+            echo "GURU setup failed; app-misc/lf and other GURU ebuilds will not be available." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            tail -n 80 "$log" || true
             exit 1
           fi
 
