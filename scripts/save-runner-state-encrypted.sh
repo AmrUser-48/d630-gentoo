@@ -37,8 +37,8 @@ if [[ -z "$GH_TOKEN_FOUND" ]]; then
   GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 fi
 [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; expected gh auth in hosts.yml or an existing GH_TOKEN/GITHUB_TOKEN environment variable"
-printf 'Archive passphrase must be saved OUTSIDE this runner and entered as the repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not use your GitHub token as the passphrase.\n' > /dev/tty
-IFS= read -r -s -p "New archive passphrase (minimum 16 characters): " PASS1 </dev/tty
+printf 'Enter the SAME passphrase stored as repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not choose a new one for each save. Do not use your GitHub token as the passphrase.\n' > /dev/tty
+IFS= read -r -s -p "Snapshot encryption passphrase (minimum 16 characters): " PASS1 </dev/tty
 printf '\n' > /dev/tty
 IFS= read -r -s -p "Repeat passphrase: " PASS2 </dev/tty
 printf '\n' > /dev/tty
