@@ -57,6 +57,7 @@ test -s scripts/package-binpkgs-release.sh
 test -s scripts/install-binpkgs-release.sh
 test -s scripts/snapshot-gentoo-session.sh
 test -s scripts/save-runner-state-encrypted.sh
+test -s scripts/publish-pending-state-save.sh
 test -s scripts/build-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
 test -s scripts/build-runtime-squashfs-local.sh
@@ -72,6 +73,8 @@ grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/bui
 grep -Fq 'LOCAL_RELEASE_ASSETS_DIR' scripts/build-runtime-squashfs.sh
 grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
 grep -Fq 'Archive format: gpg-aes256-encrypted-zstd-tar' scripts/save-runner-state-encrypted.sh
+grep -Fq 'Remote release does not match the expected unpublished draft.' scripts/publish-pending-state-save.sh
+grep -Fq 'releases/$RELEASE_ID' scripts/publish-pending-state-save.sh
 grep -Fq 'STATE_ENCRYPTION_PASSPHRASE' .github/workflows/restore-gentoo-runner-state.yml
 grep -Fq 'gpg --batch --yes --pinentry-mode loopback' .github/workflows/restore-gentoo-runner-state.yml
 ! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
@@ -96,6 +99,7 @@ bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh
 bash -n scripts/snapshot-gentoo-session.sh
 bash -n scripts/save-runner-state-encrypted.sh
+bash -n scripts/publish-pending-state-save.sh
 bash -n scripts/build-squashfs.sh
 bash -n scripts/build-runtime-squashfs.sh
 bash -n scripts/build-runtime-squashfs-local.sh
