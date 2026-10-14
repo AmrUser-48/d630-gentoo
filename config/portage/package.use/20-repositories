@@ -1,0 +1,2 @@
+# Enable Git synchronization support for eselect-repository overlays.
+app-eselect/eselect-repository git
