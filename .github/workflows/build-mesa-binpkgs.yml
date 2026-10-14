@@ -88,11 +88,11 @@ jobs:
 
           if [[ -f "$root/etc/portage/package.use" ]]; then
             sudo mv "$root/etc/portage/package.use" "$root/etc/portage/package.use.stage3"
-            sudo mkdir -p "$root/etc/portage/package.use"
           fi
+          sudo mkdir -p "$root/etc/portage/package.use"
           sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
           sudo install -m 0644 config/portage/profile/package.use.force \
-            "$root/etc/portage/profile/package.use.force.d630"
+            "$root/etc/portage/profile/package.use.force/zz-d630-llvm"
           sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
           sudo mkdir -p "$root/etc/portage/package.accept_keywords"
           sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
