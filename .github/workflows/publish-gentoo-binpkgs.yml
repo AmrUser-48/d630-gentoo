@@ -64,8 +64,9 @@ jobs:
           release_dir="${RUNNER_TEMP}/release-assets"
           prepared_dir="${RUNNER_TEMP}/source-artifact/release"
 
-          # Reuse the release assets already prepared by the source builder.
-          # This avoids recompressing packages after a release-permission failure.
+          # Reuse assets prepared by the source runner, then merge boot files
+          # that may have been stored outside its release/ directory.
+          # This avoids rebuilding or recompressing the binary packages.
           if [[ -d "$prepared_dir" && -s "$prepared_dir/BUILD-MANIFEST.txt" && -s "$prepared_dir/SHA256SUMS" ]]; then
             mkdir -p "$release_dir"
             cp -a "$prepared_dir/." "$release_dir/"
@@ -78,9 +79,49 @@ jobs:
               echo "Prepared release manifest has no valid source commit SHA." >&2
               exit 1
             }
+
+            # Artifact layouts vary by run: boot bundle files may be under
+            # binpkgs/, boot-bundle/, or at the artifact root. Do not overwrite
+            # a validated asset already present in the prepared release.
+            for input_dir in "$RUNNER_TEMP/source-artifact/boot-bundle" "$source_dir" "$RUNNER_TEMP/source-artifact"; do
+              [[ -d "$input_dir" ]] || continue
+              for pattern in kernel initramfs KERNELRELEASE.txt kernel-release.txt 'modules-*.tar.zst' d630-firmware.tar.zst \
+                             'd630-*.config' FIRMWARE-SOURCES.txt KERNEL-BUILD-MANIFEST.txt; do
+                for source in "$input_dir"/$pattern; do
+                  [[ -f "$source" ]] || continue
+                  destination="$release_dir/$(basename "$source")"
+                  [[ -e "$destination" ]] && continue
+                  cp -p "$source" "$destination"
+                done
+              done
+            done
+
+            if [[ -s "$release_dir/kernel" || -s "$release_dir/initramfs" ]]; then
+              [[ -s "$release_dir/kernel" && -s "$release_dir/initramfs" ]] || {
+                echo "A boot bundle must contain both kernel and initramfs." >&2
+                exit 1
+              }
+              file "$release_dir/kernel" "$release_dir/initramfs" > "$release_dir/BOOT-FILES.txt"
+              rel_file="$release_dir/KERNELRELEASE.txt"
+              [[ -s "$rel_file" ]] || rel_file="$release_dir/kernel-release.txt"
+              if [[ -s "$rel_file" ]]; then
+                printf '\nRecovered boot bundle:\nKernel release: %s\n' "$(tr -d '\r\n' < "$rel_file")" >> "$release_dir/BUILD-MANIFEST.txt"
+              fi
+            fi
+
+            # Update checksums after merging any additional boot assets.
+            (
+              cd "$release_dir"
+              : > SHA256SUMS
+              for asset in *; do
+                [[ -f "$asset" && "$asset" != SHA256SUMS ]] || continue
+                sha256sum "$asset" >> SHA256SUMS
+              done
+              sha256sum --check SHA256SUMS
+            )
             echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
             echo "has_release=true" >> "$GITHUB_OUTPUT"
-            echo "Reused prepared release assets; no package rebuilding or re-archiving required."
+            echo "Reused prepared release assets and merged recovered boot files; no package rebuilding or re-archiving required."
             find "$release_dir" -maxdepth 1 -type f -printf '%f (%s bytes)\n' | sort
             exit 0
           fi
