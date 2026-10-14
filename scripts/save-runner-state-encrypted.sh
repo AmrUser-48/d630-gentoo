@@ -12,6 +12,19 @@ ROOT="${1:-/}"
 for tool in tar zstd gpg split sha256sum curl python3 realpath; do
   command -v "$tool" >/dev/null || die "missing required tool: $tool"
 done
+
+# Parse every embedded Python heredoc before doing expensive or destructive work.
+python3 - "$0" <<'PY'
+from pathlib import Path
+import re, sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
+if not snippets:
+    raise SystemExit("No embedded Python heredocs found in " + sys.argv[1])
+for index, snippet in enumerate(snippets, start=1):
+    compile(snippet, f"{sys.argv[1]}:python-heredoc-{index}", "exec")
+PY
 [[ -r /dev/tty && -w /dev/tty ]] || die "run from an interactive SSH terminal so GPG can ask for the archive passphrase"
 
 # Prefer the durable GitHub CLI credential in hosts.yml, but never print it.
