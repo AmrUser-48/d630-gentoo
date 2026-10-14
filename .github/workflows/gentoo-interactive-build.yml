@@ -488,18 +488,56 @@ jobs:
           AllowUsers gentoo
           EOF
 
+          # SFTP must run inside the Gentoo root, not on the Ubuntu runner.
+          # Gentoo installs OpenSSH's sftp-server under /usr/{lib,lib64}/misc.
+          sudo install -d -m 0755 "$GENTOO_ROOT/usr/local/sbin"
+          sudo tee "$GENTOO_ROOT/usr/local/sbin/d630-sftp-server" >/dev/null <<'EOF'
+          #!/bin/sh
+          for server in \
+              /usr/lib64/misc/sftp-server \
+              /usr/lib/misc/sftp-server \
+              /usr/lib/openssh/sftp-server \
+              /usr/libexec/openssh/sftp-server; do
+              if [ -x "$server" ]; then
+                  exec "$server"
+              fi
+          done
+          echo "d630 SFTP: OpenSSH sftp-server not found inside Gentoo root." >&2
+          exit 127
+          EOF
+          sudo chmod 0755 "$GENTOO_ROOT/usr/local/sbin/d630-sftp-server"
+
+          # The SSH key remains limited to the Tailnet. Interactive SSH enters
+          # the Gentoo root shell; SFTP is explicitly dispatched to a server
+          # running inside /opt/gentoo so it cannot browse the Ubuntu host.
+          sudo tee /usr/local/sbin/gentoo-ssh-force-command >/dev/null <<'EOF'
+          #!/bin/sh
+          set -eu
+          original="${SSH_ORIGINAL_COMMAND:-}"
+          case "$original" in
+              sftp|internal-sftp|sftp-server|sftp-server\ *|*/sftp-server|*/sftp-server\ *)
+                  exec /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /usr/local/sbin/d630-sftp-server
+                  ;;
+              *)
+                  exec /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+                  ;;
+          esac
+          EOF
+          sudo chmod 0755 /usr/local/sbin/gentoo-ssh-force-command
+
           sudo tee /etc/sudoers.d/gentoo-chroot >/dev/null <<'EOF'
           gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /usr/local/sbin/d630-sftp-server
           EOF
           sudo chmod 0440 /etc/sudoers.d/gentoo-chroot
           sudo visudo -cf /etc/sudoers.d/gentoo-chroot
 
-          # Force an SSH login into the Gentoo rootfs. The account is only
-          # reachable using the one public key over the private Tailscale IP.
+          # Keep interactive SSH forced into Gentoo, but allow the SFTP
+          # subsystem through the wrapper above. No host-shell escape.
           sudo tee -a /etc/ssh/sshd_config >/dev/null <<'EOF'
 
           Match User gentoo
-              ForceCommand /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+              ForceCommand /usr/local/sbin/gentoo-ssh-force-command
               PermitTTY yes
               AllowTcpForwarding no
               X11Forwarding no
