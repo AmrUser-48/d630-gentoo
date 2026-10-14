@@ -155,11 +155,19 @@ jobs:
           else
             part_prefix="gentoo-rootfs.tar.zst.part-"
           fi
-          mapfile -t parts < <(
-            gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
-              --jq --arg prefix "$part_prefix" '.assets[] | select(.state == "uploaded") | select(.name | startswith($prefix)) | .name' |
-              sort
-          )
+          if [[ "${STATE_ENCRYPTED:-false}" == true ]]; then
+            mapfile -t parts < <(
+              gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+                --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.gpg.part-")) | .name' |
+                sort
+            )
+          else
+            mapfile -t parts < <(
+              gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+                --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.part-")) | .name' |
+                sort
+            )
+          fi
           (( ${#parts[@]} > 0 )) || {
             echo "Release $STATE_TAG has no uploaded state chunks matching $part_prefix." >&2
             exit 1
