@@ -19,6 +19,19 @@ for tool in curl python3 sha256sum; do
   command -v "$tool" >/dev/null || die "missing required tool: $tool"
 done
 
+# Parse every embedded Python heredoc before doing expensive or destructive work.
+python3 - "$0" <<'PY'
+from pathlib import Path
+import re, sys
+
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
+if not snippets:
+    raise SystemExit("No embedded Python heredocs found in " + sys.argv[1])
+for index, snippet in enumerate(snippets, start=1):
+    compile(snippet, f"{sys.argv[1]}:python-heredoc-{index}", "exec")
+PY
+
 # Only encrypted chunks are uploaded. Never print or put the token in a command argument.
 GH_TOKEN_FOUND=""
 for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" /root/.config/gh/hosts.yml /home/runner/.config/gh/hosts.yml /home/gentoo/.config/gh/hosts.yml; do
