@@ -1,0 +1,9 @@
+# Minimal console application set for the D630 runtime image.
+# Core boot/account packages are selected separately by the builder.
+app-misc/lf
+app-shells/bash
+app-shells/zsh
+app-i18n/fbterm
+media-sound/sox
+media-sound/lame
+media-sound/alsa-utils
