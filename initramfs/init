@@ -31,6 +31,8 @@ fail() {
     exec /bin/sh
 }
 
+log "Initramfs userspace started; /bin/sh is available for rescue"
+
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || fail "cannot mount devtmpfs"
 mount -t proc proc /proc 2>/dev/null || fail "cannot mount proc"
 mount -t sysfs sysfs /sys 2>/dev/null || fail "cannot mount sysfs"
