@@ -24,6 +24,10 @@ grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.for
 grep -Fq 'profile/package.use.force/zz-d630-llvm' .github/workflows/gentoo-interactive-build.yml
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
+test -s config/portage/package.use/20-repositories
+test -s config/portage/package.accept_keywords/20-guru
+grep -Fq 'app-eselect/eselect-repository git' config/portage/package.use/20-repositories
+grep -Fq 'app-misc/lf ~amd64' config/portage/package.accept_keywords/20-guru
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 grep -Fq 'dev-util/mesa_clc LLVM_SLOT: -* 22' config/portage/package.use/10-d630-hardware
@@ -55,6 +59,9 @@ test -s scripts/build-runtime-squashfs.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'eselect repository enable guru' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'emaint sync -r guru' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"' .github/workflows/gentoo-interactive-build.yml
 grep -Fq 'uses: actions/upload-artifact@v4' .github/workflows/publish-gentoo-binpkgs.yml
 grep -Fq 'name: Prepare existing Gentoo assets for SquashFS build' .github/workflows/publish-gentoo-binpkgs.yml
 grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/build-d630-runtime-squashfs.yml
