@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: d630-gentoo-mesa-binpkgs
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-mesa:
