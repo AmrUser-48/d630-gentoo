@@ -44,6 +44,8 @@ grep -Fxq 'x11-base/xorg-drivers' config/package.list
 
 test -s config/package-sets/runner-tools.list
 test -s config/package-sets/cli.list
+test -s config/package-sets/tiny-console.list
+test -s config/portage/package.use/50-tiny-console
 test -s config/package-sets/development.list
 test -s config/package-sets/desktop.list
 test -s config/package-sets/multimedia.list
