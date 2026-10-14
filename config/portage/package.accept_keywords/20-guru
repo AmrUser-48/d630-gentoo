@@ -1,4 +1,4 @@
-# Keep the base repository stable-only; allow selected GURU applications individually.
-# app-misc/lf is keyworded ~amd64 in GURU.
+# Keep the base repository stable-only; allow selected non-stable packages individually.
+# app-misc/lf is keyworded ~amd64 in GURU; SoX-ng is currently ~amd64 in Gentoo.
 app-misc/lf ~amd64
 media-sound/sox ~amd64
