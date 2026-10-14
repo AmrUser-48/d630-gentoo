@@ -157,7 +157,7 @@ jobs:
           fi
           mapfile -t parts < <(
             gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
-              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith(env.part_prefix)) | .name' |
+              --jq --arg prefix "$part_prefix" '.assets[] | select(.state == "uploaded") | select(.name | startswith($prefix)) | .name' |
               sort
           )
           (( ${#parts[@]} > 0 )) || {
