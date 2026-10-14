@@ -26,10 +26,14 @@ jobs:
         shell: bash
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 2; }
-          echo "Using this workflow's GITHUB_TOKEN with actions:read and contents:write permissions."
+          [[ -n "${RELEASE_TOKEN:-}" ]] || {
+            echo "Missing RELEASE_TOKEN. Create a fine-grained PAT for AmrUser-48/d630-gentoo with Actions: read and Contents: read and write, then save it as the repository Actions secret RELEASE_TOKEN." >&2
+            exit 2
+          }
 
       - name: Download the completed runner artifact
         uses: actions/download-artifact@v4
@@ -38,7 +42,7 @@ jobs:
           path: ${{ runner.temp }}/source-artifact
           repository: ${{ github.repository }}
           run-id: ${{ inputs.source_run_id }}
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Install archive tools
         shell: bash
@@ -169,7 +173,7 @@ jobs:
         if: steps.package.outputs.has_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: binpkgs-${{ inputs.source_run_id }}
           name: "D630 Gentoo packages and optional boot bundle — run ${{ inputs.source_run_id }}"
           target_commitish: ${{ steps.package.outputs.target_sha }}
