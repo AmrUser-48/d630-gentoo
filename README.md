@@ -46,6 +46,12 @@ The workflow [Gentoo — Interactive Build Runner](.github/workflows/gentoo-inte
 - Portage defaults to `emerge --ask --verbose` through `EMERGE_DEFAULT_OPTS`, with one concurrent emerge job, runner-tuned `MAKEOPTS`, parallel fetch, local binpkg creation, and the official signed Gentoo generic x86-64 binhost. The default is `--with-bdeps=n`: build-time dependencies are not pulled in when compatible binary packages make them unnecessary. Source builds still require their declared build dependencies. Portage verifies official binpkg signatures using `verify-signature = true` and `getuto`; our own release shards are checksum-verified, so the global signature-request feature is not enabled for them; it does not accept incompatible USE flags just to force a binary package. Packages are retained in `/var/cache/binpkgs` and exported in persistent releases.
 - The build environment installs Portage helpers and shell tools, including Git, rsync, nano, tmux, Midnight Commander, htop, Gentoolkit, eix, portage-utils and ufed. If an optional helper package fails, SSH remains available and the log is saved.
 
+#### Save a full runner state with encrypted credentials
+
+From the restored Gentoo root, run `bash scripts/save-runner-state-encrypted.sh`. It archives the root while excluding runtime mounts and streams the archive through Zstandard and GPG AES-256 before splitting it for a `runner-state-*` release; the uploaded state assets are ciphertext, not a plaintext tarball. The script reads the existing GitHub CLI token from `hosts.yml` without printing it.
+
+Keep the passphrase somewhere outside the runner and configure the same value as the repository Actions secret `STATE_ENCRYPTION_PASSPHRASE` before using **Restore saved runner state**. The passphrase is not embedded in the archive. If a prior public state release may have exposed a token, revoke that token and replace it before saving the new state; encrypting a later archive does not undo an earlier exposure.
+
 ### D630 USE flags and Mesa/LLVM troubleshooting
 
 This section records decisions and failure modes from the interactive Gentoo session. Use the checked-in configuration as the source of truth; a running GitHub Actions chroot does **not** receive repository changes automatically. Restart the workflow to get the new configuration, or edit the current chroot manually.
