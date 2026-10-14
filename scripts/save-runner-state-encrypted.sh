@@ -47,18 +47,6 @@ printf '\n' > /dev/tty
 unset PASS2
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/gentoo-state-save.XXXXXXXX")"
-API="https://api.github.com"
-CURL_CONFIG="$WORK/curl-auth.conf"
-printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
-chmod 0600 "$CURL_CONFIG"
-curl --config "$CURL_CONFIG" --fail --silent --show-error "$API/repos/$REPO" -o "$WORK/repository.json" ||
-  die "GitHub token cannot access $REPO"
-python3 - "$WORK/repository.json" "$REPO" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-if data.get("full_name", "").lower() != sys.argv[2].lower():
-    raise SystemExit("GitHub API returned a different repository.")
-PY
 cleanup() {
   status=$?
   # Never leave the credential-bearing curl config on disk, including on failure.
@@ -72,6 +60,18 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+API="https://api.github.com"
+CURL_CONFIG="$WORK/curl-auth.conf"
+printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
+chmod 0600 "$CURL_CONFIG"
+curl --config "$CURL_CONFIG" --fail --silent --show-error "$API/repos/$REPO" -o "$WORK/repository.json" ||
+  die "GitHub token cannot access $REPO"
+python3 - "$WORK/repository.json" "$REPO" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if data.get("full_name", "").lower() != sys.argv[2].lower():
+    raise SystemExit("GitHub API returned a different repository.")
+PY
 
 TAG="runner-state-$(date -u +%Y%m%dT%H%M%SZ)"
 ARCHIVE="$WORK/gentoo-rootfs.tar.zst.gpg"
