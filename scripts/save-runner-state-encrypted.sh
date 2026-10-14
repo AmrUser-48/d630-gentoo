@@ -149,13 +149,22 @@ data = json.load(open(sys.argv[1], encoding="utf-8"))
 print(data.get("upload_url", "").split("{", 1)[0])
 PY
 )"
+RELEASE_ID="$(python3 - "$WORK/release-response.json" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8")).get("id", ""))
+PY
+)"
 RELEASE_URL="$(python3 - "$WORK/release-response.json" <<'PY'
 import json, sys
 print(json.load(open(sys.argv[1], encoding="utf-8")).get("html_url", ""))
 PY
 )"
-[[ "$UPLOAD_URL" == https://uploads.github.com/* && "$RELEASE_URL" == "https://github.com/$REPO/releases/tag/$TAG" ]] ||
-  die "GitHub did not return a valid upload/release URL"
+# A draft release can have a temporary /tag/untagged-* html_url until published.
+# Verify the API ID and upload endpoint now; check the canonical tagged URL after publishing.
+[[ "$UPLOAD_URL" == "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets" &&
+   "$RELEASE_ID" =~ ^[0-9]+$ &&
+   "$RELEASE_URL" == "https://github.com/$REPO/releases/"* ]] ||
+  die "GitHub did not return a valid draft release ID/upload URL"
 
 for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
   name="$(basename "$asset")"
@@ -170,7 +179,7 @@ for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
   printf '%s\t%s\n' "$(basename "$asset")" "$(stat -c '%s' "$asset")" >> "$WORK/expected-assets.tsv"
 done
 curl --config "$CURL_CONFIG" --fail --silent --show-error \
-  "$API/repos/$REPO/releases/tags/$TAG" -o "$WORK/verify-release.json"
+  "$API/repos/$REPO/releases/$RELEASE_ID" -o "$WORK/verify-release.json"
 RELEASE_ID="$(python3 - "$WORK/verify-release.json" "$WORK/expected-assets.tsv" <<'PY'
 import json, sys
 release=json.load(open(sys.argv[1], encoding="utf-8"))
@@ -194,13 +203,20 @@ printf '{"draft":false}\n' > "$WORK/publish.json"
 curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
   -H 'Content-Type: application/json' -X PATCH --data-binary "@$WORK/publish.json" \
   "$API/repos/$REPO/releases/$RELEASE_ID" -o "$WORK/published-release.json"
-python3 - "$WORK/published-release.json" <<'PY' || die "Release was uploaded but could not be published."
+RELEASE_URL="$(python3 - "$WORK/published-release.json" "$TAG" "$REPO" <<'PY'
 import json, sys
 data=json.load(open(sys.argv[1], encoding="utf-8"))
+tag, repo = sys.argv[2], sys.argv[3]
 if data.get("draft") is not False:
     raise SystemExit("Release remains a draft.")
+url = data.get("html_url", "")
+expected = f"https://github.com/{repo}/releases/tag/{tag}"
+if url != expected:
+    raise SystemExit("Release was published but GitHub returned an unexpected canonical URL: " + url)
+print(url)
 PY
+)" || die "Release was uploaded but could not be verified as published."
 
 unset GH_TOKEN_FOUND
 echo "Encrypted state published: $RELEASE_URL"
-echo "Now save the same passphrase as repository Actions secret STATE_ENCRYPTION_PASSPHRASE."
+echo "Use the same passphrase for future saves; it must match repository secret STATE_ENCRYPTION_PASSPHRASE."
