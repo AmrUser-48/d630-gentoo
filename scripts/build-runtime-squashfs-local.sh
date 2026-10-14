@@ -29,9 +29,14 @@ DEST_FREE="$(available_mb "$DEST")"
 (( WORK_FREE >= 6000 )) || die "scratch filesystem needs 6000 MB free; found ${WORK_FREE} MB at $WORK_BASE"
 (( DEST_FREE >= 1000 )) || die "output filesystem needs 1000 MB free; found ${DEST_FREE} MB at $DEST"
 
-for tool in curl sha256sum zstd unzstd tar xz rsync mksquashfs unsquashfs chroot mount umount realpath; do
+for tool in curl sha256sum zstd unzstd tar xz rsync mksquashfs unsquashfs chroot mount umount realpath findmnt; do
   command -v "$tool" >/dev/null || die "missing host tool '$tool'; install curl ca-certificates xz-utils zstd rsync squashfs-tools e2fsprogs util-linux"
 done
+WORK_FS="$(findmnt -no FSTYPE -T "$WORK_BASE" | head -n 1)"
+case "$WORK_FS" in
+  ext2|ext3|ext4|btrfs|xfs|f2fs|zfs) ;;
+  *) die "scratch filesystem '$WORK_FS' cannot safely hold a Gentoo root; pass a work directory on ext4/Btrfs/XFS/F2FS (the boot directory may be FAT/NTFS)" ;;
+esac
 
 PKG_URL="https://github.com/AmrUser-48/d630-gentoo/releases/download/gentoo-core2-2026.10.14/gentoo-binpkgs.tar.zst"
 PKG_SHA256="d2634d6f1266dd21c5b902185c2574042ce4c494be7a13f7b841b0de9835708c"
