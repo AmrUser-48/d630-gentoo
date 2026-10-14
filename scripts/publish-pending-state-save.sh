@@ -30,7 +30,7 @@ m = re.search(r'(?m)^github\.com:[ \t]*\r?\n((?:[ \t]+[^\r\n]*(?:\r?\n|$))*)', t
 if m:
     token = re.search(r'(?m)^[ \t]+(?:oauth_token|token):[ \t]*([^\s#]+)', m.group(1))
     if token:
-        value = token.group(1).strip().strip("\\"'").strip()
+        value = token.group(1).strip().strip('"').strip("'").strip()
         if value:
             print(value)
 PY
