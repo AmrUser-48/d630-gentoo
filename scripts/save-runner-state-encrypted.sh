@@ -69,6 +69,13 @@ cleanup() {
     rm -rf "$WORK"
   else
     echo "Encrypted snapshot files (if created) remain at: $WORK" >&2
+    if [[ -s "$WORK/release-response.json" && -s "$WORK/manifest.txt" && -s "$WORK/SHARD-SHA256SUMS" ]]; then
+      echo "Do NOT run save-gentoo-state again to recover this snapshot." >&2
+      echo "Resume the existing upload with:" >&2
+      echo "  /usr/local/sbin/publish-pending-state-save '$WORK'" >&2
+    else
+      echo "No complete release metadata was saved; the recovery helper may not apply." >&2
+    fi
     echo "The temporary token header file was removed." >&2
   fi
 }
