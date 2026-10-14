@@ -54,6 +54,7 @@ test -s .github/workflows/publish-gentoo-binpkgs.yml
 test -s scripts/package-binpkgs-release.sh
 test -s scripts/install-binpkgs-release.sh
 test -s scripts/snapshot-gentoo-session.sh
+test -s scripts/save-runner-state-encrypted.sh
 test -s scripts/build-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
 test -s scripts/build-runtime-squashfs-local.sh
@@ -67,6 +68,10 @@ grep -Fq 'uses: actions/upload-artifact@v4' .github/workflows/publish-gentoo-bin
 grep -Fq 'name: Prepare existing Gentoo assets for SquashFS build' .github/workflows/publish-gentoo-binpkgs.yml
 grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'LOCAL_RELEASE_ASSETS_DIR' scripts/build-runtime-squashfs.sh
+grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
+grep -Fq 'Archive format: gpg-aes256-encrypted-zstd-tar' scripts/save-runner-state-encrypted.sh
+grep -Fq 'STATE_ENCRYPTION_PASSPHRASE' .github/workflows/restore-gentoo-runner-state.yml
+grep -Fq 'gpg --batch --yes --pinentry-mode loopback' .github/workflows/restore-gentoo-runner-state.yml
 ! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
 ! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/build-d630-runtime-squashfs.yml
 
@@ -88,6 +93,7 @@ bash -n scripts/gentoo-build-set
 bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh
 bash -n scripts/snapshot-gentoo-session.sh
+bash -n scripts/save-runner-state-encrypted.sh
 bash -n scripts/build-squashfs.sh
 bash -n scripts/build-runtime-squashfs.sh
 bash -n scripts/build-runtime-squashfs-local.sh
