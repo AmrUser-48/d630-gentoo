@@ -109,7 +109,7 @@ import re
 
 for filename in ("scripts/save-runner-state-encrypted.sh", "scripts/publish-pending-state-save.sh"):
     source = Path(filename).read_text(encoding="utf-8")
-    snippets = re.findall(r"(?m)^[ \t]*<<'PY'[ \t]*\n(.*?)^[ \t]*PY[ \t]*$", source, re.S)
+    snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
     if not snippets:
         raise SystemExit(f"No embedded Python heredocs found in {filename}")
     for index, snippet in enumerate(snippets, start=1):
