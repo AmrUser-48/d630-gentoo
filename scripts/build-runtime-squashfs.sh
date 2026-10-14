@@ -9,16 +9,22 @@ log() { echo; echo "[d630-runtime-rootfs] $*"; }
 [[ "$SOURCE_FALLBACK" == true || "$SOURCE_FALLBACK" == false ]] || die "SOURCE_FALLBACK must be true or false"
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
 LOCAL_RELEASE_ASSETS_DIR="${LOCAL_RELEASE_ASSETS_DIR:-}"
-[[ -n "$BINPKG_RUN_IDS" || -n "$LOCAL_RELEASE_ASSETS_DIR" ]] || die "provide binpkg_run_ids or prepared_assets_run_id"
+LOCAL_BINPKG_ARCHIVE="${LOCAL_BINPKG_ARCHIVE:-}"
+[[ -n "$BINPKG_RUN_IDS" || -n "$LOCAL_RELEASE_ASSETS_DIR" || -n "$LOCAL_BINPKG_ARCHIVE" ]] ||
+  die "provide binpkg_run_ids, prepared assets, or LOCAL_BINPKG_ARCHIVE"
 if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
   [[ -d "$LOCAL_RELEASE_ASSETS_DIR" ]] || die "prepared assets directory not found: $LOCAL_RELEASE_ASSETS_DIR"
   [[ -s "$LOCAL_RELEASE_ASSETS_DIR/SHA256SUMS" ]] || die "prepared assets have no SHA256SUMS"
+fi
+if [[ -n "$LOCAL_BINPKG_ARCHIVE" ]]; then
+  [[ -s "$LOCAL_BINPKG_ARCHIVE" ]] || die "local binpkg archive not found: $LOCAL_BINPKG_ARCHIVE"
+  zstd -t "$LOCAL_BINPKG_ARCHIVE" >/dev/null || die "local binpkg archive is not valid Zstandard data"
 fi
 
 IDS="$(printf '%s' "$BINPKG_RUN_IDS" | tr ',' ' ')"
 ROOT="$RUNNER_TEMP/d630-runtime-root"
 WORK="$RUNNER_TEMP/d630-runtime-work"
-OUT="$GITHUB_WORKSPACE/output"
+OUT="${OUTPUT_DIR:-$GITHUB_WORKSPACE/output}"
 mkdir -p "$WORK" "$OUT"
 rm -rf "$ROOT" "$WORK/stage3"
 mkdir -p "$WORK/stage3"
@@ -30,8 +36,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf 'Profile: %s\nBinpkg releases: %s\nPrepared assets directory: %s\nSource fallback: %s\nKernel bundle tag: %s\n' \
-  "$RUNTIME_PROFILE" "$IDS" "$LOCAL_RELEASE_ASSETS_DIR" "$SOURCE_FALLBACK" "$KERNEL_BUNDLE_TAG" > "$OUT/BUILD-INPUTS.txt"
+printf 'Profile: %s\nBinpkg releases: %s\nPrepared assets directory: %s\nLocal package archive: %s\nSource fallback: %s\nKernel bundle tag: %s\n' \
+  "$RUNTIME_PROFILE" "$IDS" "$LOCAL_RELEASE_ASSETS_DIR" "$LOCAL_BINPKG_ARCHIVE" "$SOURCE_FALLBACK" "$KERNEL_BUNDLE_TAG" > "$OUT/BUILD-INPUTS.txt"
 
 log "Fetch and verify official Gentoo amd64 OpenRC Stage 3"
 BASE='https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc'
@@ -110,6 +116,12 @@ if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
     tar --use-compress-program=unzstd -xf "$PART" -C "$ROOT/var/cache/binpkgs"
   done
   printf 'Source: prepared Actions artifact\nPackage shards: %s\n' "${#PARTS[@]}" > "$OUT/LOCAL-BINPKG-IMPORT.txt"
+elif [[ -n "$LOCAL_BINPKG_ARCHIVE" ]]; then
+  log "Import local binpkg bundle: $LOCAL_BINPKG_ARCHIVE"
+  tar --use-compress-program=unzstd -xf "$LOCAL_BINPKG_ARCHIVE" -C "$ROOT/var/cache/binpkgs"
+  PKG_COUNT="$(find "$ROOT/var/cache/binpkgs" -type f \\( -name '*.gpkg.tar' -o -name '*.tbz2' \\) | wc -l)"
+  (( PKG_COUNT > 0 )) || die "local binpkg archive contained no .gpkg.tar/.tbz2 files under PKGDIR"
+  printf 'Source: local archive\nArchive: %s\nPackage files: %s\n' "$LOCAL_BINPKG_ARCHIVE" "$PKG_COUNT" > "$OUT/LOCAL-BINPKG-IMPORT.txt"
 else
   for ID in $IDS; do
     curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
