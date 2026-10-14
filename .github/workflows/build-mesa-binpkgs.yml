@@ -82,7 +82,7 @@ jobs:
           root="$GENTOO_ROOT"
           sudo mkdir -p "$root/etc/portage" "$root/etc/portage/repos.conf" \
             "$root/etc/portage/binrepos.conf" "$root/etc/portage/profile" \
-            "$root/etc/portage/package-sets" "$root/etc/portage/package.use" \
+            "$root/etc/portage/package-sets" "$root/etc/portage/profile/package.use.force" \
             "$root/var/cache/binpkgs" "$root/var/log/portage" \
             "$root/dev" "$root/proc" "$root/sys" "$root/run"
 
