@@ -21,7 +21,7 @@ for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" /root/.config
   GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PY'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-m = re.search(r'(?ms)^github\.com:\s*\n((?:^[ \t].*(?:\n|$))*)', text)
+m = re.search(r'(?m)^github\.com:[ \t]*\r?\n((?:[ \t]+[^\r\n]*(?:\r?\n|$))*)', text)
 if not m:
     raise SystemExit(0)
 token = re.search(r'(?m)^[ \t]+(?:oauth_token|token):[ \t]*([^\s#]+)', m.group(1))
