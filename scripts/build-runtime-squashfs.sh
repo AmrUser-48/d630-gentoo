@@ -341,7 +341,11 @@ bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
 [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
-(cd "$OUT" && sha256sum squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt kernel initramfs KERNELRELEASE.txt 2>/dev/null > SHA256SUMS)
+sum_files=(squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
+  [[ ! -f "$OUT/$optional" ]] || sum_files+=("$optional")
+done
+(cd "$OUT" && sha256sum "${sum_files[@]}" > SHA256SUMS)
 du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
 cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
 log "Runtime image completed"
