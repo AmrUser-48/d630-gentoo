@@ -82,7 +82,7 @@ resolve_token() {
       GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PYTOKEN'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-m = re.search(r'(?m)^github\\.com:[ \\t]*\\r?\\n((?:[ \\t]+[^\\r\\n]*(?:\\r?\\n|$))*)', text)
+m = re.search(r'(?m)^github\.com:[ \t]*\r?\n((?:[ \t]+[^\r\n]*(?:\r?\n|$))*)', text)
 if m:
     token = re.search(r'(?m)^[ \\t]+(?:oauth_token|token):[ \\t]*([^\\s#]+)', m.group(1))
     if token:
@@ -192,10 +192,10 @@ PYCOUNT
 import json, sys
 releases = json.load(open(sys.argv[1], encoding="utf-8"))
 tag = sys.argv[2]
-matches = [r for r in releases if r.get("tag_name") == tag and r.get("draft") is True]
+matches = [r for r in releases if r.get("tag_name") == tag]
 if matches:
     # Prefer the draft with the most uploaded assets, then the newest ID.
-    matches.sort(key=lambda r: (len(r.get("assets", [])), int(r.get("id", 0))), reverse=True)
+    matches.sort(key=lambda r: (len(r.get("assets", [])), bool(r.get("draft")), int(r.get("id", 0))), reverse=True)
     print(json.dumps(matches[0]))
 PYSELECT
     then
@@ -235,7 +235,7 @@ PYCOUNT2
         if python3 - "$WORK/releases-page.json" "$tag" > "$WORK/current-release.json" <<'PYSELECT2'
 import json, sys
 releases = json.load(open(sys.argv[1], encoding="utf-8"))
-matches = [r for r in releases if r.get("tag_name") == sys.argv[2] and r.get("draft") is True]
+matches = [r for r in releases if r.get("tag_name") == sys.argv[2]]
 if matches:
     matches.sort(key=lambda r: (len(r.get("assets", [])), int(r.get("id", 0))), reverse=True)
     print(json.dumps(matches[0]))
