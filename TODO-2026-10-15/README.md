@@ -75,6 +75,18 @@ Do not start the copy if the work filesystem lacks room for the runtime copy and
 
 Check that the following packages are installed in the source tree before trimming: `app-i18n/fbterm`, `app-misc/mc`, `media-libs/mesa`, `x11-base/xorg-server`, `x11-base/xorg-drivers`, `x11-apps/xinit`, and `x11-wm/openbox`. If any target is still compiling or missing, stop here and finish it first.
 
+Verify them against Portage's installed-package database instead of relying on an old build log:
+
+```bash
+for atom in app-i18n/fbterm app-misc/mc media-libs/mesa \
+  x11-base/xorg-server x11-base/xorg-drivers x11-apps/xinit x11-wm/openbox; do
+  chroot "$BUILD" /usr/bin/portageq has_version / "$atom" || {
+    echo "Missing installed target: $atom" >&2
+    exit 1
+  }
+done
+```
+
 ### 5.2 Create a runtime-only working copy
 
 ```bash
@@ -113,7 +125,10 @@ done
 Keep a small, explicit world set. It contains the boot/init and console essentials, the requested tools, the Xorg drivers/start command, Mesa, and the OpenRC logind services needed for a non-root X session. Save the original world list for reference:
 
 ```bash
-cp -a "$ROOT/var/lib/portage/world" "$OUT/world-builder-original.txt"
+mkdir -p "$ROOT/var/lib/portage"
+if [[ -f "$ROOT/var/lib/portage/world" ]]; then
+  cp -a "$ROOT/var/lib/portage/world" "$OUT/world-builder-original.txt"
+fi
 cat > "$ROOT/var/lib/portage/world" <<'EOF'
 app-admin/sudo
 app-i18n/fbterm
@@ -228,6 +243,7 @@ Create the SFS **outside** the runtime root, so the image cannot include itself.
 ```bash
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort \
   > "$OUT/INSTALLED-PACKAGES.txt"
+rm -f "$OUT/squashfs" "$OUT/SQUASHFS-INFO.txt" "$OUT/INIT-PROBE.txt" "$OUT/SHA256SUMS"
 mksquashfs "$ROOT" "$OUT/squashfs" -noappend -comp zstd -b 1M -Xcompression-level 15
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
