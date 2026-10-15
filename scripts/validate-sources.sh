@@ -60,6 +60,8 @@ test -s scripts/save-runner-state-encrypted.sh
 ! test -e scripts/publish-pending-state-save.sh
 test -s scripts/build-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
+grep -Fq 'if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; then' scripts/build-runtime-squashfs.sh
+! grep -Fq 'if [[ "$RUNTIME_PROFILE" != console ]]; then' scripts/build-runtime-squashfs.sh
 test -s scripts/build-runtime-squashfs-local.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
