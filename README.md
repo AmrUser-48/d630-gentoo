@@ -54,7 +54,7 @@ Use the exact same passphrase for every save, and store it as the repository Act
 
 If a prior public state release may have exposed a token, revoke that token and authenticate a replacement before saving the new state; encrypting later snapshots does not undo an earlier exposure.
 
-If a save fails after creating a draft release and reports a retained `/tmp/gentoo-state-save.*` directory, the tar stream has already been encrypted. Resume that exact snapshot without re-tarring by running `publish-pending-state-save.sh /tmp/gentoo-state-save.<suffix>`; this verifies local checksums, uploads missing encrypted chunks to the existing draft, verifies remote sizes, and publishes it. It removes its temporary curl-auth file but deliberately leaves the encrypted working directory for manual cleanup after confirming the release.
+If a save is interrupted after the encrypted archive and checksums are complete, the script prints the retained `/tmp/gentoo-state-save.*` directory. Resume the exact same snapshot—without re-tarring or using a second script—with `save-gentoo-state --resume /tmp/gentoo-state-save.<suffix>`. The same command verifies local checksums, uploads only missing assets, verifies the remote release and publishes it. Keep the same encryption passphrase in the repository secret `STATE_ENCRYPTION_PASSPHRASE`.
 
 ### D630 USE flags and Mesa/LLVM troubleshooting
 
