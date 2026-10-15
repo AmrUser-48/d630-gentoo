@@ -2,106 +2,361 @@
 set -Eeuo pipefail
 umask 077
 
-die() { echo "save-runner-state: ERROR: $*" >&2; exit 2; }
+die() { echo "save-gentoo-state: ERROR: $*" >&2; exit 2; }
 REPO="${GITHUB_REPOSITORY:-AmrUser-48/d630-gentoo}"
-ROOT="${1:-/}"
-[[ "$EUID" -eq 0 ]] || die "run inside the restored root as root"
-[[ "$REPO" == "AmrUser-48/d630-gentoo" ]] || die "unexpected target repository: $REPO"
-[[ "$(realpath "$ROOT")" == "/" ]] || die "the snapshot root must be / inside the restored Gentoo environment"
+API="https://api.github.com"
+WORK=""
+CURL_CONFIG=""
+GH_TOKEN_FOUND=""
+MODE="snapshot"
+ROOT="/"
 
-for tool in tar zstd gpg split sha256sum curl python3 realpath; do
+[[ "$EUID" -eq 0 ]] || die "run inside the restored Gentoo root as root"
+[[ "$REPO" == "AmrUser-48/d630-gentoo" ]] || die "unexpected target repository: $REPO"
+
+if [[ "${1:-}" == "--resume" ]]; then
+  [[ $# -eq 2 ]] || die "Usage: save-gentoo-state [--resume /tmp/gentoo-state-save.XXXXXXXX]"
+  MODE="resume"
+  WORK="$(realpath "$2")"
+  case "$WORK" in /tmp/gentoo-state-save.*) ;; *) die "refusing to resume a directory outside /tmp/gentoo-state-save.*" ;; esac
+elif [[ $# -le 1 ]]; then
+  ROOT="${1:-/}"
+  [[ "$(realpath "$ROOT")" == "/" ]] || die "the snapshot root must be / inside the restored Gentoo environment"
+else
+  die "Usage: save-gentoo-state [--resume /tmp/gentoo-state-save.XXXXXXXX]"
+fi
+
+for tool in curl python3 sha256sum realpath; do
   command -v "$tool" >/dev/null || die "missing required tool: $tool"
 done
 
-# Parse every embedded Python heredoc before doing expensive or destructive work.
-python3 - "$0" <<'PY'
-from pathlib import Path
-import re, sys
+if [[ "$MODE" == snapshot ]]; then
+  for tool in tar zstd gpg split stat; do
+    command -v "$tool" >/dev/null || die "missing required tool: $tool"
+  done
+else
+  [[ -d "$WORK" ]] || die "resume directory does not exist: $WORK"
+  [[ -s "$WORK/manifest.txt" && -s "$WORK/SHARD-SHA256SUMS" ]] ||
+    die "directory has no complete manifest/checksum metadata; cannot resume this snapshot"
+fi
 
-source = Path(sys.argv[1]).read_text(encoding="utf-8")
-snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
-if not snippets:
-    raise SystemExit("No embedded Python heredocs found in " + sys.argv[1])
-for index, snippet in enumerate(snippets, start=1):
-    compile(snippet, f"{sys.argv[1]}:python-heredoc-{index}", "exec")
-PY
-[[ -r /dev/tty && -w /dev/tty ]] || die "run from an interactive SSH terminal so GPG can ask for the archive passphrase"
+cleanup() {
+  local status=$?
+  trap - EXIT
+  [[ -z "$CURL_CONFIG" ]] || rm -f "$CURL_CONFIG"
+  unset GH_TOKEN_FOUND GH_TOKEN GITHUB_TOKEN PASS1 PASS2
+  if [[ -n "$WORK" && -d "$WORK" ]]; then
+    if (( status == 0 )); then
+      rm -rf -- "$WORK"
+    elif [[ -s "$WORK/manifest.txt" && -s "$WORK/SHARD-SHA256SUMS" ]] &&
+         compgen -G "$WORK/gentoo-rootfs.tar.zst.gpg.part-*" >/dev/null; then
+      echo "Encrypted snapshot preserved at: $WORK" >&2
+      echo "Retry using this SAME command (no new snapshot will be created):" >&2
+      echo "  save-gentoo-state --resume '$WORK'" >&2
+    else
+      echo "Snapshot failed before a resumable archive was complete; temporary data: $WORK" >&2
+      echo "Inspect it before removing it; a new save may be required." >&2
+    fi
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
 
-# Prefer the durable GitHub CLI credential in hosts.yml, but never print it.
-GH_TOKEN_FOUND=""
-for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" /root/.config/gh/hosts.yml /home/runner/.config/gh/hosts.yml /home/gentoo/.config/gh/hosts.yml; do
-  [[ -n "$auth_file" && -s "$auth_file" ]] || continue
-  GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PY'
+# Prefer the durable GitHub CLI credential from hosts.yml, but never print it.
+resolve_token() {
+  local auth_file
+  for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" \
+      /root/.config/gh/hosts.yml /home/runner/.config/gh/hosts.yml /home/gentoo/.config/gh/hosts.yml; do
+    [[ -n "$auth_file" && -s "$auth_file" ]] || continue
+    GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PY'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
 m = re.search(r'(?m)^github\.com:[ \t]*\r?\n((?:[ \t]+[^\r\n]*(?:\r?\n|$))*)', text)
-if not m:
-    raise SystemExit(0)
-token = re.search(r'(?m)^[ \t]+(?:oauth_token|token):[ \t]*([^\s#]+)', m.group(1))
-if token:
-    value = token.group(1).strip().strip("\"'").strip()
-    if value:
-        print(value)
+if m:
+    token = re.search(r'(?m)^[ \t]+(?:oauth_token|token):[ \t]*([^\s#]+)', m.group(1))
+    if token:
+        value = token.group(1).strip().strip("\"'").strip()
+        if value:
+            print(value)
 PY
 )"
-  [[ -n "$GH_TOKEN_FOUND" ]] && break
-done
-if [[ -z "$GH_TOKEN_FOUND" ]]; then
-  GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    [[ -n "$GH_TOKEN_FOUND" ]] && break
+  done
+  if [[ -z "$GH_TOKEN_FOUND" ]]; then
+    GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  fi
+  [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; authorize gh or provide GH_TOKEN/GITHUB_TOKEN with repository Contents: write"
+}
+
+write_curl_config() {
+  CURL_CONFIG="$WORK/curl-auth.conf"
+  printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
+  chmod 0600 "$CURL_CONFIG"
+  curl --config "$CURL_CONFIG" --fail --silent --show-error "$API/repos/$REPO" -o "$WORK/repository.json" ||
+    die "GitHub token cannot access $REPO"
+  python3 - "$WORK/repository.json" "$REPO" <<'PY'
+import json, sys
+repo = json.load(open(sys.argv[1], encoding="utf-8"))
+if repo.get("full_name", "").lower() != sys.argv[2].lower():
+    raise SystemExit("GitHub API returned a different repository.")
+PY
+}
+
+# Validate local state and idempotently publish or finish publishing that state.
+# This is the only publication/recovery implementation; --resume never re-tars.
+publish_snapshot() {
+  local tag release_id upload_url draft_state name expected_size asset_state
+  local -a parts part_names
+  [[ -s "$WORK/manifest.txt" && -s "$WORK/SHARD-SHA256SUMS" ]] || die "snapshot manifest/checksums are missing"
+  grep -Fxq 'Archive format: gpg-aes256-encrypted-zstd-tar' "$WORK/manifest.txt" ||
+    die "manifest archive format is not supported by this restore workflow"
+  tag="$(sed -n 's/^Tag: //p' "$WORK/manifest.txt" | head -n 1)"
+  [[ "$tag" =~ ^runner-state-[0-9]{8}T[0-9]{6}Z$ ]] || die "invalid state tag in manifest: $tag"
+
+  shopt -s nullglob
+  parts=( "$WORK"/gentoo-rootfs.tar.zst.gpg.part-* )
+  shopt -u nullglob
+  (( ${#parts[@]} > 0 )) || die "no encrypted archive chunks found in $WORK"
+  part_names=()
+  for asset in "${parts[@]}"; do
+    name="$(basename "$asset")"
+    [[ "$name" =~ ^gentoo-rootfs\.tar\.zst\.gpg\.part-[0-9]{3,}$ ]] || die "invalid archive chunk name: $name"
+    (( $(stat -c '%s' "$asset") < 2000000000 )) || die "chunk exceeds GitHub release asset limit: $name"
+    part_names+=("$name")
+  done
+  python3 - "$WORK/SHARD-SHA256SUMS" "${part_names[@]}" <<'PY'
+import sys
+checksum_file, *parts = sys.argv[1:]
+actual = []
+for line in open(checksum_file, encoding="utf-8"):
+    fields = line.split()
+    if len(fields) >= 2:
+        name = fields[1].removeprefix("*")
+        if len(fields[0]) != 64 or any(c not in "0123456789abcdefABCDEF" for c in fields[0]):
+            raise SystemExit("Invalid SHA-256 entry in SHARD-SHA256SUMS")
+        actual.append(name)
+if sorted(actual) != sorted(parts) or len(actual) != len(set(actual)):
+    raise SystemExit("SHARD-SHA256SUMS does not name exactly the local archive chunks")
+PY
+  (cd "$WORK" && sha256sum --check SHARD-SHA256SUMS) || die "local chunk checksum verification failed"
+
+  : > "$WORK/expected-assets.tsv"
+  for asset in "${parts[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
+    printf '%s\t%s\t%s\n' "$(basename "$asset")" "$(stat -c '%s' "$asset")" "$(sha256sum "$asset" | awk '{print $1}')" >> "$WORK/expected-assets.tsv"
+  done
+
+  # Recreate release metadata from the manifest. This still works if the network
+  # failed before GitHub returned the original create-release response.
+  python3 - "$tag" <<'PY' > "$WORK/release.json.tmp"
+import json, sys
+tag = sys.argv[1]
+data = {
+    "tag_name": tag,
+    "name": "Gentoo runner state (encrypted) — " + tag,
+    "body": "Full Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted. Configure the Actions secret STATE_ENCRYPTION_PASSPHRASE to restore this state.",
+    "draft": True,
+    "prerelease": True,
+    "generate_release_notes": False,
+}
+json.dump(data, sys.stdout)
+PY
+  mv "$WORK/release.json.tmp" "$WORK/release.json"
+
+  if ! curl --config "$CURL_CONFIG" --fail --silent --show-error \
+       "$API/repos/$REPO/releases/tags/$tag" -o "$WORK/current-release.json"; then
+    echo "No release currently exists for $tag; creating a draft release."
+    if ! curl --config "$CURL_CONFIG" --fail --silent --show-error \
+        -H 'Content-Type: application/json' -X POST --data-binary "@$WORK/release.json" \
+        "$API/repos/$REPO/releases" -o "$WORK/release-response.json"; then
+      echo "Release creation response was interrupted; checking whether GitHub created it anyway." >&2
+    fi
+    local found=false
+    for attempt in 1 2 3; do
+      if curl --config "$CURL_CONFIG" --fail --silent --show-error \
+          "$API/repos/$REPO/releases/tags/$tag" -o "$WORK/current-release.json"; then
+        found=true
+        break
+      fi
+      sleep 2
+    done
+    [[ "$found" == true ]] || die "could not create or find release $tag; encrypted snapshot remains resumable"
+  fi
+
+  upload_url="$(python3 - "$WORK/current-release.json" "$tag" "$REPO" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+tag, repo = sys.argv[2:]
+if r.get("tag_name") != tag:
+    raise SystemExit("Remote release tag does not match the local snapshot.")
+expected_name = "Gentoo runner state (encrypted) — " + tag
+if r.get("name") != expected_name:
+    raise SystemExit("The tag already belongs to a release with a different name; refusing to modify it.")
+release_id = r.get("id")
+u = r.get("upload_url", "").split("{", 1)[0]
+if not isinstance(release_id, int) or u != f"https://uploads.github.com/repos/{repo}/releases/{release_id}/assets":
+    raise SystemExit("Remote release ID/upload URL failed validation.")
+print(u)
+PY
+  )" || die "remote release cannot be verified; encrypted snapshot is preserved"
+  release_id="$(python3 - "$WORK/current-release.json" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8"))["id"])
+PY
+  )"
+
+  for asset in "${parts[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
+    name="$(basename "$asset")"
+    expected_size="$(stat -c '%s' "$asset")"
+    curl --config "$CURL_CONFIG" --fail --silent --show-error \
+      "$API/repos/$REPO/releases/$release_id" -o "$WORK/current-release.json" ||
+      die "cannot inspect release before uploading $name"
+    asset_state="$(python3 - "$WORK/current-release.json" "$name" "$expected_size" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+name, expected = sys.argv[2], int(sys.argv[3])
+for a in r.get("assets", []):
+    if a.get("name") == name:
+        if a.get("state") != "uploaded" or int(a.get("size", -1)) != expected:
+            raise SystemExit("Remote asset name exists with unexpected state/size: " + name)
+        print("present")
+        break
+else:
+    print("missing")
+PY
+    )" || die "remote asset verification failed for $name"
+    if [[ "$asset_state" == missing ]]; then
+      echo "Uploading $name"
+      if ! curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 --retry-all-errors \
+          -H 'Content-Type: application/octet-stream' -X POST --data-binary "@$asset" \
+          "$upload_url?name=$name" -o "$WORK/upload-response.json"; then
+        echo "Upload response was unsuccessful/ambiguous for $name; checking remote state." >&2
+      fi
+      curl --config "$CURL_CONFIG" --fail --silent --show-error \
+        "$API/repos/$REPO/releases/$release_id" -o "$WORK/current-release.json" ||
+        die "cannot verify upload of $name; rerun save-gentoo-state --resume '$WORK'"
+      asset_state="$(python3 - "$WORK/current-release.json" "$name" "$expected_size" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+name, expected = sys.argv[2], int(sys.argv[3])
+for a in r.get("assets", []):
+    if a.get("name") == name:
+        if a.get("state") != "uploaded" or int(a.get("size", -1)) != expected:
+            raise SystemExit("Remote asset exists but state/size is wrong: " + name)
+        print("present")
+        break
+else:
+    print("missing")
+PY
+      )" || die "upload verification failed for $name"
+      [[ "$asset_state" == present ]] || die "upload of $name did not complete; rerun save-gentoo-state --resume '$WORK'"
+    else
+      echo "Already uploaded and verified: $name"
+    fi
+  done
+
+  curl --config "$CURL_CONFIG" --fail --silent --show-error \
+    "$API/repos/$REPO/releases/$release_id" -o "$WORK/current-release.json" || die "cannot verify final release assets"
+  python3 - "$WORK/current-release.json" "$WORK/expected-assets.tsv" "$tag" "$REPO" <<'PY' || die "remote assets failed final verification; the snapshot can be resumed"
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+expected = {}
+for line in open(sys.argv[2], encoding="utf-8"):
+    name, size, digest = line.rstrip("\n").split("\t")
+    expected[name] = (int(size), digest.lower())
+assets_list = r.get("assets", [])
+assets = {a.get("name"): a for a in assets_list}
+if len(assets) != len(assets_list) or set(assets) != set(expected):
+    raise SystemExit("Remote release assets do not exactly match this snapshot.")
+for name, (size, digest) in expected.items():
+    a = assets[name]
+    if a.get("state") != "uploaded" or int(a.get("size", -1)) != size:
+        raise SystemExit("Remote asset failed state/size verification: " + name)
+    remote_digest = a.get("digest")
+    if remote_digest and remote_digest.lower() != "sha256:" + digest:
+        raise SystemExit("Remote asset digest mismatch: " + name)
+if r.get("tag_name") != sys.argv[3] or r.get("name") != "Gentoo runner state (encrypted) — " + sys.argv[3]:
+    raise SystemExit("Remote release identity changed during upload.")
+PY
+
+  draft_state="$(python3 - "$WORK/current-release.json" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+print("true" if r.get("draft") is True else "false")
+PY
+  )"
+  if [[ "$draft_state" == true ]]; then
+    printf '{"draft":false}\n' > "$WORK/publish.json"
+    echo "All assets verified; publishing release $tag."
+    if ! curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
+        -H 'Content-Type: application/json' -X PATCH --data-binary "@$WORK/publish.json" \
+        "$API/repos/$REPO/releases/$release_id" -o "$WORK/published-release.json"; then
+      echo "Publish response was interrupted; checking final release state." >&2
+    fi
+  fi
+
+  curl --config "$CURL_CONFIG" --fail --silent --show-error \
+    "$API/repos/$REPO/releases/$release_id" -o "$WORK/published-release.json" ||
+    die "cannot verify final publication; rerun save-gentoo-state --resume '$WORK'"
+  RELEASE_URL="$(python3 - "$WORK/published-release.json" "$WORK/expected-assets.tsv" "$tag" "$REPO" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1], encoding="utf-8"))
+expected = {}
+for line in open(sys.argv[2], encoding="utf-8"):
+    name, size, digest = line.rstrip("\n").split("\t")
+    expected[name] = (int(size), digest.lower())
+assets_list = r.get("assets", [])
+assets = {a.get("name"): a for a in assets_list}
+if r.get("draft") is not False:
+    raise SystemExit("Release is not published yet.")
+if r.get("html_url") != f"https://github.com/{sys.argv[4]}/releases/tag/{sys.argv[3]}":
+    raise SystemExit("Published release URL does not match the expected tag.")
+if r.get("tag_name") != sys.argv[3] or r.get("name") != "Gentoo runner state (encrypted) — " + sys.argv[3]:
+    raise SystemExit("Published release identity mismatch.")
+if len(assets) != len(assets_list) or set(assets) != set(expected):
+    raise SystemExit("Published release asset list does not match this snapshot.")
+for name, (size, digest) in expected.items():
+    a = assets[name]
+    if a.get("state") != "uploaded" or int(a.get("size", -1)) != size:
+        raise SystemExit("Published asset failed state/size verification: " + name)
+    remote_digest = a.get("digest")
+    if remote_digest and remote_digest.lower() != "sha256:" + digest:
+        raise SystemExit("Published asset digest mismatch: " + name)
+print(r["html_url"])
+PY
+  )" || die "snapshot release could not be verified as published"
+  echo "Encrypted state published and verified: $RELEASE_URL"
+  echo "The same passphrase must be stored in Actions secret STATE_ENCRYPTION_PASSPHRASE."
+}
+
+if [[ "$MODE" == resume ]]; then
+  resolve_token
+  write_curl_config
+  publish_snapshot
+  exit 0
 fi
-[[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; expected gh auth in hosts.yml or an existing GH_TOKEN/GITHUB_TOKEN environment variable"
-printf 'Enter the SAME passphrase stored as repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not choose a new one for each save. Do not use your GitHub token as the passphrase.\n' > /dev/tty
+
+# Drop the old second helper from the filesystem before capturing the root.
+rm -f /usr/local/sbin/publish-pending-state-save
+[[ -r /dev/tty && -w /dev/tty ]] || die "run from an interactive SSH terminal so the encryption passphrase can be entered"
+resolve_token
+printf 'Enter the SAME passphrase stored as repository Actions secret STATE_ENCRYPTION_PASSPHRASE. Do not use your GitHub token as this passphrase.\n' > /dev/tty
 IFS= read -r -s -p "Snapshot encryption passphrase (minimum 16 characters): " PASS1 </dev/tty
 printf '\n' > /dev/tty
 IFS= read -r -s -p "Repeat passphrase: " PASS2 </dev/tty
 printf '\n' > /dev/tty
 [[ "${#PASS1}" -ge 16 ]] || die "passphrase must be at least 16 characters"
 [[ "$PASS1" == "$PASS2" ]] || die "passphrases do not match"
-unset PASS2
-
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/gentoo-state-save.XXXXXXXX")"
-cleanup() {
-  status=$?
-  # Never leave the credential-bearing curl config on disk, including on failure.
-  rm -f "$WORK/curl-auth.conf"
-  unset GH_TOKEN_FOUND GH_TOKEN GITHUB_TOKEN
-  if (( status == 0 )); then
-    rm -rf "$WORK"
-  else
-    echo "Encrypted snapshot files (if created) remain at: $WORK" >&2
-    if [[ -s "$WORK/release-response.json" && -s "$WORK/manifest.txt" && -s "$WORK/SHARD-SHA256SUMS" ]]; then
-      echo "Do NOT run save-gentoo-state again to recover this snapshot." >&2
-      echo "Resume the existing upload with:" >&2
-      echo "  /usr/local/sbin/publish-pending-state-save '$WORK'" >&2
-    else
-      echo "No complete release metadata was saved; the recovery helper may not apply." >&2
-    fi
-    echo "The temporary token header file was removed." >&2
-  fi
-}
-trap cleanup EXIT
-API="https://api.github.com"
-CURL_CONFIG="$WORK/curl-auth.conf"
-printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
-chmod 0600 "$CURL_CONFIG"
-curl --config "$CURL_CONFIG" --fail --silent --show-error "$API/repos/$REPO" -o "$WORK/repository.json" ||
-  die "GitHub token cannot access $REPO"
-python3 - "$WORK/repository.json" "$REPO" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-if data.get("full_name", "").lower() != sys.argv[2].lower():
-    raise SystemExit("GitHub API returned a different repository.")
-PY
+write_curl_config
 
 TAG="runner-state-$(date -u +%Y%m%dT%H%M%SZ)"
 ARCHIVE="$WORK/gentoo-rootfs.tar.zst.gpg"
 PART_PREFIX="$WORK/gentoo-rootfs.tar.zst.gpg.part-"
 printf 'Tag: %s\nRepo: %s\nStarted UTC: %s\n' "$TAG" "$REPO" "$(date -u +%FT%TZ)"
 
-# FD 3 is used only for the secret. The root tar -> zstd stream goes to GPG
-# directly, so no unencrypted tar or .tar.zst archive is written to disk.
+# The root tar -> zstd -> GPG stream never writes an unencrypted archive to disk.
 exec 3<<<"$PASS1"
-unset PASS1
+unset PASS1 PASS2
 tar --create --file=- --directory="$ROOT" --numeric-owner --acls --xattrs --xattrs-include='*' --sparse --one-file-system \
   --exclude='./proc' --exclude='./proc/*' \
   --exclude='./sys' --exclude='./sys/*' \
@@ -125,12 +380,11 @@ shopt -u nullglob
 for part in "${PARTS[@]}"; do
   (( $(stat -c '%s' "$part") < 2000000000 )) || die "chunk exceeds the 2 GB release-asset safety limit: $(basename "$part")"
 done
-
 (
   cd "$WORK"
   sha256sum gentoo-rootfs.tar.zst.gpg.part-* > SHARD-SHA256SUMS
 )
-cat > "$WORK/manifest.txt" <<EOF
+cat > "$WORK/manifest.txt" <<EOF_MANIFEST
 Gentoo runner state snapshot
 Tag: $TAG
 Captured UTC: $(date -u +%FT%TZ)
@@ -142,101 +396,9 @@ Chunks: ${#PARTS[@]}
 The complete root archive is encrypted before being written to release chunks.
 Excluded runtime paths: /proc /sys /dev /run /tmp /mnt /media /var/tmp/portage
 The token/configuration files inside the root are contained only inside the encrypted archive.
-EOF
+EOF_MANIFEST
 
-echo "Verifying local chunk checksums..."
+echo "Verifying local encrypted chunks..."
 (cd "$WORK" && sha256sum --check SHARD-SHA256SUMS)
-
-echo "Creating encrypted state release $TAG..."
-python3 - "$TAG" <<'PY' > "$WORK/release.json"
-import json, sys
-tag = sys.argv[1]
-print(json.dumps({
-    "tag_name": tag,
-    "name": "Gentoo runner state (encrypted) — " + tag,
-    "body": "Full Gentoo runner snapshot. Archive chunks are GPG AES-256 encrypted. Configure the Actions secret STATE_ENCRYPTION_PASSPHRASE to restore this state.",
-    "draft": True,
-    "prerelease": True,
-    "generate_release_notes": False,
-}))
-PY
-curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
-  -H 'Content-Type: application/json' -X POST --data-binary "@$WORK/release.json" \
-  "$API/repos/$REPO/releases" -o "$WORK/release-response.json"
-UPLOAD_URL="$(python3 - "$WORK/release-response.json" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-print(data.get("upload_url", "").split("{", 1)[0])
-PY
-)"
-RELEASE_ID="$(python3 - "$WORK/release-response.json" <<'PY'
-import json, sys
-print(json.load(open(sys.argv[1], encoding="utf-8")).get("id", ""))
-PY
-)"
-RELEASE_URL="$(python3 - "$WORK/release-response.json" <<'PY'
-import json, sys
-print(json.load(open(sys.argv[1], encoding="utf-8")).get("html_url", ""))
-PY
-)"
-# A draft release can have a temporary /tag/untagged-* html_url until published.
-# Verify the API ID and upload endpoint now; check the canonical tagged URL after publishing.
-[[ "$UPLOAD_URL" == "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets" &&
-   "$RELEASE_ID" =~ ^[0-9]+$ &&
-   "$RELEASE_URL" == "https://github.com/$REPO/releases/"* ]] ||
-  die "GitHub did not return a valid draft release ID/upload URL"
-
-for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
-  name="$(basename "$asset")"
-  echo "Uploading encrypted state asset: $name"
-  curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 --retry-all-errors \
-    -H 'Content-Type: application/octet-stream' -X POST \
-    --data-binary "@$asset" "$UPLOAD_URL?name=$name" -o "$WORK/upload-response.json"
-done
-
-: > "$WORK/expected-assets.tsv"
-for asset in "${PARTS[@]}" "$WORK/manifest.txt" "$WORK/SHARD-SHA256SUMS"; do
-  printf '%s\t%s\n' "$(basename "$asset")" "$(stat -c '%s' "$asset")" >> "$WORK/expected-assets.tsv"
-done
-curl --config "$CURL_CONFIG" --fail --silent --show-error \
-  "$API/repos/$REPO/releases/$RELEASE_ID" -o "$WORK/verify-release.json"
-RELEASE_ID="$(python3 - "$WORK/verify-release.json" "$WORK/expected-assets.tsv" <<'PY'
-import json, sys
-release=json.load(open(sys.argv[1], encoding="utf-8"))
-expected={}
-for line in open(sys.argv[2], encoding="utf-8"):
-    name,size=line.rstrip("\n").split("\t")
-    expected[name]=int(size)
-assets={a.get("name"):a for a in release.get("assets", [])}
-if set(assets) != set(expected):
-    raise SystemExit("Uploaded asset names do not match the encrypted local snapshot.")
-for name,size in expected.items():
-    asset=assets[name]
-    if asset.get("state") != "uploaded" or int(asset.get("size",-1)) != size:
-        raise SystemExit("Uploaded asset failed state/size verification: "+name)
-print(release["id"])
-PY
-)" || die "Uploaded release assets failed verification"
-
-# Publish only after all encrypted chunks, manifest and hashes are present and size-verified.
-printf '{"draft":false}\n' > "$WORK/publish.json"
-curl --config "$CURL_CONFIG" --fail --silent --show-error --retry 3 \
-  -H 'Content-Type: application/json' -X PATCH --data-binary "@$WORK/publish.json" \
-  "$API/repos/$REPO/releases/$RELEASE_ID" -o "$WORK/published-release.json"
-RELEASE_URL="$(python3 - "$WORK/published-release.json" "$TAG" "$REPO" <<'PY'
-import json, sys
-data=json.load(open(sys.argv[1], encoding="utf-8"))
-tag, repo = sys.argv[2], sys.argv[3]
-if data.get("draft") is not False:
-    raise SystemExit("Release remains a draft.")
-url = data.get("html_url", "")
-expected = f"https://github.com/{repo}/releases/tag/{tag}"
-if url != expected:
-    raise SystemExit("Release was published but GitHub returned an unexpected canonical URL: " + url)
-print(url)
-PY
-)" || die "Release was uploaded but could not be verified as published."
-
-unset GH_TOKEN_FOUND
-echo "Encrypted state published: $RELEASE_URL"
-echo "Use the same passphrase for future saves; it must match repository secret STATE_ENCRYPTION_PASSPHRASE."
+echo "Starting single-command publish/verification for $TAG..."
+publish_snapshot
