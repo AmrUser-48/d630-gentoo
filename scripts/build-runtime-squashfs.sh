@@ -351,9 +351,9 @@ fi
 
 log "Validate runtime root and build SquashFS"
 [[ -x "$ROOT/sbin/init" ]] || die "runtime root has no executable /sbin/init"
-if [[ "$RUNTIME_PROFILE" != console ]]; then
-  [[ -x "$ROOT/usr/bin/Xorg" || -x "$ROOT/usr/libexec/Xorg" ]] || die "desktop profile missing Xorg"
-  [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "desktop profile missing openbox-session"
+if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; then
+  [[ -x "$ROOT/usr/bin/Xorg" || -x "$ROOT/usr/libexec/Xorg" ]] || die "graphical profile missing Xorg"
+  [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "graphical profile missing openbox-session"
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
