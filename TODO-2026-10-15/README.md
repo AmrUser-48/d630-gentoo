@@ -73,13 +73,14 @@ find "$BUILD/var/cache/binpkgs" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' 
 
 Do not start the copy if the work filesystem lacks room for the runtime copy and the final image. Keep the binpkgs in the source state until the package release/archive has been published and verified. The final SquashFS must not contain `/var/cache/binpkgs`.
 
-Check that the following packages are installed in the source tree before trimming: `app-i18n/fbterm`, `app-misc/mc`, `media-libs/mesa`, `x11-base/xorg-server`, `x11-base/xorg-drivers`, `x11-apps/xinit`, and `x11-wm/openbox`. If any target is still compiling or missing, stop here and finish it first.
+Check that the following packages are installed in the source tree before trimming: `app-i18n/fbterm`, `app-misc/mc`, `media-libs/mesa`, `x11-base/xorg-server`, `x11-base/xorg-drivers`, `x11-apps/xinit`, `x11-wm/openbox`, and `x11-misc/obconf-qt`. If any target is still compiling or missing, stop here and finish it first.
 
 Verify them against Portage's installed-package database instead of relying on an old build log:
 
 ```bash
 for atom in app-i18n/fbterm app-misc/mc media-libs/mesa \
-  x11-base/xorg-server x11-base/xorg-drivers x11-apps/xinit x11-wm/openbox; do
+  x11-base/xorg-server x11-base/xorg-drivers x11-apps/xinit x11-wm/openbox \
+  x11-misc/obconf-qt; do
   chroot "$BUILD" /usr/bin/portageq has_version / "$atom" || {
     echo "Missing installed target: $atom" >&2
     exit 1
@@ -149,6 +150,7 @@ x11-apps/xinit
 x11-base/xorg-drivers
 x11-base/xorg-server
 x11-wm/openbox
+x11-misc/obconf-qt
 EOF
 ```
 
@@ -161,7 +163,7 @@ chroot "$ROOT" /bin/bash -lc \
 tail -n 80 "$OUT/depclean-preview.txt"
 ```
 
-Review `$OUT/depclean-preview.txt`. If Portage reports unresolved dependencies, a missing target, or proposes removing OpenRC, the console/login tools, Mesa, Xorg, Xorg drivers, Xinit, Openbox, fbterm, or mc, **stop and fix the set/dependencies before continuing**. If the plan is correct, execute it on the copy only:
+Review `$OUT/depclean-preview.txt`. If Portage reports unresolved dependencies, a missing target, or proposes removing OpenRC, the console/login tools, Mesa, Xorg, Xorg drivers, Xinit, Openbox, ObConf-Qt, fbterm, or mc, **stop and fix the set/dependencies before continuing**. If the plan is correct, execute it on the copy only:
 
 ```bash
 chroot "$ROOT" /bin/bash -lc \
@@ -170,7 +172,7 @@ chroot "$ROOT" /bin/bash -lc \
 tail -n 50 "$OUT/depclean.log"
 ```
 
-Using `--with-bdeps=n` allows build-only dependencies such as unneeded compiler components to be removed when no retained runtime package needs them. Do not run a full `@world` update or rebuild in this copy. Keep Portage and `/var/db/pkg` for this first bootable test; removing them can be a later size-reduction experiment after the image boots.
+Using `--with-bdeps=n` allows build-only dependencies such as unneeded compiler components to be removed when no retained runtime package needs them. Do not run a full `@world` update or rebuild in this copy. Keep Portage and `/var/db/pkg` for this first bootable test; removing them can be a later size-reduction experiment after the image boots. Keep `x11-misc/obconf-qt` and its Qt 6 runtime dependency closure because the graphical configuration editor is an intentional part of this desktop. Qt libraries add image size, but not continuous idle CPU use when the editor is closed.
 
 ### 5.4 Configure PID 1, console login, and the Openbox start command
 
