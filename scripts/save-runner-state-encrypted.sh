@@ -62,32 +62,40 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Prefer the durable GitHub CLI credential from hosts.yml, but never print it.
+# Prefer explicitly supplied credentials, then the active gh CLI session.
+# Never print tokens; the curl config is mode 0600 and removed on exit.
 resolve_token() {
-  local auth_file
-  for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" \
-      /root/.config/gh/hosts.yml /home/runner/.config/gh/hosts.yml /home/gentoo/.config/gh/hosts.yml; do
-    [[ -n "$auth_file" && -s "$auth_file" ]] || continue
-    GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PY'
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    GH_TOKEN_FOUND="$GITHUB_TOKEN"
+  elif [[ -n "${GH_TOKEN:-}" ]]; then
+    GH_TOKEN_FOUND="$GH_TOKEN"
+  elif command -v gh >/dev/null 2>&1; then
+    GH_TOKEN_FOUND="$(gh auth token --hostname github.com 2>/dev/null || true)"
+  fi
+
+  # Compatibility fallback for older runner images without a working gh command.
+  if [[ -z "$GH_TOKEN_FOUND" ]]; then
+    local auth_file
+    for auth_file in "${GH_HOSTS_FILE:-}" "$HOME/.config/gh/hosts.yml" \
+        /root/.config/gh/hosts.yml /home/runner/.config/gh/hosts.yml /home/gentoo/.config/gh/hosts.yml; do
+      [[ -n "$auth_file" && -s "$auth_file" ]] || continue
+      GH_TOKEN_FOUND="$(python3 - "$auth_file" <<'PYTOKEN'
 import re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-m = re.search(r'(?m)^github\.com:[ \t]*\r?\n((?:[ \t]+[^\r\n]*(?:\r?\n|$))*)', text)
+m = re.search(r'(?m)^github\\.com:[ \\t]*\\r?\\n((?:[ \\t]+[^\\r\\n]*(?:\\r?\\n|$))*)', text)
 if m:
-    token = re.search(r'(?m)^[ \t]+(?:oauth_token|token):[ \t]*([^\s#]+)', m.group(1))
+    token = re.search(r'(?m)^[ \\t]+(?:oauth_token|token):[ \\t]*([^\\s#]+)', m.group(1))
     if token:
-        value = token.group(1).strip().strip("\"'").strip()
+        value = token.group(1).strip().strip("\\\"'").strip()
         if value:
             print(value)
-PY
+PYTOKEN
 )"
-    [[ -n "$GH_TOKEN_FOUND" ]] && break
-  done
-  if [[ -z "$GH_TOKEN_FOUND" ]]; then
-    GH_TOKEN_FOUND="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+      [[ -n "$GH_TOKEN_FOUND" ]] && break
+    done
   fi
-  [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; authorize gh or provide GH_TOKEN/GITHUB_TOKEN with repository Contents: write"
+  [[ -n "$GH_TOKEN_FOUND" ]] || die "no GitHub token found; run gh auth login or provide GH_TOKEN/GITHUB_TOKEN with release Contents: write permission"
 }
-
 write_curl_config() {
   CURL_CONFIG="$WORK/curl-auth.conf"
   printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\nheader = "X-GitHub-Api-Version: 2022-11-28"\n' "$GH_TOKEN_FOUND" > "$CURL_CONFIG"
@@ -162,25 +170,89 @@ json.dump(data, sys.stdout)
 PY
   mv "$WORK/release.json.tmp" "$WORK/release.json"
 
-  if ! curl --config "$CURL_CONFIG" --fail --silent --show-error \
-       "$API/repos/$REPO/releases/tags/$tag" -o "$WORK/current-release.json"; then
-    echo "No release currently exists for $tag; creating a draft release."
-    if ! curl --config "$CURL_CONFIG" --fail --silent --show-error \
-        -H 'Content-Type: application/json' -X POST --data-binary "@$WORK/release.json" \
-        "$API/repos/$REPO/releases" -o "$WORK/release-response.json"; then
-      echo "Release creation response was interrupted; checking whether GitHub created it anyway." >&2
-    fi
-    local found=false
-    for attempt in 1 2 3; do
-      if curl --config "$CURL_CONFIG" --fail --silent --show-error \
-          "$API/repos/$REPO/releases/tags/$tag" -o "$WORK/current-release.json"; then
+  # Search paginated release listings. The tag endpoint can return 404 for
+  # draft releases in some token/repository configurations; never treat a
+  # failed lookup as proof that no release exists.
+  local found=false page count
+  page=1
+  while :; do
+    curl --config "$CURL_CONFIG" --fail --silent --show-error \
+      "$API/repos/$REPO/releases?per_page=100&page=$page" \
+      -o "$WORK/releases-page.json" ||
+      die "cannot list releases; refusing to create a duplicate release"
+    count="$(python3 - "$WORK/releases-page.json" <<'PYCOUNT'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if not isinstance(data, list):
+    raise SystemExit("GitHub releases API returned an unexpected response.")
+print(len(data))
+PYCOUNT
+)"
+    if python3 - "$WORK/releases-page.json" "$tag" > "$WORK/current-release.json" <<'PYSELECT'
+import json, sys
+releases = json.load(open(sys.argv[1], encoding="utf-8"))
+tag = sys.argv[2]
+matches = [r for r in releases if r.get("tag_name") == tag and r.get("draft") is True]
+if matches:
+    # Prefer the draft with the most uploaded assets, then the newest ID.
+    matches.sort(key=lambda r: (len(r.get("assets", [])), int(r.get("id", 0))), reverse=True)
+    print(json.dumps(matches[0]))
+PYSELECT
+    then
+      if [[ -s "$WORK/current-release.json" ]]; then
         found=true
+        echo "Reusing existing draft release for $tag."
         break
       fi
-      sleep 2
-    done
-    [[ "$found" == true ]] || die "could not create or find release $tag; encrypted snapshot remains resumable"
+    fi
+    (( count < 100 )) && break
+    ((page += 1))
+  done
+
+  if [[ "$found" != true ]]; then
+    echo "No matching draft release found; creating one."
+    if curl --config "$CURL_CONFIG" --fail --silent --show-error \
+        -H 'Content-Type: application/json' -X POST --data-binary "@$WORK/release.json" \
+        "$API/repos/$REPO/releases" -o "$WORK/current-release.json"; then
+      found=true
+    else
+      # The server may have created the release even if the response was lost.
+      echo "Create response failed; rechecking release list before any retry." >&2
+      page=1
+      while :; do
+        curl --config "$CURL_CONFIG" --fail --silent --show-error \
+          "$API/repos/$REPO/releases?per_page=100&page=$page" \
+          -o "$WORK/releases-page.json" ||
+          die "cannot verify release creation; encrypted snapshot remains resumable"
+        count="$(python3 - "$WORK/releases-page.json" <<'PYCOUNT2'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+if not isinstance(data, list):
+    raise SystemExit("GitHub releases API returned an unexpected response.")
+print(len(data))
+PYCOUNT2
+)"
+        if python3 - "$WORK/releases-page.json" "$tag" > "$WORK/current-release.json" <<'PYSELECT2'
+import json, sys
+releases = json.load(open(sys.argv[1], encoding="utf-8"))
+matches = [r for r in releases if r.get("tag_name") == sys.argv[2] and r.get("draft") is True]
+if matches:
+    matches.sort(key=lambda r: (len(r.get("assets", [])), int(r.get("id", 0))), reverse=True)
+    print(json.dumps(matches[0]))
+PYSELECT2
+        then
+          if [[ -s "$WORK/current-release.json" ]]; then
+            found=true
+            break
+          fi
+        fi
+        (( count < 100 )) && break
+        ((page += 1))
+      done
+    fi
   fi
+  [[ "$found" == true && -s "$WORK/current-release.json" ]] ||
+    die "could not verify a draft release for $tag; refusing to create duplicates"
 
   upload_url="$(python3 - "$WORK/current-release.json" "$tag" "$REPO" <<'PY'
 import json, sys
