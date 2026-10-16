@@ -1,0 +1,384 @@
+name: Build D630 complete boot bundle from saved Core 2 state
+run-name: "D630 SFS + initramfs • Linux ${{ inputs.kernel_version }} • ${{ inputs.state_tag }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      state_tag:
+        description: Encrypted saved runner-state release to restore
+        required: true
+        type: string
+        default: runner-state-20261015T100327Z
+      kernel_version:
+        description: Stable Linux 6.18.y point release (no RC builds)
+        required: true
+        type: string
+        default: "6.18.56"
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: d630-state-boot-bundle
+  cancel-in-progress: false
+
+jobs:
+  kernel:
+    name: Build stable D630 kernel and external initramfs
+    uses: ./.github/workflows/build-d630-kernel.yml
+    with:
+      kernel_version: ${{ inputs.kernel_version }}
+    permissions:
+      contents: write
+
+  rootfs:
+    name: Restore saved Gentoo state, build SquashFS, and boot-test
+    needs: kernel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      STATE_TAG: ${{ inputs.state_tag }}
+      KERNEL_VERSION: ${{ inputs.kernel_version }}
+      GH_TOKEN: ${{ github.token }}
+      GENTOO_ROOT: /opt/gentoo
+
+    steps:
+      - name: Check out D630 Gentoo configuration
+        uses: actions/checkout@v4
+
+      - name: Validate state and passphrase
+        shell: bash
+        env:
+          STATE_TAG_INPUT: ${{ inputs.state_tag }}
+          STATE_ENCRYPTION_PASSPHRASE: ${{ secrets.STATE_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          [[ "$STATE_TAG_INPUT" =~ ^runner-state-[A-Za-z0-9._-]+$ ]] || {
+            echo "state_tag must be a runner-state-* release tag." >&2
+            exit 2
+          }
+          [[ -n "$STATE_ENCRYPTION_PASSPHRASE" ]] || {
+            echo "Missing repository secret STATE_ENCRYPTION_PASSPHRASE." >&2
+            exit 2
+          }
+          [[ "$KERNEL_VERSION" =~ ^6\.18\.[0-9]+$ ]] || {
+            echo "Only stable Linux 6.18.y versions are accepted." >&2
+            exit 2
+          }
+
+      - name: Install restore, image, and QEMU test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates coreutils curl diffutils gnupg gh \
+            tar zstd xz-utils gzip cpio rsync squashfs-tools e2fsprogs util-linux \
+            python3 qemu-system-x86 qemu-utils
+          sudo apt-get clean
+          df -h / | tee "$RUNNER_TEMP/host-disk-before.txt"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/host-disk-before.txt"
+
+      - name: Download and verify the kernel/initramfs bundle built by this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel_tag="d630-kernel-$KERNEL_VERSION-run-$GITHUB_RUN_ID"
+          kernel_dir="$RUNNER_TEMP/kernel-bundle"
+          mkdir -p "$kernel_dir"
+          echo "Kernel release tag: $kernel_tag"
+          gh release download "$kernel_tag" --repo "$GITHUB_REPOSITORY" --dir "$kernel_dir"
+          [[ -s "$kernel_dir/SHA256SUMS" && -s "$kernel_dir/kernel" && -s "$kernel_dir/initramfs" ]] || {
+            echo "The kernel workflow did not publish a complete kernel/initramfs release." >&2
+            exit 1
+          }
+          (cd "$kernel_dir" && sha256sum --check SHA256SUMS)
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp -p "$kernel_dir/kernel" "$kernel_dir/initramfs" "$GITHUB_WORKSPACE/output/"
+          cp -p "$kernel_dir/BUILD-MANIFEST.txt" "$GITHUB_WORKSPACE/output/KERNEL-BUILD-MANIFEST.txt"
+          cp -p "$kernel_dir/kernel-release.txt" "$GITHUB_WORKSPACE/output/KERNELRELEASE.txt"
+          cp -p "$kernel_dir/FIRMWARE-SOURCES.txt" "$GITHUB_WORKSPACE/output/"
+          cp -p "$kernel_dir/d630-firmware.tar.zst" "$GITHUB_WORKSPACE/output/"
+          cp -p "$kernel_dir"/d630-*.config "$GITHUB_WORKSPACE/output/"
+          module_archive="$(find "$kernel_dir" -maxdepth 1 -type f -name 'modules-*.tar.zst' -print -quit)"
+          [[ -s "$module_archive" ]] || { echo "Matching kernel module archive missing." >&2; exit 1; }
+          cp -p "$module_archive" "$GITHUB_WORKSPACE/output/"
+          file "$GITHUB_WORKSPACE/output/kernel" "$GITHUB_WORKSPACE/output/initramfs" |
+            tee "$GITHUB_WORKSPACE/output/BOOT-FILES.txt"
+
+      - name: Restore the encrypted saved Gentoo build root
+        shell: bash
+        env:
+          STATE_ENCRYPTION_PASSPHRASE: ${{ secrets.STATE_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -Eeuo pipefail
+          report="$RUNNER_TEMP/d630-state-restore"
+          metadata="$report/metadata"
+          chunks="$report/chunks"
+          fifo="$report/rootfs-stream.fifo"
+          mkdir -p "$metadata" "$chunks"
+
+          gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern manifest.txt --pattern SHARD-SHA256SUMS --dir "$metadata"
+          [[ -s "$metadata/manifest.txt" && -s "$metadata/SHARD-SHA256SUMS" ]] || {
+            echo "Saved release lacks manifest.txt or SHARD-SHA256SUMS." >&2
+            exit 1
+          }
+          grep -Fxq 'Archive format: gpg-aes256-encrypted-zstd-tar' "$metadata/manifest.txt" || {
+            echo "The selected snapshot is not the expected encrypted runner state." >&2
+            exit 1
+          }
+
+          part_names="$(gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.gpg.part-")) | .name' | sort)"
+          [[ -n "$part_names" ]] || { echo "No encrypted rootfs chunks in $STATE_TAG." >&2; exit 1; }
+          diff -u \
+            <(printf '%s\n' "$part_names") \
+            <(awk 'NF >= 2 {name=$2; sub(/^\*/, "", name); print name}' "$metadata/SHARD-SHA256SUMS" | sort) || {
+              echo "Release chunks do not match SHARD-SHA256SUMS." >&2
+              exit 1
+            }
+
+          if [[ -e "$GENTOO_ROOT" ]] && find "$GENTOO_ROOT" -mindepth 1 -print -quit | grep -q .; then
+            echo "$GENTOO_ROOT is not empty; refusing to overwrite it." >&2
+            exit 1
+          fi
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+          avail_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+          [[ "$avail_kib" =~ ^[0-9]+$ ]] && (( avail_kib >= 3145728 )) || {
+            echo "Less than 3 GiB free for verified restore data." >&2
+            df -h / >&2
+            exit 1
+          }
+
+          cleanup_restore() {
+            exec 3>&- 2>/dev/null || true
+            if [[ -n "$extract_pid" ]]; then kill "$extract_pid" 2>/dev/null || true; fi
+            rm -f "$fifo"
+          }
+          extract_pid=""
+          mkfifo "$fifo"
+          trap cleanup_restore EXIT
+          (
+            set -euo pipefail
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase-fd 3 --decrypt < "$fifo" \
+              3< <(printf '%s\n' "$STATE_ENCRYPTION_PASSPHRASE") |
+              zstd --decompress --stdout |
+              sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+          ) > "$report/extract.log" 2>&1 &
+          extract_pid=$!
+          exec 3>"$fifo"
+
+          while IFS= read -r part; do
+            [[ -n "$part" ]] || continue
+            echo "Downloading and verifying $part"
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$part" --dir "$chunks"
+            expected="$(awk -v name="$part" '$2 == name {print $1}' "$metadata/SHARD-SHA256SUMS")"
+            [[ "$expected" =~ ^[[:xdigit:]]{64}$ ]] || { echo "Missing checksum for $part." >&2; exit 1; }
+            (cd "$chunks" && printf '%s  %s\n' "$expected" "$part" | sha256sum --check -)
+            cat "$chunks/$part" >&3
+            rm -f "$chunks/$part"
+          done <<< "$part_names"
+
+          exec 3>&-
+          if ! wait "$extract_pid"; then
+            tail -n 100 "$report/extract.log" >&2 || true
+            exit 1
+          fi
+          extract_pid=""
+          trap - EXIT
+          rm -f "$fifo"
+
+          sudo install -d -m 0755 "$GENTOO_ROOT/dev" "$GENTOO_ROOT/proc" \
+            "$GENTOO_ROOT/sys" "$GENTOO_ROOT/run" "$GENTOO_ROOT/mnt" "$GENTOO_ROOT/media"
+          sudo install -d -m 1777 "$GENTOO_ROOT/tmp"
+          for mp in dev proc sys run; do
+            sudo mount --rbind "/$mp" "$GENTOO_ROOT/$mp"
+            sudo mount --make-rslave "$GENTOO_ROOT/$mp"
+          done
+          sudo rm -f "$GENTOO_ROOT/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$GENTOO_ROOT/etc/resolv.conf"
+          sudo chroot "$GENTOO_ROOT" /bin/bash --login -c \
+            'test -s /etc/gentoo-release && command -v emerge >/dev/null && emerge --version'
+          du -sh "$GENTOO_ROOT" "$GENTOO_ROOT/var/cache/binpkgs" | tee "$RUNNER_TEMP/restored-root-size.txt"
+          df -h / | tee "$RUNNER_TEMP/disk-after-restore.txt"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/restored-root-size.txt"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/disk-after-restore.txt"
+
+      - name: Build runtime SquashFS from the restored Core 2 state
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo env RUNNER_TEMP="$RUNNER_TEMP" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+            bash scripts/build-state-squashfs.sh "$GENTOO_ROOT" "$GITHUB_WORKSPACE/output"
+
+      - name: Boot-test the actual kernel + initramfs + SquashFS in QEMU
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -Eeuo pipefail
+          out="$GITHUB_WORKSPACE/output"
+          test -s "$out/kernel"
+          test -s "$out/initramfs"
+          test -s "$out/squashfs"
+
+          disk="$RUNNER_TEMP/d630-qemu-root.raw"
+          mnt="$RUNNER_TEMP/d630-qemu-root-mount"
+          mkdir -p "$mnt"
+          trap 'sudo umount "$mnt" 2>/dev/null || true' EXIT
+          truncate -s 5G "$disk"
+          mkfs.ext4 -F -q "$disk"
+          sudo mount -o loop "$disk" "$mnt"
+          sudo mkdir -p "$mnt/d630-gentoo"
+          sudo cp "$out/squashfs" "$mnt/d630-gentoo/squashfs"
+          sync
+          sudo umount "$mnt"
+          trap - EXIT
+
+          status=0
+          timeout --foreground --signal=TERM --kill-after=10s 180s \
+            qemu-system-x86_64 -machine pc -m 2048 -smp 2 -nographic \
+              -no-reboot -no-shutdown \
+              -kernel "$out/kernel" \
+              -initrd "$out/initramfs" \
+              -append "console=ttyS0,115200n8 loglevel=7 ignore_loglevel d630.debug=1 d630.squashfs=/d630-gentoo/squashfs" \
+              -drive "file=$disk,format=raw,if=ide" \
+              -serial "file:$out/QEMU-BOOT-TEST.log" -monitor none -display none || status=$?
+
+          if [[ "$status" != 0 && "$status" != 124 && "$status" != 137 ]]; then
+            echo "QEMU exited unexpectedly with status $status." >&2
+            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
+            exit 1
+          fi
+          grep -Fq '[d630-init] Found /d630-gentoo/squashfs on /dev/sda' "$out/QEMU-BOOT-TEST.log" || {
+            echo "Initramfs did not discover the SquashFS on the QEMU ext4 disk." >&2
+            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
+            exit 1
+          }
+          grep -Fq '[d630-init] Switching to Gentoo userspace' "$out/QEMU-BOOT-TEST.log" || {
+            echo "Initramfs did not switch to the Gentoo root." >&2
+            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
+            exit 1
+          }
+          grep -Fq 'Create a local username:' "$out/QEMU-BOOT-TEST.log" || {
+            echo "OpenRC/first-boot service did not reach its console prompt." >&2
+            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
+            exit 1
+          }
+          {
+            echo "QEMU smoke test: PASS"
+            echo "Kernel and external initramfs booted with an IDE-attached ext4 disk."
+            echo "Initramfs discovered /d630-gentoo/squashfs, mounted it, switched root, and reached the OpenRC first-boot prompt."
+            echo "QEMU remained running at the expected interactive first-boot prompt until timeout (status $status)."
+          } | tee "$out/QEMU-BOOT-TEST.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare preserved binary-package release
+        id: package-release
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="$GITHUB_WORKSPACE/output/binpkgs-release"
+          if [[ -s "$pkg/SHA256SUMS" ]] && find "$pkg" -maxdepth 1 -type f -name 'binpkgs-part-*.tar.zst' -print -quit | grep -q .; then
+            (cd "$pkg" && sha256sum --check SHA256SUMS)
+            {
+              echo "has_packages=true"
+              echo "files<<EOF"
+              find "$pkg" -maxdepth 1 -type f -printf '%p\n' | sort
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "has_packages=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Finalize boot bundle checksums and release file list
+        id: boot-release
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/output"
+          {
+            echo "Project: AmrUser-48/d630-gentoo"
+            echo "Source state: $STATE_TAG"
+            echo "Kernel version: $KERNEL_VERSION (stable 6.18.y)"
+            echo "Kernel release: $(tr -d '\r\n' < "$out/KERNELRELEASE.txt")"
+            echo "Target CPU: Intel Core 2 / Merom; CFLAGS for userland: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Root filesystem: Gentoo OpenRC runtime root, Mesa + Xorg + Openbox, fbterm, mc, NetworkManager and rescue basics"
+            echo "Boot files: kernel, external initramfs, squashfs"
+            echo "SquashFS compression: Zstandard, 1 MiB blocks, level 15"
+            echo "Overlay: temporary RAM OverlayFS; changes vanish at reboot"
+            echo "QEMU smoke test: passed; see QEMU-BOOT-TEST.txt and QEMU-BOOT-TEST.log"
+            echo "Workflow run ID: $GITHUB_RUN_ID"
+          } > "$out/BUILD-MANIFEST.txt"
+          (
+            cd "$out"
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' |
+              sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+          {
+            echo "release_files<<EOF"
+            find "$out" -maxdepth 1 -type f -printf '%p\n' | sort
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          ls -lh "$out" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build outputs and diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d630-boot-bundle-run-${{ github.run_id }}
+          path: |
+            output/kernel
+            output/initramfs
+            output/squashfs
+            output/modules-*.tar.zst
+            output/d630-firmware.tar.zst
+            output/d630-*.config
+            output/KERNELRELEASE.txt
+            output/KERNEL-BUILD-MANIFEST.txt
+            output/BUILD-MANIFEST.txt
+            output/SHA256SUMS
+            output/QEMU-BOOT-TEST.*
+            output/*.log
+            output/*.txt
+            output/RUNTIME-PACKAGES.txt
+            output/INSTALLED-PACKAGES.txt
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+
+      - name: Publish reusable Core 2 binary packages
+        if: always() && steps.package-release.outputs.has_packages == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          tag_name: binpkgs-${{ github.run_id }}
+          name: "D630 Core 2 binary packages — run ${{ github.run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: ${{ steps.package-release.outputs.files }}
+
+      - name: Publish tested D630 boot bundle
+        if: success() && steps.boot-release.outputs.release_files != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          tag_name: d630-gentoo-boot-${{ github.run_id }}
+          name: "D630 Gentoo Core 2 boot bundle — run ${{ github.run_id }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: ${{ steps.boot-release.outputs.release_files }}
