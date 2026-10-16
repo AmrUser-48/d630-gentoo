@@ -1,7 +1,12 @@
 name: Build D630 complete boot bundle from saved Core 2 state
-run-name: "D630 SFS + initramfs • Linux ${{ inputs.kernel_version }} • ${{ inputs.state_tag }}"
+run-name: "D630 SFS + initramfs • Linux ${{ inputs.kernel_version || '6.18.56' }} • ${{ inputs.state_tag || 'runner-state-20261015T153832Z' }}"
 
 on:
+  push:
+    branches:
+      - test/sfs-initrd-20261016
+    paths:
+      - ".github/workflows/build-d630-state-boot-bundle.yml"
   workflow_dispatch:
     inputs:
       state_tag:
@@ -28,7 +33,7 @@ jobs:
     name: Build stable D630 kernel and external initramfs
     uses: ./.github/workflows/build-d630-kernel.yml
     with:
-      kernel_version: ${{ inputs.kernel_version }}
+      kernel_version: ${{ inputs.kernel_version || '6.18.56' }}
     secrets: inherit
     permissions:
       contents: write
@@ -39,8 +44,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      STATE_TAG: ${{ inputs.state_tag }}
-      KERNEL_VERSION: ${{ inputs.kernel_version }}
+      STATE_TAG: ${{ inputs.state_tag || 'runner-state-20261015T153832Z' }}
+      KERNEL_VERSION: ${{ inputs.kernel_version || '6.18.56' }}
       GH_TOKEN: ${{ github.token }}
       GENTOO_ROOT: /opt/gentoo
 
@@ -51,7 +56,7 @@ jobs:
       - name: Validate state and passphrase
         shell: bash
         env:
-          STATE_TAG_INPUT: ${{ inputs.state_tag }}
+          STATE_TAG_INPUT: ${{ inputs.state_tag || 'runner-state-20261015T153832Z' }}
           STATE_ENCRYPTION_PASSPHRASE: ${{ secrets.STATE_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
