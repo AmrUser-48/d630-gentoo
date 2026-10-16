@@ -86,6 +86,17 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/kernel-bundle
+
+      - name: Stage and verify files from the existing kernel artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel_dir="$RUNNER_TEMP/kernel-bundle"
+          [[ -s "$kernel_dir/SHA256SUMS" && -s "$kernel_dir/kernel" && -s "$kernel_dir/initramfs" ]] || {
+            echo "Existing kernel artifact is incomplete." >&2
+            exit 1
+          }
+          (cd "$kernel_dir" && sha256sum --check SHA256SUMS)
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp -p "$kernel_dir/kernel" "$kernel_dir/initramfs" "$GITHUB_WORKSPACE/output/"
           cp -p "$kernel_dir/BUILD-MANIFEST.txt" "$GITHUB_WORKSPACE/output/KERNEL-BUILD-MANIFEST.txt"
