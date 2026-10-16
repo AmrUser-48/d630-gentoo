@@ -29,6 +29,7 @@ jobs:
     uses: ./.github/workflows/build-d630-kernel.yml
     with:
       kernel_version: ${{ inputs.kernel_version }}
+    secrets: inherit
     permissions:
       contents: write
 
