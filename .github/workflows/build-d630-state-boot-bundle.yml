@@ -8,7 +8,7 @@ on:
         description: Encrypted saved runner-state release to restore
         required: true
         type: string
-        default: runner-state-20261015T100327Z
+        default: runner-state-20261015T153832Z
       kernel_version:
         description: Stable Linux 6.18.y point release (no RC builds)
         required: true
