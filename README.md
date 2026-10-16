@@ -4,6 +4,47 @@ A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with
 
 **Current state:** the repository defines a standalone three-file boot contract, GRUB2 entry, and an Actions workflow that builds the stable D630 kernel, matching module archive, early Intel microcode + BusyBox initramfs, and selected firmware bundle. The Gentoo SquashFS root and live ISO remain separate unfinished stages.
 
+## AI assistant operating instructions
+
+**Read this section before suggesting commands, changing files, or resuming an interrupted build.** The objective is a working, small Gentoo daily-use system for the Dell Latitude D630—not a green CI badge, a generic Gentoo installation, or a pile of untested artifacts.
+
+### Understand the target and protect the working state
+
+- Primary hardware is the Dell Latitude D630 with Intel Core 2 Duo T7250 (Merom), Intel GM965/GMA X3100 graphics, Intel 3945ABG Wi-Fi, Intel HDA audio, legacy BIOS/GRUB, and no EFI or U-Boot requirement. Keep the userland optimized for the target: `-O2 -pipe -march=core2 -mtune=core2`; never use the GitHub runner's CPU features or `-march=native`.
+- Treat the checked-in configuration and the **actual current runner, release, artifact, and workflow state** as evidence. Inspect existing kernel bundles, generated `.config` files, initramfs archives, saved-state releases, workflow runs, and logs before rebuilding anything. Do not assume that a past status summary still describes the current repository.
+- The saved Gentoo build root and its binary packages are valuable work. Preserve the source/build root and `/var/cache/binpkgs`. Build and trim a separate disposable runtime root; depclean or prune only that copy. Do not restart a large package rebuild or overwrite a non-empty restore destination unless the task explicitly requires it.
+- The target boot storage is constrained. Keep the runtime SquashFS as small as practical (historical target: around 400 MiB or less for a roughly 500 MiB available partition, unless the user changes this requirement). Always report the actual compressed size and whether it fits; never call an oversized image “tiny.”
+- The preferred direct-folder boot contract is `/d630-gentoo/kernel`, `/d630-gentoo/initramfs`, and `/d630-gentoo/squashfs`. The initramfs must have a working executable `/init`, valid **relative, non-dangling BusyBox applet symlinks** (especially `/bin/sh` and `/bin/static-sh` to `busybox`), the firmware and microcode required by this target, and the tools used before root switch.
+
+### Avoid unnecessary rebuilds
+
+- **Do not rebuild the kernel by default.** First inspect the latest available kernel bundle and its generated configuration against the required symbols in `config/kernel/d630-base.fragment` and `config/kernel/d630-live.fragment`. Reuse a compatible existing kernel. Rebuild it only if it is missing, fails a required-option check, needs a source/configuration change, or testing shows that a kernel change is necessary.
+- If only `initramfs/init` or its archive assembly/link handling changed, prefer rebuilding and validating just the initramfs while reusing the compatible kernel. If the available workflow always rebuilds both, say so explicitly and, when safe, adjust the workflow rather than silently spending time recompiling. Do not infer that an earlier kernel lacked options merely because a new workflow compiles one.
+- For an SFS update, reuse the saved runner state and compatible binpkgs. Inspect the emerge plan and build only missing or incompatible runtime packages. Keep logs useful and concise; avoid noisy diagnostic dumps and sprawling command sequences when a targeted check will answer the question.
+- Make the smallest change that addresses a demonstrated issue. Inspect the relevant file and its call sites before editing. Keep the main branch stable; use an isolated branch for risky workflow/build changes and merge only after validation.
+
+### Validate the real result, not just the workflow
+
+Keep these outcomes distinct and report each accurately:
+
+1. **Static/source validation** passed: syntax, lint, and repository assertions passed; this does not prove packages build.
+2. **Build passed**: the intended kernel/initramfs/SquashFS artifacts actually exist and their checksums and contents were verified.
+3. **QEMU boot test passed**: the actual built kernel plus external initramfs found `/d630-gentoo/squashfs`, mounted SquashFS and OverlayFS, switched root, and reached the expected Gentoo/OpenRC console state. A timeout is acceptable only if the expected boot milestone is in the serial log.
+4. **D630 hardware boot passed**: verified separately on the actual laptop. QEMU success is not proof of hardware success.
+
+Check archive contents and symlinks, the effective kernel configuration, SquashFS compression and size, release assets/checksums, and the relevant logs. Never say an artifact was built or a test passed unless the corresponding run/result confirms it. If a run has not completed, state exactly what remains pending. A failed test should lead to inspecting its first relevant error and making a targeted fix, not blindly restarting everything.
+
+### Use Gentoo knowledge critically
+
+- Consult the [Gentoo AMD64 Handbook](https://wiki.gentoo.org/wiki/Handbook:AMD64), relevant [Gentoo Wiki documentation](https://wiki.gentoo.org/), and the [Gentoo Forums](https://forums.gentoo.org/) when solving Portage, USE-flag, profile, OpenRC, kernel, package, and system integration problems. Search for specific errors and version details rather than relying on memory alone.
+- **Treat documentation and forum posts as evidence to evaluate, not commands to copy blindly.** The Handbook primarily describes a general installation and can assume normal disk space, a conventional root filesystem, standard package sets, and a fully installed system. Wiki pages and forum posts can be old, superseded, version-specific, or written for different profiles, init systems, architectures, and hardware. Check publication dates, Gentoo release/ebuild versions, and whether advice applies to this tiny Core 2, OpenRC, legacy-BIOS, multi-partition, SquashFS/initramfs design.
+- Cross-check advice against the current repository configuration, current ebuild/dependency metadata, the actual profile and USE flags, `emerge --info`, `emerge -pv`/pretend output, and real logs. Prefer current official documentation and the live ebuild/source for syntax and dependency facts; use forum discussions for troubleshooting context and alternative approaches, then verify them. Do not introduce a conventional full-install requirement merely because the Handbook assumes it.
+- Preserve known project-specific decisions and mistakes recorded below in this README. Do not repeat an already documented failed approach unless new evidence shows the circumstances have changed.
+
+### Work style
+
+Be focused and responsive. Read the latest relevant state before proposing the next action; use prior conversation/repository history to avoid asking the user to repeat facts already established. Give short, directly usable commands and explain only the essential effect and risk. Avoid needless dependencies, unrelated redesigns, repetitive status chatter, and commands that disturb an active runner or terminal. Ask a question only when a missing detail actually blocks safe progress; otherwise make a careful, reversible best effort. Separate facts, assumptions, unverified hypotheses, and completed actions.
+
 ## Preferred boot: three files, root filesystem may be on another partition
 
 Use these paths for the kernel, external initramfs archive, and SquashFS root. The kernel and initramfs can be found by GRUB on any GRUB-readable partition; the SquashFS root may be on a different partition:
