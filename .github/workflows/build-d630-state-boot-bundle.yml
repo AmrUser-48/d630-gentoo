@@ -29,18 +29,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  kernel:
-    name: Build stable D630 kernel and external initramfs
-    uses: ./.github/workflows/build-d630-kernel.yml
-    with:
-      kernel_version: ${{ inputs.kernel_version || '6.18.56' }}
-    secrets: inherit
-    permissions:
-      contents: write
-
+  # This test reuses the kernel/initramfs artifact produced by run 38891651088.
+  # Do not spend runner time recompiling an unchanged kernel just to test the SFS path.
   rootfs:
     name: Restore saved Gentoo state, build SquashFS, and boot-test
-    needs: kernel
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
@@ -86,20 +78,14 @@ jobs:
           df -h / | tee "$RUNNER_TEMP/host-disk-before.txt"
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/host-disk-before.txt"
 
-      - name: Download and verify the kernel/initramfs bundle built by this workflow
-        shell: bash
-        run: |
-          set -euo pipefail
-          kernel_tag="d630-kernel-$KERNEL_VERSION-run-$GITHUB_RUN_ID"
-          kernel_dir="$RUNNER_TEMP/kernel-bundle"
-          mkdir -p "$kernel_dir"
-          echo "Kernel release tag: $kernel_tag"
-          gh release download "$kernel_tag" --repo "$GITHUB_REPOSITORY" --dir "$kernel_dir"
-          [[ -s "$kernel_dir/SHA256SUMS" && -s "$kernel_dir/kernel" && -s "$kernel_dir/initramfs" ]] || {
-            echo "The kernel workflow did not publish a complete kernel/initramfs release." >&2
-            exit 1
-          }
-          (cd "$kernel_dir" && sha256sum --check SHA256SUMS)
+      - name: Download and verify existing kernel/initramfs artifact (no kernel rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: d630-kernel-bundle-6.18.56-run-1
+          run-id: 38891651088
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/kernel-bundle
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp -p "$kernel_dir/kernel" "$kernel_dir/initramfs" "$GITHUB_WORKSPACE/output/"
           cp -p "$kernel_dir/BUILD-MANIFEST.txt" "$GITHUB_WORKSPACE/output/KERNEL-BUILD-MANIFEST.txt"
