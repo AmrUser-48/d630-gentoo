@@ -53,6 +53,22 @@ for atom in $TARGETS; do
     fi
 done
 
+log "Package the preserved Core 2 binpkgs for a durable reusable release"
+PKG_RELEASE="$OUT/binpkgs-release"
+mkdir -p "$PKG_RELEASE"
+if ! find "$BUILD_ROOT/var/cache/binpkgs" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) -print -quit | grep -q .; then
+    die "no binary packages found in the restored build tree"
+fi
+bash "$REPO/scripts/package-binpkgs-release.sh" "$BUILD_ROOT/var/cache/binpkgs" "$PKG_RELEASE"
+(
+    cd "$PKG_RELEASE"
+    : > SHA256SUMS
+    for asset in PACKAGE-LIST.txt binpkgs-part-*.tar.zst; do
+        [[ -f "$asset" ]] && sha256sum "$asset" >> SHA256SUMS
+    done
+    sha256sum --check SHA256SUMS
+)
+
 log "Copy build tree to a separate runtime root; source tree and binpkgs remain untouched"
 rsync -aHAX --numeric-ids --one-file-system --delete \
     --exclude='/dev/***' \
