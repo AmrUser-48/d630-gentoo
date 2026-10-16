@@ -425,6 +425,9 @@ jobs:
             output/kernel-source.txt
             output/kernel-release.txt
             output/build-command.txt
+            output/kernel-source.txt
+            output/kernel-release.txt
+            output/build-command.txt
             output/kernel-build.log
             output/modules-install.log
             output/initramfs-file-list.txt
