@@ -231,7 +231,7 @@ printf 'Source root: %s\nProfile: OpenRC desktop + fbterm/mc\nTarget: Core 2 Duo
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
 
 log "Build Zstandard SquashFS from runtime-only root"
-bash "$REPO/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+bash "$REPO/scripts/build-squashfs-inplace.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
 [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "runtime root lost openbox-session"
