@@ -421,6 +421,9 @@ jobs:
             output/d630-firmware.tar.zst
             output/FIRMWARE-SOURCES.txt
             output/BUILD-MANIFEST.txt
+            output/kernel-source.txt
+            output/kernel-release.txt
+            output/build-command.txt
             output/SHA256SUMS
             output/kernel-source.txt
             output/kernel-release.txt
