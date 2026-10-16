@@ -146,11 +146,11 @@ jobs:
           fi
           sudo install -d -m 0755 "$GENTOO_ROOT"
           avail_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
-          [[ "$avail_kib" =~ ^[0-9]+$ ]] && (( avail_kib >= 3145728 )) || {
+          if [[ ! "$avail_kib" =~ ^[0-9]+$ ]] || (( avail_kib < 3145728 )); then
             echo "Less than 3 GiB free for verified restore data." >&2
             df -h / >&2
             exit 1
-          }
+          fi
 
           cleanup_restore() {
             exec 3>&- 2>/dev/null || true
@@ -317,8 +317,12 @@ jobs:
           } > "$out/BUILD-MANIFEST.txt"
           (
             cd "$out"
-            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' |
-              sort -z | xargs -0 sha256sum > SHA256SUMS
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' |
+              sort > "$RUNNER_TEMP/boot-release-files.txt"
+            : > SHA256SUMS
+            while IFS= read -r asset; do
+              sha256sum "$asset" >> SHA256SUMS
+            done < "$RUNNER_TEMP/boot-release-files.txt"
             sha256sum --check SHA256SUMS
           )
           {
@@ -326,7 +330,7 @@ jobs:
             find "$out" -maxdepth 1 -type f -printf '%p\n' | sort
             echo EOF
           } >> "$GITHUB_OUTPUT"
-          ls -lh "$out" | tee -a "$GITHUB_STEP_SUMMARY"
+          find "$out" -maxdepth 1 -type f -printf '%f\t%s bytes\n' | sort | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload build outputs and diagnostic logs
         if: always()
