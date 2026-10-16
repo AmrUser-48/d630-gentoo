@@ -30,7 +30,7 @@ for path in \
 done
 
 find "$src/usr" -type f \( -name '*.a' -o -name '*.la' -o -name '*.pyc' \) -delete 2>/dev/null || true
-find "$src" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
+find "$src/usr" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
 
 # Regenerate the offline man-db index before detaching the runtime root's
 # pseudo-filesystems. Keep the man pages and /var/db/pkg package records.
