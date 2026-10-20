@@ -45,6 +45,15 @@ jobs:
       - name: Check out D630 Gentoo configuration
         uses: actions/checkout@v4
 
+      - name: Validate source and symlink-fix scripts before restoring state
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash -n scripts/build-state-squashfs.sh scripts/build-squashfs-inplace.sh \
+            scripts/build-squashfs.sh scripts/build-runtime-squashfs.sh \
+            scripts/validate-runtime-symlinks.sh
+          bash scripts/validate-sources.sh
+
       - name: Validate state and passphrase
         shell: bash
         env:
