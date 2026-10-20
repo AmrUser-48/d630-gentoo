@@ -357,8 +357,15 @@ if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; th
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
-rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru"
+PROFILE_DIR="$ROOT/var/db/repos/gentoo/profiles"
+[[ -d "$PROFILE_DIR" ]] || die "runtime root lacks Gentoo profiles needed by /etc/portage/make.profile"
+find "$ROOT/var/db/repos/gentoo" -mindepth 1 -maxdepth 1 ! -name profiles -exec rm -rf -- {} +
+rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/guru"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
+if [[ -L "$ROOT/etc/portage/make.profile" ]]; then
+  chroot "$ROOT" /bin/bash -lc 'test -e /etc/portage/make.profile' ||
+    die "dangling /etc/portage/make.profile symlink after runtime pruning"
+fi
 
 cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
 Project: AmrUser-48/d630-gentoo
