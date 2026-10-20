@@ -36,7 +36,7 @@ trap cleanup EXIT
 TARGETS="app-admin/sudo app-i18n/fbterm app-misc/mc app-shells/bash media-fonts/dejavu media-fonts/terminus-font media-libs/mesa media-sound/alsa-utils net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/coreutils sys-apps/dbus sys-apps/kmod sys-apps/man-db sys-apps/openrc sys-apps/pciutils sys-apps/portage sys-apps/shadow sys-apps/usbutils sys-apps/util-linux sys-auth/elogind sys-auth/pambase x11-apps/xinit x11-apps/xterm x11-base/xorg-drivers x11-base/xorg-server x11-wm/openbox"
 
 printf '%s\n' $TARGETS > "$OUT/RUNTIME-PACKAGES.txt"
-du -sh "$BUILD_ROOT" "$BUILD_ROOT/var/cache/binpkgs" 2>/dev/null | tee "$OUT/SOURCE-ROOT-SIZE.txt"
+du -shx "$BUILD_ROOT" "$BUILD_ROOT/var/cache/binpkgs" 2>/dev/null | tee "$OUT/SOURCE-ROOT-SIZE.txt"
 df -h "$BUILD_ROOT" "$WORK" | tee "$OUT/DISK-BEFORE-ROOTFS.txt"
 
 log "Finish required D630 runtime packages in the restored Core 2 build tree"
