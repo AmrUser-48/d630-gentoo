@@ -27,7 +27,7 @@ The old ISO loopback configuration remains in the repository as a reference, but
 2. Keep the final runtime small and practical for rescue work, without sacrificing support for the target laptop's hardware or common disk formats.
 3. Build on GitHub Actions rather than on the D630, whose Core 2 Duo is too slow for large Gentoo builds.
 4. Optimize compiled software for the Core 2 family, not for the remote build runner.
-5. Keep the build system separate from the final live root. Keep the compiler toolchain, development headers, source trees and build caches out of the base runtime image. Since this is a daily-use Gentoo system, Portage should remain available for package management; prefer CI-built binary packages on the slow D630, and keep the ebuild repository/distfiles out of the base image until needed.
+5. Keep the build system separate from the final live root. Keep the compiler toolchain, development headers, source trees and build caches out of the base runtime image. Since this is a daily-use Gentoo system, Portage should remain available for package management; prefer CI-built binary packages on the slow D630. Omit the Gentoo ebuild checkout and distfiles from the base image, but retain its small `profiles/` subtree so `/etc/portage/make.profile` does not become a dangling symlink.
 6. Prefer a reproducible, inspectable build pipeline and small incremental changes over a large untested one-shot build.
 7. Deliver a genuinely usable daily system, not a disposable rescue shell: persistent installed system files and user data are core requirements. Keep the live ISO as a testing/installation entry point, then produce and verify the disk-install target.
 
