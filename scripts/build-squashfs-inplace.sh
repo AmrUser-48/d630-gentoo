@@ -50,7 +50,41 @@ for mp in dev proc sys run tmp; do
 done
 mkdir -p "$src/var/tmp/portage" "$src/var/cache/distfiles" "$src/var/cache/binpkgs"
 
-bash "$(dirname -- "${BASH_SOURCE[0]}")/validate-runtime-symlinks.sh" "$src" 2>&1 | tee "$output.symlink-audit.txt"
+# Static archives and libtool files are removed above; drop their symlink aliases
+# too. These are build-time metadata, not runtime shared libraries.
+find "$src/usr" -type l \( -name '*.a' -o -name '*.la' \) -print -delete 2>/dev/null || true
+
+# Optional man/Vim and command aliases may point to targets omitted by trimming.
+# Resolve them inside this root; remove only dangling links from these known
+# non-runtime categories, then keep the global symlink audit strict.
+cleanup_script="$src/tmp/d630-clean-optional-dangling-links.sh"
+cat > "$cleanup_script" <<'EOF'
+#!/bin/sh
+set -eu
+for tree in /usr/share/man /usr/share/vim; do
+    [ -d "$tree" ] || continue
+    find "$tree" -type l -exec sh -c '
+        for link do
+            if [ ! -e "$link" ]; then
+                echo "REMOVING-OPTIONAL-DANGLING-SYMLINK: $link"
+                rm -f -- "$link"
+            fi
+        done
+    ' sh {} +
+done
+for name in HEAD GET POST vi view ex lua luac; do
+    link="/usr/bin/$name"
+    if [ -L "$link" ] && [ ! -e "$link" ]; then
+        echo "REMOVING-OPTIONAL-DANGLING-SYMLINK: $link"
+        rm -f -- "$link"
+    fi
+done
+EOF
+chmod 0755 "$cleanup_script"
+chroot "$src" /bin/sh /tmp/d630-clean-optional-dangling-links.sh | tee "$output.optional-symlink-cleanup.txt"
+rm -f "$cleanup_script"
+
+bash "$(dirname -- "\${BASH_SOURCE[0]}")/validate-runtime-symlinks.sh" "$src" 2>&1 | tee "$output.symlink-audit.txt"
 
 rm -f "$tmp_output"
 echo "Packing disposable runtime root directly (no duplicate staging copy): $src"

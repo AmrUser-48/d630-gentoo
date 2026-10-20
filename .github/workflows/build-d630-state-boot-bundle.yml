@@ -85,7 +85,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates coreutils curl diffutils gnupg gh \
             tar zstd xz-utils gzip cpio rsync squashfs-tools e2fsprogs util-linux \
-            python3 qemu-system-x86 qemu-utils
+            python3 python3-pexpect qemu-system-x86 qemu-utils
           sudo apt-get clean
           df -h / | tee "$RUNNER_TEMP/host-disk-before.txt"
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/host-disk-before.txt"
@@ -233,7 +233,7 @@ jobs:
 
       - name: Boot-test the actual kernel + initramfs + SquashFS in QEMU
         shell: bash
-        timeout-minutes: 4
+        timeout-minutes: 8
         run: |
           set -Eeuo pipefail
           out="$GITHUB_WORKSPACE/output"
@@ -254,41 +254,74 @@ jobs:
           sudo umount "$mnt"
           trap - EXIT
 
-          status=0
-          timeout --foreground --signal=TERM --kill-after=10s 180s \
-            qemu-system-x86_64 -machine pc -m 2048 -smp 2 -nographic \
-              -no-reboot -no-shutdown \
-              -kernel "$out/kernel" \
-              -initrd "$out/initramfs" \
-              -append "console=ttyS0,115200n8 loglevel=7 ignore_loglevel d630.debug=1 d630.squashfs=/d630-gentoo/squashfs" \
-              -drive "file=$disk,format=raw,if=ide" \
-              -serial "file:$out/QEMU-BOOT-TEST.log" -monitor none -display none || status=$?
+          # Boot the actual kernel/initramfs/SFS, respond to first boot, and
+          # assert SysVinit remains alive at runlevel 3 with tty1 respawning.
+          python3 - "$out" "$disk" <<'PY'
+          import os
+          import re
+          import sys
+          import pexpect
 
-          if [[ "$status" != 0 && "$status" != 124 && "$status" != 137 ]]; then
-            echo "QEMU exited unexpectedly with status $status." >&2
-            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
-            exit 1
-          fi
-          grep -Fq '[d630-init] Found /d630-gentoo/squashfs on /dev/sda' "$out/QEMU-BOOT-TEST.log" || {
-            echo "Initramfs did not discover the SquashFS on the QEMU ext4 disk." >&2
-            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
-            exit 1
-          }
-          grep -Fq '[d630-init] Switching to Gentoo userspace' "$out/QEMU-BOOT-TEST.log" || {
-            echo "Initramfs did not switch to the Gentoo root." >&2
-            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
-            exit 1
-          }
-          grep -Fq 'Create a local username:' "$out/QEMU-BOOT-TEST.log" || {
-            echo "OpenRC/first-boot service did not reach its console prompt." >&2
-            cat "$out/QEMU-BOOT-TEST.log" >&2 || true
-            exit 1
-          }
+          out, disk = sys.argv[1:3]
+          log_path = os.path.join(out, "QEMU-BOOT-TEST.log")
+          cmd = [
+              "qemu-system-x86_64", "-machine", "pc", "-m", "2048", "-smp", "2",
+              "-no-reboot", "-no-shutdown",
+              "-kernel", os.path.join(out, "kernel"),
+              "-initrd", os.path.join(out, "initramfs"),
+              "-append",
+              "console=ttyS0,115200n8 loglevel=7 ignore_loglevel "
+              "d630.debug=1 d630.squashfs=/d630-gentoo/squashfs",
+              "-drive", f"file={disk},format=raw,if=ide",
+              "-display", "none", "-serial", "stdio", "-monitor", "none",
+          ]
+
+          child = pexpect.spawn(cmd[0], cmd[1:], encoding="utf-8", timeout=180)
+          try:
+              with open(log_path, "w", encoding="utf-8", buffering=1) as log:
+                  child.logfile_read = log
+                  child.expect(re.escape("[d630-init] Found /d630-gentoo/squashfs on /dev/sda"))
+                  child.expect(re.escape("[d630-init] Switching to Gentoo userspace"))
+                  child.expect("Create a local username:")
+                  child.sendline("d630test")
+                  child.expect("New password:")
+                  child.sendline("D630-Boot-Test-123!")
+                  child.expect("Retype new password:")
+                  child.sendline("D630-Boot-Test-123!")
+                  child.expect(r"INIT: Entering runlevel: 3", timeout=120)
+                  child.expect(pexpect.TIMEOUT, timeout=8)
+          except Exception as exc:
+              child.close(force=True)
+              try:
+                  with open(log_path, "r", encoding="utf-8", errors="replace") as log:
+                      print(log.read()[-12000:], file=sys.stderr)
+              except OSError:
+                  pass
+              raise SystemExit(f"QEMU boot test failed: {exc}") from exc
+          finally:
+              if child.isalive():
+                  child.close(force=True)
+
+          with open(log_path, "r", encoding="utf-8", errors="replace") as log:
+              transcript = log.read()
+          required = [
+              "[d630-init] Found /d630-gentoo/squashfs on /dev/sda",
+              "[d630-init] Switching to Gentoo userspace",
+              "Create a local username:",
+              "INIT: Entering runlevel: 3",
+          ]
+          for marker in required:
+              if marker not in transcript:
+                  raise SystemExit(f"QEMU boot log missing milestone: {marker}")
+          if "INIT: no more processes left in this runlevel" in transcript:
+              raise SystemExit("SysVinit reached runlevel 3 but had no respawning console process.")
+          print("QEMU boot test passed: SquashFS found, switch_root succeeded, first-boot prompt completed, runlevel 3 entered, no empty-runlevel failure.")
+          PY
           {
             echo "QEMU smoke test: PASS"
-            echo "Kernel and external initramfs booted with an IDE-attached ext4 disk."
-            echo "Initramfs discovered /d630-gentoo/squashfs, mounted it, switched root, and reached the OpenRC first-boot prompt."
-            echo "QEMU remained running at the expected interactive first-boot prompt until timeout (status $status)."
+            echo "The matching kernel and external initramfs mounted /d630-gentoo/squashfs and switched root."
+            echo "First-boot account creation completed; SysVinit entered runlevel 3 and remained there without the empty-runlevel failure."
+            echo "The packed SFS was checked for id:3:initdefault and SysVinit tty1 respawn entries."
           } | tee "$out/QEMU-BOOT-TEST.txt" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare preserved binary-package release

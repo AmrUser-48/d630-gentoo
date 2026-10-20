@@ -19,6 +19,8 @@ This can be a Windows NTFS partition or another filesystem supported by GRUB. Th
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
+**Init contract:** the current SFS uses SysVinit as PID 1 and OpenRC for services. Its `/etc/inittab` must define runlevel 3, delegate runlevel 3 to `/sbin/openrc default`, and contain a SysVinit `respawn` getty entry for `tty1` (and optionally tty2–tty6). An OpenRC `agetty.tty1` runlevel service is an alternative only when switching PID 1 to `/sbin/openrc-init`; do not configure both supervisors for the same terminal.
+
 The old ISO loopback configuration remains in the repository as a reference, but the current build targets direct-folder boot. The kernel workflow publishes the kernel, matching /lib/modules archive, external initramfs (including early Intel microcode and Intel 3945ABG firmware), and a separate firmware tarball. The SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
 
 ## Project goals

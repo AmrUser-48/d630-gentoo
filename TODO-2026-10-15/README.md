@@ -177,7 +177,7 @@ Using `--with-bdeps=n` allows build-only dependencies such as unneeded compiler 
 This image has two init stages:
 
 1. The early initramfs script at `initramfs/init` mounts the host filesystems, finds `/d630-gentoo/squashfs`, mounts SquashFS read-only, adds a temporary RAM OverlayFS, and calls `switch_root /mnt/newroot /sbin/init`.
-2. **The SFS root's PID 1 is `/sbin/init`, using Gentoo OpenRC.** OpenRC then starts the services enabled in `/etc/runlevels`. Do not add systemd to this image.
+2. The SFS root's PID 1 is SysVinit at `/sbin/init`; it reads `/etc/inittab` and dispatches service startup to OpenRC. The default is runlevel 3. SysVinit also requires a `respawn` getty entry such as `c1:12345:respawn:/sbin/agetty 38400 tty1 linux`; without one, it can finish runlevel 3 and report `no more processes left in this runlevel`. Do not add systemd to this image.
 
 Verify the OpenRC init exists and is executable:
 
@@ -186,11 +186,11 @@ chroot "$ROOT" /bin/bash -lc \
   'test -x /sbin/init && command -v rc-update && command -v rc-status'
 ```
 
-For the console login and first-boot account creation, use the existing implementation in [`scripts/build-runtime-squashfs.sh`](https://github.com/AmrUser-48/d630-gentoo/blob/main/scripts/build-runtime-squashfs.sh), under **“Configure console login, first-boot user creation, and OpenRC”**. Apply that section's `d630-firstboot`, `agetty.tty1`, sudoers, hostname, hosts, and fstab setup to `$ROOT`; do not invent a second version of those service definitions. In particular, create the services before enabling them:
+For console login and first-boot account creation, use the existing `d630-firstboot`, sudoers, hostname, hosts, and fstab setup in [`scripts/build-runtime-squashfs.sh`](https://github.com/AmrUser-48/d630-gentoo/blob/main/scripts/build-runtime-squashfs.sh). For this SysVinit-based image, configure console gettys with `/etc/inittab` `respawn` entries rather than also registering an OpenRC `agetty.tty1` service. Create the first-boot service before enabling it:
 
 ```bash
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
-chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default'
+# SysVinit supervises tty1 via /etc/inittab; do not also enable an OpenRC agetty service.
 chroot "$ROOT" /bin/bash -lc 'rc-update add dbus default'
 chroot "$ROOT" /bin/bash -lc 'rc-update add elogind default'
 chroot "$ROOT" /bin/bash -lc 'rc-update show -v'
@@ -267,7 +267,7 @@ Minimum kernel support for this boot path: devtmpfs, procfs, sysfs, tmpfs, Overl
 
 1. Confirm the produced `squashfs` and `SHA256SUMS` verify, and place the SFS at `/d630-gentoo/squashfs` on a partition supported by the initramfs.
 2. Boot using the matching Core2 kernel and the initramfs in the format expected by that kernel/GRUB entry.
-3. Verify the early init log finds and mounts SquashFS, then calls `switch_root`; OpenRC should become PID 1 and bring up `agetty.tty1`.
+3. Verify the early init log finds and mounts SquashFS, then calls `switch_root`; SysVinit should remain PID 1, run OpenRC's default runlevel, and keep tty1 alive via an `inittab` `respawn` entry.
 4. Complete the first-boot account prompt. Log in on tty1, confirm `mc` and `fbterm` are present, then test X from that user's console with `startx`. Confirm Mesa uses the Intel GM965/Crocus path rather than llvmpipe where applicable.
 5. After any failed test, inspect the boot log and the root cause first. Do not blindly remove more packages or trim additional libraries until this baseline boots.
 

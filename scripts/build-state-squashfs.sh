@@ -151,12 +151,14 @@ for atom in $TARGETS; do
         die "depclean removed a required runtime target: $atom"
     fi
 done
-chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && test -x /sbin/openrc && command -v rc-update && command -v rc-status'
+chroot "$ROOT" /bin/bash -lc \
+    'test -x /sbin/init && test -x /sbin/openrc && test -x /sbin/agetty && (test -x /bin/login || test -x /usr/bin/login) && command -v rc-update && command -v rc-status'
 
-# SysVinit must explicitly hand startup to OpenRC.  Do not assume an inherited
-# Stage 3 inittab survives runtime depclean or is correct for this image.
+# SysVinit reads /etc/inittab. OpenRC owns service ordering, but SysVinit
+# owns respawning virtual-console login processes. Without a respawn entry,
+# the machine can enter runlevel 3 and report "no more processes".
 cat > "$ROOT/etc/inittab" <<'EOF'
-# Minimal SysVinit configuration for the D630 OpenRC runtime.
+# Gentoo SysVinit -> OpenRC handoff for the D630 runtime.
 id:3:initdefault:
 si::sysinit:/sbin/openrc sysinit
 rc::bootwait:/sbin/openrc boot
@@ -174,6 +176,12 @@ l6r:6:wait:/sbin/reboot -d
 su0:S:wait:/sbin/openrc single
 su1:S:wait:/sbin/sulogin
 ca:12345:ctrlaltdel:/sbin/shutdown -r now
+c1:12345:respawn:/sbin/agetty --noclear 38400 tty1 linux
+c2:2345:respawn:/sbin/agetty 38400 tty2 linux
+c3:2345:respawn:/sbin/agetty 38400 tty3 linux
+c4:2345:respawn:/sbin/agetty 38400 tty4 linux
+c5:2345:respawn:/sbin/agetty 38400 tty5 linux
+c6:2345:respawn:/sbin/agetty 38400 tty6 linux
 EOF
 chmod 0644 "$ROOT/etc/inittab"
 
@@ -222,19 +230,10 @@ EOF
 printf '%s\n' 'exec openbox-session' > "$ROOT/etc/skel/.xinitrc"
 chmod 0644 "$ROOT/etc/skel/.xinitrc"
 
-if [[ ! -x "$ROOT/etc/init.d/agetty.tty1" ]]; then
-    cat > "$ROOT/etc/init.d/agetty.tty1" <<'EOF'
-#!/sbin/openrc-run
-description="D630 local tty1 login"
-command="/sbin/agetty"
-command_args="--noclear tty1 linux"
-command_background="yes"
-pidfile="/run/agetty.tty1.pid"
-EOF
-    chmod 0755 "$ROOT/etc/init.d/agetty.tty1"
-fi
+# SysVinit manages console respawning from /etc/inittab. Remove a stale
+# OpenRC agetty service/link so tty1 has only one supervisor.
+rm -f "$ROOT/etc/init.d/agetty.tty1" "$ROOT/etc/runlevels/default/agetty.tty1"
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
-chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default'
 for service in dbus elogind NetworkManager bluetooth; do
     if [[ -x "$ROOT/etc/init.d/$service" ]]; then
         chroot "$ROOT" /bin/bash -lc "rc-update add '$service' default"
@@ -245,12 +244,14 @@ for entry in \
     'id:3:initdefault:' \
     'si::sysinit:/sbin/openrc sysinit' \
     'rc::bootwait:/sbin/openrc boot' \
-    'l3:3:wait:/sbin/openrc default'; do
-    grep -Fxq "$entry" "$ROOT/etc/inittab" || die "runtime /etc/inittab lacks required startup entry: $entry"
+    'l3:3:wait:/sbin/openrc default' \
+    'c1:12345:respawn:/sbin/agetty --noclear 38400 tty1 linux' \
+    'c6:2345:respawn:/sbin/agetty 38400 tty6 linux'; do
+    grep -Fxq "$entry" "$ROOT/etc/inittab" || die "runtime /etc/inittab lacks required entry: $entry"
 done
 chroot "$ROOT" /bin/bash -lc \
-    'test -e /etc/runlevels/sysinit/d630-firstboot && test -e /etc/runlevels/default/agetty.tty1' || \
-    die "required first-boot or console-login service is not enabled"
+    'test -e /etc/runlevels/sysinit/d630-firstboot && ! test -e /etc/runlevels/default/agetty.tty1 && test -x /sbin/agetty && (test -x /bin/login || test -x /usr/bin/login)' || \
+    die "first-boot service or SysVinit-managed console login is not configured"
 if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
     chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
 fi
@@ -276,6 +277,10 @@ log "Build Zstandard SquashFS from runtime-only root"
 bash "$REPO/scripts/build-squashfs-inplace.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
+unsquashfs -cat "$OUT/squashfs" etc/inittab > "$OUT/SFS-INITTAB.txt"
+grep -Fxq 'id:3:initdefault:' "$OUT/SFS-INITTAB.txt" || die "packed SFS lacks default runlevel 3"
+grep -Fxq 'c1:12345:respawn:/sbin/agetty --noclear 38400 tty1 linux' "$OUT/SFS-INITTAB.txt" ||
+    die "packed SFS lacks a SysVinit tty1 respawn entry"
 [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "runtime root lost openbox-session"
 [[ -x "$ROOT/usr/bin/Xorg" || -x "$ROOT/usr/libexec/Xorg" ]] || die "runtime root lost Xorg"
 [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
