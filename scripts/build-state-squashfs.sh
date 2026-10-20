@@ -16,7 +16,8 @@ SUCCESS=false
 
 [[ "$EUID" -eq 0 ]] || die "run as root"
 [[ -x "$BUILD_ROOT/bin/bash" && -d "$BUILD_ROOT/var/db/pkg" ]] || die "not a Gentoo build root: $BUILD_ROOT"
-[[ -f "$REPO/scripts/build-squashfs-inplace.sh" ]] || die "repository checkout is incomplete: missing scripts/build-squashfs-inplace.sh"
+[[ -f "$REPO/scripts/build-squashfs-inplace.sh" && -f "$REPO/scripts/validate-runtime-symlinks.sh" ]] ||
+    die "repository checkout is incomplete: missing state SquashFS packer or symlink validator"
 for tool in rsync chroot mount umount mksquashfs unsquashfs; do
     command -v "$tool" >/dev/null || die "required host tool missing: $tool"
 done
