@@ -45,6 +45,8 @@ rsync -aHAX --numeric-ids --one-file-system --delete \
   --exclude='/var/cache/distfiles/***' \
   --exclude='/var/cache/binpkgs/***' \
   --exclude='/var/cache/edb/dep/***' \
+  --include='/var/db/repos/gentoo/' \
+  --include='/var/db/repos/gentoo/profiles/***' \
   --exclude='/var/db/repos/gentoo/***' \
   --exclude='/var/log/portage/***' \
   --exclude='/var/log/emerge.log' \
