@@ -372,6 +372,7 @@ Firmware has licensing and redistribution implications. Verify the applicable te
 - `scripts/package-binpkgs-release.sh`: shard built packages into persistent GitHub Release assets.
 - `scripts/install-binpkgs-release.sh`: verify and import a package release into the target's configured Portage `PKGDIR`.
 - `scripts/build-runtime-squashfs.sh`: bootstrap a clean Gentoo OpenRC runtime from verified binpkgs and build the direct-folder SquashFS root.
+- `scripts/validate-runtime-symlinks.sh`: audit persistent symlink targets in a disposable runtime root before SquashFS packing.
 - `.github/workflows/build-d630-runtime-squashfs.yml`: manually triggered runtime-root/SquashFS builder; it does not compile the kernel or initramfs.
 - `.github/workflows/publish-gentoo-binpkgs.yml`: publish packages from an existing, still-retained runner artifact.
 - `.github/workflows/validate.yml`: source validation only, not a Gentoo build.
