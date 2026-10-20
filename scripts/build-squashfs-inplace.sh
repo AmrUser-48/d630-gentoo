@@ -50,7 +50,7 @@ for mp in dev proc sys run tmp; do
 done
 mkdir -p "$src/var/tmp/portage" "$src/var/cache/distfiles" "$src/var/cache/binpkgs"
 
-bash "$(dirname -- "${BASH_SOURCE[0]}")/validate-runtime-symlinks.sh" "$src"
+bash "$(dirname -- "${BASH_SOURCE[0]}")/validate-runtime-symlinks.sh" "$src" 2>&1 | tee "$output.symlink-audit.txt"
 
 rm -f "$tmp_output"
 echo "Packing disposable runtime root directly (no duplicate staging copy): $src"
