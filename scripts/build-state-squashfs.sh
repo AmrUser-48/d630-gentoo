@@ -220,12 +220,19 @@ if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
     chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
 fi
 
-log "Remove package caches and ebuild trees from runtime copy, retaining package records"
+log "Remove package caches and ebuilds, but preserve Gentoo profile symlink targets"
+PROFILE_DIR="$ROOT/var/db/repos/gentoo/profiles"
+[[ -d "$PROFILE_DIR" ]] || die "runtime copy lacks Gentoo profiles needed by /etc/portage/make.profile"
+find "$ROOT/var/db/repos/gentoo" -mindepth 1 -maxdepth 1 ! -name profiles -exec rm -rf -- {} +
 rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" \
     "$ROOT/var/tmp/portage" "$ROOT/var/log/portage" "$ROOT/var/log/emerge.log" \
-    "$ROOT/var/log/gentoo-build-set.log" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru" \
+    "$ROOT/var/log/gentoo-build-set.log" "$ROOT/var/db/repos/guru" \
     "$ROOT/usr/src" "$ROOT/root/.cache"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
+if [[ -L "$ROOT/etc/portage/make.profile" ]]; then
+    chroot "$ROOT" /bin/bash -lc 'test -e /etc/portage/make.profile' ||
+        die "dangling /etc/portage/make.profile symlink after runtime pruning"
+fi
 printf 'Source root: %s\nProfile: OpenRC desktop + fbterm/mc\nTarget: Core 2 Duo, -march=core2 -mtune=core2\nRuntime root: separate copy; build root/binpkgs preserved\nWritable upper: volatile RAM OverlayFS; changes vanish on reboot\n' \
     "$BUILD_ROOT" > "$OUT/RUNTIME-MANIFEST.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
