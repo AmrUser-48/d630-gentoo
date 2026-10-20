@@ -43,7 +43,7 @@ df -h "$BUILD_ROOT" "$WORK" | tee "$OUT/DISK-BEFORE-ROOTFS.txt"
 log "Finish required D630 runtime packages in the restored Core 2 build tree"
 printf 'Target atoms:\n%s\n' "$(printf '  %s\n' $TARGETS)" | tee "$OUT/target-build.log"
 if ! chroot "$BUILD_ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg $TARGETS" \
+    "umask 022; FEATURES=-xattr emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg $TARGETS" \
     |& tee -a "$OUT/target-build.log"; then
     die "Portage failed while finishing runtime targets; see output/target-build.log"
 fi

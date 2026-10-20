@@ -63,6 +63,7 @@ test -s scripts/build-squashfs-inplace.sh
 test -s scripts/validate-runtime-symlinks.sh
 test -s scripts/build-state-squashfs.sh
 grep -Fq 'x11-terms/xterm' scripts/build-state-squashfs.sh
+grep -Fq 'umask 022; FEATURES=-xattr emerge' scripts/build-state-squashfs.sh
 ! grep -Fq 'x11-apps/xterm' scripts/build-state-squashfs.sh config/package.list config/package-sets/desktop.list config/package-sets/daily-driver.list
 grep -Fq 'id:3:initdefault:' scripts/build-state-squashfs.sh
 grep -Fq 'si::sysinit:/sbin/openrc sysinit' scripts/build-state-squashfs.sh
