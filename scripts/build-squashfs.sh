@@ -71,6 +71,8 @@ rsync -aHAX --numeric-ids --one-file-system --delete \
 find "$stage/usr" -type f \( -name '*.a' -o -name '*.la' -o -name '*.pyc' \) -delete 2>/dev/null || true
 find "$stage" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
 
+bash "$(dirname -- "${BASH_SOURCE[0]}")/validate-runtime-symlinks.sh" "$stage"
+
 # Do not blindly delete LLVM files from an arbitrary root: a runtime package
 # could genuinely link to them. The image must be staged from a runtime-only
 # package set, with build-time dependencies excluded by Portage.
