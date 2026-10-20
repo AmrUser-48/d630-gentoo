@@ -60,6 +60,7 @@ test -s scripts/save-runner-state-encrypted.sh
 ! test -e scripts/publish-pending-state-save.sh
 test -s scripts/build-squashfs.sh
 test -s scripts/build-squashfs-inplace.sh
+test -s scripts/validate-runtime-symlinks.sh
 test -s scripts/build-state-squashfs.sh
 test -s .github/workflows/build-d630-state-boot-bundle.yml
 grep -Fq 'workflow_call:' .github/workflows/build-d630-kernel.yml
