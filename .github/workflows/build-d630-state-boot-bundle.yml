@@ -207,7 +207,7 @@ jobs:
           sudo cp -L /etc/resolv.conf "$GENTOO_ROOT/etc/resolv.conf"
           sudo chroot "$GENTOO_ROOT" /bin/bash --login -c \
             'test -s /etc/gentoo-release && command -v emerge >/dev/null && emerge --version'
-          du -shx "$GENTOO_ROOT" "$GENTOO_ROOT/var/cache/binpkgs" | tee "$RUNNER_TEMP/restored-root-size.txt"
+          sudo du -shx "$GENTOO_ROOT" "$GENTOO_ROOT/var/cache/binpkgs" | tee "$RUNNER_TEMP/restored-root-size.txt"
           df -h / | tee "$RUNNER_TEMP/disk-after-restore.txt"
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/restored-root-size.txt"
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/disk-after-restore.txt"
