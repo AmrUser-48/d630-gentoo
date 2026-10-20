@@ -223,15 +223,22 @@ done
 Remove caches, repository checkouts, logs, debug symbols, development headers/metadata, static archives, and bytecode from the **runtime copy** only. Keep runtime shared libraries, `/usr/share/licenses`, man pages, the OpenRC service files, and `/var/db/pkg`:
 
 ```bash
+# Preserve Gentoo's profile files so /etc/portage/make.profile stays valid.
+test -d "$ROOT/var/db/repos/gentoo/profiles" || {
+  echo "Missing Gentoo profiles; refusing to remove the repository target." >&2
+  exit 1
+}
+find "$ROOT/var/db/repos/gentoo" -mindepth 1 -maxdepth 1 ! -name profiles -exec rm -rf -- {} +
 rm -rf "$ROOT/var/tmp/portage" "$ROOT/var/cache/binpkgs" \
   "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" \
-  "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru" \
+  "$ROOT/var/db/repos/guru" \
   "$ROOT/var/log/portage" "$ROOT/var/log/emerge.log" \
   "$ROOT/var/log/gentoo-build-set.log" "$ROOT/usr/src" \
   "$ROOT/usr/include" "$ROOT/usr/share/doc" "$ROOT/usr/share/info" \
   "$ROOT/usr/share/gtk-doc" "$ROOT/usr/share/help" \
   "$ROOT/usr/share/gnome/help" "$ROOT/usr/share/aclocal" \
   "$ROOT/usr/share/gettext" "$ROOT/usr/lib/debug" "$ROOT/usr/lib64/debug"
+chroot "$ROOT" /bin/bash -lc 'test -e /etc/portage/make.profile'
 find "$ROOT/usr" -type f \( -name '*.a' -o -name '*.la' -o -name '*.pyc' \) -delete
 find "$ROOT/usr" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$ROOT/usr" -type d \( -name pkgconfig -o -name cmake \) -prune -exec rm -rf {} +
