@@ -34,7 +34,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-TARGETS="app-admin/sudo app-i18n/fbterm app-misc/mc app-shells/bash media-fonts/dejavu media-fonts/terminus-font media-libs/mesa media-sound/alsa-utils net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/coreutils sys-apps/dbus sys-apps/kmod sys-apps/man-db sys-apps/openrc sys-apps/pciutils sys-apps/portage sys-apps/shadow sys-apps/usbutils sys-apps/util-linux sys-auth/elogind sys-auth/pambase x11-apps/xinit x11-apps/xterm x11-base/xorg-drivers x11-base/xorg-server x11-wm/openbox"
+TARGETS="app-admin/sudo app-i18n/fbterm app-misc/mc app-shells/bash media-fonts/dejavu media-fonts/terminus-font media-libs/mesa media-sound/alsa-utils net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/coreutils sys-apps/dbus sys-apps/kmod sys-apps/man-db sys-apps/openrc sys-apps/pciutils sys-apps/portage sys-apps/shadow sys-apps/usbutils sys-apps/util-linux sys-auth/elogind sys-auth/pambase x11-apps/xinit x11-terms/xterm x11-base/xorg-drivers x11-base/xorg-server x11-wm/openbox"
 
 printf '%s\n' $TARGETS > "$OUT/RUNTIME-PACKAGES.txt"
 du -shx "$BUILD_ROOT" "$BUILD_ROOT/var/cache/binpkgs" 2>/dev/null | tee "$OUT/SOURCE-ROOT-SIZE.txt"
@@ -127,7 +127,7 @@ sys-apps/util-linux
 sys-auth/elogind
 sys-auth/pambase
 x11-apps/xinit
-x11-apps/xterm
+x11-terms/xterm
 x11-base/xorg-drivers
 x11-base/xorg-server
 x11-wm/openbox
@@ -151,7 +151,31 @@ for atom in $TARGETS; do
         die "depclean removed a required runtime target: $atom"
     fi
 done
-chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v rc-update && command -v rc-status'
+chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && test -x /sbin/openrc && command -v rc-update && command -v rc-status'
+
+# SysVinit must explicitly hand startup to OpenRC.  Do not assume an inherited
+# Stage 3 inittab survives runtime depclean or is correct for this image.
+cat > "$ROOT/etc/inittab" <<'EOF'
+# Minimal SysVinit configuration for the D630 OpenRC runtime.
+id:3:initdefault:
+si::sysinit:/sbin/openrc sysinit
+rc::bootwait:/sbin/openrc boot
+l0u:0:wait:/sbin/telinit u
+l0:0:wait:/sbin/openrc shutdown
+l0s:0:wait:/sbin/halt.sh
+l1:S1:wait:/sbin/openrc single
+l2:2:wait:/sbin/openrc nonetwork
+l3:3:wait:/sbin/openrc default
+l4:4:wait:/sbin/openrc default
+l5:5:wait:/sbin/openrc default
+l6u:6:wait:/sbin/telinit u
+l6:6:wait:/sbin/openrc reboot
+l6r:6:wait:/sbin/reboot -d
+su0:S:wait:/sbin/openrc single
+su1:S:wait:/sbin/sulogin
+ca:12345:ctrlaltdel:/sbin/shutdown -r now
+EOF
+chmod 0644 "$ROOT/etc/inittab"
 
 log "Configure first boot, OpenRC services, console login, and Openbox session"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
@@ -217,6 +241,16 @@ for service in dbus elogind NetworkManager bluetooth; do
     fi
 done
 chroot "$ROOT" /bin/bash -lc 'rc-update show -v' | tee "$OUT/OPENRC-RUNLEVELS.txt"
+for entry in \
+    'id:3:initdefault:' \
+    'si::sysinit:/sbin/openrc sysinit' \
+    'rc::bootwait:/sbin/openrc boot' \
+    'l3:3:wait:/sbin/openrc default'; do
+    grep -Fxq "$entry" "$ROOT/etc/inittab" || die "runtime /etc/inittab lacks required startup entry: $entry"
+done
+chroot "$ROOT" /bin/bash -lc \
+    'test -e /etc/runlevels/sysinit/d630-firstboot && test -e /etc/runlevels/default/agetty.tty1' || \
+    die "required first-boot or console-login service is not enabled"
 if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
     chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
 fi

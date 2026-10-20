@@ -7,6 +7,9 @@ on:
       - test/sfs-initrd-20261016
     paths:
       - ".github/workflows/build-d630-state-boot-bundle.yml"
+      - "scripts/build-state-squashfs.sh"
+      - "scripts/build-squashfs-inplace.sh"
+      - "scripts/validate-runtime-symlinks.sh"
   workflow_dispatch:
     inputs:
       state_tag:

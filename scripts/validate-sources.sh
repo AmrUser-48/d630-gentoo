@@ -62,6 +62,11 @@ test -s scripts/build-squashfs.sh
 test -s scripts/build-squashfs-inplace.sh
 test -s scripts/validate-runtime-symlinks.sh
 test -s scripts/build-state-squashfs.sh
+grep -Fq 'x11-terms/xterm' scripts/build-state-squashfs.sh
+! grep -Fq 'x11-apps/xterm' scripts/build-state-squashfs.sh config/package.list config/package-sets/desktop.list config/package-sets/daily-driver.list
+grep -Fq 'id:3:initdefault:' scripts/build-state-squashfs.sh
+grep -Fq 'si::sysinit:/sbin/openrc sysinit' scripts/build-state-squashfs.sh
+grep -Fq 'l3:3:wait:/sbin/openrc default' scripts/build-state-squashfs.sh
 test -s .github/workflows/build-d630-state-boot-bundle.yml
 grep -Fq 'workflow_call:' .github/workflows/build-d630-kernel.yml
 bash -n scripts/build-squashfs-inplace.sh
