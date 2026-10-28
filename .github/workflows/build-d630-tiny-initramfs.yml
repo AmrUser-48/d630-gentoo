@@ -261,7 +261,8 @@ jobs:
             -re {d630-tiny# } {}
             timeout { puts stderr "Shell prompt not returned after network tool checks"; exit 1 }
           }
-          send -- "interface=; for path in /sys/class/net/*; do candidate=\${path##*/}; [ \"\$candidate\" = lo ] && continue; [ -e \"\$path/device\" ] || continue; interface=\$candidate; break; done; [ -n \"\$interface\" ] && udhcpc -q -i \"\$interface\" -s /usr/share/udhcpc/default.script && echo D630_TINY_DHCP'_'OK\r"
+          send -- {interface=; for path in /sys/class/net/*; do candidate=${path##*/}; case "$candidate" in lo) continue;; esac; [ -e "$path/device" ] || continue; interface=$candidate; break; done; [ -n "$interface" ] && udhcpc -q -i "$interface" -s /usr/share/udhcpc/default.script && echo D630_TINY_DHCP_OK}
+          send -- "\r"
           expect {
             -re {D630_TINY_DHCP_OK} {}
             timeout { puts stderr "QEMU USB network adapter did not receive a DHCP lease"; exit 1 }
