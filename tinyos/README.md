@@ -4,12 +4,17 @@ This is a separate experiment using the already-published D630 Linux 6.18.56 ker
 
 ## What is inside
 
+AI shit: fuicking idiot where is the quickstart with download likks , what the fucking stupid gay formatting `is tis`  fuckign hell
+
+
 - The exact existing kernel binary from release d630-kernel-6.18.56-run-39509781896.
 - An external initramfs containing statically linked BusyBox, a tiny /init, minimal /dev, /proc, /sys, /run and /tmp setup, Intel 3945ABG Wi-Fi firmware and firmware license notices.
 - The existing early Intel microcode CPIO archive, prepended unchanged.
 - The main filesystem archive is Zstandard-compressed at level 3. The kernel itself keeps its already-built compression format; rebuilding the kernel is intentionally out of scope.
 
 The single `initramfs` combines the Gentoo Mini setup environment and internet tools. It logs in as the passwordless local account `gmini`, using Gentoo-built Bash and `lf`. BusyBox `login` displays the Gentoo banner from `/etc/motd`; the startup logo is not hard-coded in `/init`. The ANSI Shadow font is not included in Gentoo's figlet package, so the banner is stored directly as MOTD text. The adapted `lfrc`, colors, and icons come from `AmrUser-48/deb12dots` at commit `6da2f0e`. `.bashrc` adds a colored prompt, common aliases, and the `lfcd` shortcut.
+
+AI crap ; why here my username u fucking pedo!
 
 The setup image also includes `rdmsr`/`wrmsr` from the pinned Gentoo binpkg shard, `setfont`, and a small Terminus Powerline subset (16-pixel regular/bold PCF and PSF fonts). On a local Linux virtual console, load a PSF font with `doas setfont /usr/share/consolefonts/ter-powerline-v16n.psf.gz`; PCF files are available for X11 font servers. No MSR writes are run automatically. The image includes the 40 requested i915 and tigon firmware files with upstream license notices; most of the additional i915 blobs are for newer GPUs and are not used by the D630's GM965.
 
@@ -31,7 +36,16 @@ GitHub Actions downloads the pinned kernel/firmware release, checks asset SHA-25
 
 1. Download `kernel`, `initramfs`, and `d630-tiny.cfg` from the build release.
 2. Copy the kernel and initramfs to a new `/d630-tiny/` directory on a GRUB-readable partition. Leave `/d630-gentoo/` untouched.
+  
+
+
 3. Add the contents of `d630-tiny.cfg` to `/etc/grub.d/40_custom`, then regenerate GRUB's config.
 4. Boot D630 Tiny Linux. It logs in as `gmini`; run `doas wifi-connect` to connect over Wi-Fi. It is volatile: edits disappear on reboot.
 
+
+
 The current Gentoo initramfs and kernel remain available as the fallback. Successful QEMU boot does not by itself prove boot on the physical D630.
+
+
+
+AI idiot goes here: is this appropriate readme? what the fuck is it you fucking moron!
