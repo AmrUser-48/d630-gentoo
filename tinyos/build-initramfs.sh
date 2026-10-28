@@ -64,7 +64,7 @@ fi
 SETUP_MODE=false
 if [[ -n "$NETWORK_ROOT" && -f "$NETWORK_ROOT/etc/d630-tiny/setup-mode" ]]; then
   SETUP_MODE=true
-  for applet in su chown; do
+  for applet in login chown; do
     if ! grep -Fxq "$applet" "$APPLET_LIST"; then
       echo "Required setup BusyBox applet missing: $applet" >&2
       exit 1
@@ -145,7 +145,7 @@ if [[ -n "$NETWORK_ROOT" ]]; then
   required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
 if [[ "$SETUP_MODE" == true ]]; then
-  required_members+=(bin/bash usr/bin/lf usr/bin/doas etc/passwd etc/group etc/shadow etc/doas.conf home/gmini/.bashrc home/gmini/.bash_profile etc/d630-tiny/setup-mode)
+  required_members+=(bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/sbin/lf-preview etc/passwd etc/group etc/shadow etc/doas.conf etc/motd home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode)
 fi
 for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
@@ -179,7 +179,7 @@ test -s "$OUT/initramfs"
     echo "Networking: not included in this minimal shell variant"
   fi
   if [[ "$SETUP_MODE" == true ]]; then
-    echo "Setup user: gmini (passwordless local console), Bash, lf, and custom Bash startup files"
+    echo "Setup user: gmini, BusyBox login/MOTD, Gentoo Bash/lf/file, doas, and custom shell/file-manager configs"
   fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"

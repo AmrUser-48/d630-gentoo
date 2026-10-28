@@ -1,0 +1,105 @@
+# Adapted from AmrUser-48/deb12dots@6da2f0e .config/lf/lfrc.
+set shell bash
+set shellopts '-eu'
+set ifs "\n"
+set scrolloff 2
+set icons
+set preview
+set previewer /usr/sbin/lf-preview
+
+map <enter> shell
+map x $$f
+map X !$f
+map o open
+map O :open
+map zp :set preview!
+map ; read
+map <delete> trash
+map <backspace> set hidden!
+map <backspace2> set hidden!
+map <insert> :toggle ; down
+map <c-c> push :quit<enter>
+map ZQ quit
+map ZZ quit
+map f half-down
+map b half-up
+map gc calcdirsize
+map <c-space> :calcdirsize ; down
+map <f-6> push :rename<space>
+map <f-7> push $mkdir<space>
+map '.' editconfig
+map V push :vi<space>
+map I $EDITOR $f
+map gr bulk-rename
+
+cmap <up> cmd-history-next
+cmap <down> cmd-history-prev
+
+cmd open ${{
+    set -f
+    for f in $fx; do
+        case "$(file --brief --mime-type "$f")" in
+            text/*) "$EDITOR" "$f";;
+            *) file "$f";;
+        esac
+    done
+}}
+
+cmd editconfig ${{
+    vi ~/.config/lf/lfrc
+    lf -remote "send $id source ~/.config/lf/lfrc"
+}}
+
+cmd trash %set -f; mkdir -p ~/.trash; mv $fx ~/.trash/
+
+cmd extract ${{
+    set -f
+    case "$f" in
+        *.tar.bz|*.tar.bz2|*.tbz|*.tbz2) tar xjf "$f";;
+        *.tar.gz|*.tgz) tar xzf "$f";;
+        *.tar.xz|*.txz) tar xJf "$f";;
+        *.zip) unzip "$f";;
+    esac
+}}
+
+cmd tar ${{
+    set -f
+    mkdir "$1"
+    cp -r $fx "$1"
+    tar czf "$1.tar.gz" "$1"
+    rm -rf "$1"
+}}
+
+cmd bulk-rename ${{
+    old="$(mktemp)"
+    new="$(mktemp)"
+    if [ -n "$fs" ]; then
+        fs="$(basename $fs)"
+    else
+        fs="$(ls)"
+    fi
+    printf '%s\n' "$fs" > "$old"
+    printf '%s\n' "$fs" > "$new"
+    "$EDITOR" "$new"
+    [ "$(wc -l < "$new")" -ne "$(wc -l < "$old")" ] && exit
+    paste "$old" "$new" | while IFS= read -r names; do
+        src="$(printf '%s' "$names" | cut -f1)"
+        dst="$(printf '%s' "$names" | cut -f2)"
+        if [ "$src" = "$dst" ] || [ -e "$dst" ]; then
+            continue
+        fi
+        mv -- "$src" "$dst"
+    done
+    rm -- "$old" "$new"
+    lf -remote "send $id unselect"
+}}
+
+set incsearch
+set smartcase
+set ignorecase
+set anchorfind
+set findlen 1
+set tabstop 4
+set mouse
+set hidden
+set info 'size'

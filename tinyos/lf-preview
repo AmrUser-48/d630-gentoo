@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+file_path=$1
+mime_type=$(file --brief --mime-type "$file_path" 2>/dev/null || true)
+case "$mime_type" in
+    text/*) head -c 8192 "$file_path" ;;
+    *) file "$file_path" ;;
+esac

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE" >&2
+if [[ $# -ne 9 ]]; then
+  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE LFRC LFCOLORS LFICONS LFPREVIEW" >&2
   exit 2
 fi
 
@@ -11,11 +11,15 @@ NETWORK_ROOT=$2
 ROOT=$3
 BASHRC=$4
 BASH_PROFILE=$5
+LFRC=$6
+LFCOLORS=$7
+LFICONS=$8
+LFPREVIEW=$9
 
 for path in "$GENTOO_ROOT" "$NETWORK_ROOT"; do
   [[ -d "$path" ]] || { echo "Required root not found: $path" >&2; exit 1; }
 done
-for file in "$BASHRC" "$BASH_PROFILE"; do
+for file in "$BASHRC" "$BASH_PROFILE" "$LFRC" "$LFCOLORS" "$LFICONS" "$LFPREVIEW"; do
   [[ -s "$file" ]] || { echo "Required shell configuration is missing: $file" >&2; exit 1; }
 done
 
@@ -65,7 +69,15 @@ copy_binary() {
 copy_binary bash /bin/bash
 copy_binary lf /usr/bin/lf
 copy_binary doas /usr/bin/doas
+copy_binary file /usr/bin/file
 chmod 4755 "$ROOT/usr/bin/doas"
+
+magic_db="$GENTOO_ROOT/usr/share/misc/magic.mgc"
+[[ -s "$magic_db" ]] || {
+  echo "Gentoo file package magic database is missing." >&2
+  exit 1
+}
+install -D -m 0644 "$magic_db" "$ROOT/usr/share/misc/magic.mgc"
 
 terminfo="$GENTOO_ROOT/usr/share/terminfo"
 [[ -d "$terminfo" ]] || {
@@ -76,6 +88,15 @@ mkdir -p "$ROOT/usr/share"
 cp -a "$terminfo" "$ROOT/usr/share/"
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
+figlet_binary="$(chroot "$GENTOO_ROOT" /bin/sh -c 'command -v figlet')" || {
+  echo "Gentoo figlet package is missing." >&2
+  exit 1
+}
+if ! chroot "$GENTOO_ROOT" "$figlet_binary" -f 'ANSI Shadow.flf' Gentoo > "$ROOT/etc/motd"; then
+  echo "Could not generate the Gentoo MOTD with the ANSI Shadow font." >&2
+  exit 1
+fi
+printf '\nGentoo Mini | D630 setup environment\n' >> "$ROOT/etc/motd"
 cat > "$ROOT/etc/passwd" <<'PASSWD'
 root:x:0:0:root:/root:/bin/sh
 gmini:x:1000:1000:Gentoo Mini:/home/gmini:/bin/bash
@@ -102,12 +123,18 @@ DOAS
 chmod 0600 "$ROOT/etc/doas.conf"
 install -m 0644 "$BASHRC" "$ROOT/home/gmini/.bashrc"
 install -m 0644 "$BASH_PROFILE" "$ROOT/home/gmini/.bash_profile"
+install -D -m 0644 "$LFRC" "$ROOT/home/gmini/.config/lf/lfrc"
+install -D -m 0644 "$LFCOLORS" "$ROOT/home/gmini/.config/lf/colors"
+install -D -m 0644 "$LFICONS" "$ROOT/home/gmini/.config/lf/icons"
+install -D -m 0755 "$LFPREVIEW" "$ROOT/usr/sbin/lf-preview"
 printf 'Gentoo Mini setup environment\n' > "$ROOT/etc/d630-tiny/setup-mode"
 
-for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" \
+for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/bin/file" \
   "$ROOT/etc/passwd" "$ROOT/etc/group" "$ROOT/etc/shadow" \
-  "$ROOT/etc/doas.conf" "$ROOT/home/gmini/.bashrc" \
-  "$ROOT/home/gmini/.bash_profile" "$ROOT/etc/d630-tiny/setup-mode"; do
+  "$ROOT/etc/doas.conf" "$ROOT/etc/motd" "$ROOT/usr/sbin/lf-preview" "$ROOT/home/gmini/.bashrc" \
+  "$ROOT/home/gmini/.bash_profile" "$ROOT/home/gmini/.config/lf/lfrc" \
+  "$ROOT/home/gmini/.config/lf/colors" "$ROOT/home/gmini/.config/lf/icons" \
+  "$ROOT/etc/d630-tiny/setup-mode"; do
   [[ -s "$file" ]] || { echo "Setup image file is missing: $file" >&2; exit 1; }
 done
 [[ "$(stat -c '%a' "$ROOT/usr/bin/doas")" == 4755 ]] || {
