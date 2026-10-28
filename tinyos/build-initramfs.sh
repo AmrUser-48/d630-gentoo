@@ -170,13 +170,24 @@ if [[ -n "$NETWORK_ROOT" ]]; then
   required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
 if [[ "$SETUP_MODE" == true ]]; then
+  firmware_whence_member=""
+  for candidate in usr/share/licenses/linux-firmware/WHENCE usr/share/licenses/linux-firmware/WHENCE.bz2; do
+    if [[ -s "$ROOT/$candidate" ]]; then
+      firmware_whence_member=$candidate
+      break
+    fi
+  done
+  [[ -n "$firmware_whence_member" && -d "$ROOT/usr/share/licenses/linux-firmware/LICENSES" ]] || {
+    echo "Firmware license notices are missing from the staged image." >&2
+    exit 1
+  }
   required_members+=(
     bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/bin/setfont
     usr/sbin/rdmsr usr/sbin/wrmsr usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/sbin/gentoo-chroot
     usr/share/d630-tiny/early-microcode.cpio usr/share/d630-tiny/firmware-files.list
     usr/share/fonts/misc/ter-powerline-x16n.pcf.gz usr/share/fonts/misc/ter-powerline-x16b.pcf.gz
     usr/share/consolefonts/ter-powerline-v16n.psf.gz usr/share/consolefonts/ter-powerline-v16b.psf.gz
-    usr/share/licenses/terminus-powerline/LICENSE.txt usr/share/licenses/linux-firmware/WHENCE
+    usr/share/licenses/terminus-powerline/LICENSE.txt "$firmware_whence_member"
     usr/share/licenses/linux-firmware/LICENSES etc/passwd etc/group etc/shadow etc/doas.conf etc/motd
     home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc
     home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode

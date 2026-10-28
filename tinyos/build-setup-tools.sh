@@ -125,12 +125,18 @@ done < "$FIRMWARE_LIST"
 }
 
 firmware_docs=$(find "$GENTOO_ROOT/usr/share/doc" -maxdepth 1 -type d -name 'linux-firmware-*' -print -quit)
-[[ -n "$firmware_docs" && -s "$firmware_docs/WHENCE" && -d "$firmware_docs/LICENSES" ]] || {
+[[ -n "$firmware_docs" && -d "$firmware_docs/LICENSES" ]] || {
   echo "Linux firmware license notices are missing from the Gentoo staging root." >&2
   exit 1
 }
+firmware_whence="$firmware_docs/WHENCE"
+[[ -s "$firmware_whence" ]] || firmware_whence="$firmware_docs/WHENCE.bz2"
+[[ -s "$firmware_whence" && -n "$(find "$firmware_docs/LICENSES" -type f -print -quit)" ]] || {
+  echo "Linux firmware WHENCE or LICENSES files are missing from the Gentoo staging root." >&2
+  exit 1
+}
 mkdir -p "$ROOT/usr/share/licenses/linux-firmware"
-cp -a "$firmware_docs/WHENCE" "$firmware_docs/LICENSES" "$ROOT/usr/share/licenses/linux-firmware/"
+cp -a "$firmware_whence" "$firmware_docs/LICENSES" "$ROOT/usr/share/licenses/linux-firmware/"
 
 for font in ter-powerline-x16n.pcf.gz ter-powerline-x16b.pcf.gz; do
   [[ -s "$POWERLINE_FONTS_ROOT/PCF/$font" ]] || {
@@ -213,7 +219,9 @@ done
   echo "Firmware manifest must contain exactly 40 files." >&2
   exit 1
 }
-[[ -d "$ROOT/usr/share/licenses/linux-firmware/LICENSES" && -s "$ROOT/usr/share/licenses/linux-firmware/WHENCE" ]] || {
+[[ -d "$ROOT/usr/share/licenses/linux-firmware/LICENSES" ]] &&
+  { [[ -s "$ROOT/usr/share/licenses/linux-firmware/WHENCE" ]] ||
+    [[ -s "$ROOT/usr/share/licenses/linux-firmware/WHENCE.bz2" ]]; } || {
   echo "Firmware license notices were not staged." >&2
   exit 1
 }
