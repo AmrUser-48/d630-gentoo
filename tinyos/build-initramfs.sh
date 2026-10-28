@@ -169,7 +169,11 @@ cat "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" > "$OUT/initramfs"
 test -s "$OUT/initramfs"
 {
   echo "D630 Tiny standalone initramfs"
-  echo "Init: /init (BusyBox static interactive console shell)"
+  if [[ "$SETUP_MODE" == true ]]; then
+    echo "Init: /init starts BusyBox login as gmini with Gentoo Bash"
+  else
+    echo "Init: /init (BusyBox static interactive console shell)"
+  fi
   echo "Main archive: newc CPIO + Zstandard level 3"
   echo "Early microcode: original uncompressed CPIO from the pinned D630 kernel release"
   echo "Firmware: Intel PRO/Wireless 3945ABG; license notices retained where provided"
