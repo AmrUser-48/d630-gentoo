@@ -40,12 +40,15 @@ if [[ -z "$assets_dir" ]]; then
     echo "Release $tag does not include the combined initramfs yet." >&2
     exit 1
   fi
-  gh release download "$tag" \
-    --repo AmrUser-48/d630-gentoo \
-    --dir "$assets_dir" \
-    --pattern kernel \
-    --pattern initramfs \
-    --pattern SHA256SUMS
+  if [[ ! -s "$assets_dir/kernel" || ! -s "$assets_dir/initramfs" || ! -s "$assets_dir/SHA256SUMS" ]]; then
+    gh release download "$tag" \
+      --repo AmrUser-48/d630-gentoo \
+      --dir "$assets_dir" \
+      --pattern kernel \
+      --pattern initramfs \
+      --pattern SHA256SUMS \
+      --clobber
+  fi
 fi
 
 for asset in kernel initramfs SHA256SUMS; do
@@ -67,7 +70,7 @@ awk '
 ' "$assets_dir/SHA256SUMS" | (cd "$assets_dir" && sha256sum -c -)
 
 exec qemu-system-x86_64 \
-  -machine pc -accel tcg -cpu core2duo -m 512 -smp 2 \
+  -machine pc -accel tcg -cpu core2duo -m 4000 -smp 2 \
   -usb -device usb-net,netdev=net0 -netdev user,id=net0 \
   -kernel "$assets_dir/kernel" \
   -initrd "$assets_dir/initramfs" \

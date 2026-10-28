@@ -4,10 +4,22 @@ die() { echo "d630-runtime-rootfs: ERROR: $*" >&2; exit 2; }
 log() { echo; echo "[d630-runtime-rootfs] $*"; }
 
 [[ "$EUID" -eq 0 ]] || die "run as root"
-[[ "$RUNTIME_PROFILE" =~ ^(tiny-console|console|desktop|daily-driver)$ ]] || die "invalid runtime profile"
+GH_API_AUTH_ARGS=()
+if [[ -n "${GH_TOKEN:-}" ]]; then GH_API_AUTH_ARGS=(-H "Authorization: Bearer $GH_TOKEN"); fi
+[[ "$RUNTIME_PROFILE" =~ ^(tiny-console|console|desktop|daily-driver|gui-initram)$ ]] || die "invalid runtime profile"
 [[ -z "$BINPKG_RUN_IDS" || "$BINPKG_RUN_IDS" =~ ^[0-9,[:space:]]+$ ]] || die "binpkg_run_ids must be numeric IDs separated by commas or spaces"
 [[ "$SOURCE_FALLBACK" == true || "$SOURCE_FALLBACK" == false ]] || die "SOURCE_FALLBACK must be true or false"
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
+BUILD_GUI_INITRAMFS="${BUILD_GUI_INITRAMFS:-false}"
+EARLY_MICROCODE_CPIO="${EARLY_MICROCODE_CPIO:-}"
+[[ "$BUILD_GUI_INITRAMFS" == true || "$BUILD_GUI_INITRAMFS" == false ]] || die "BUILD_GUI_INITRAMFS must be true or false"
+if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
+  [[ "$RUNTIME_PROFILE" == gui-initram ]] || die "GUI initramfs output requires RUNTIME_PROFILE=gui-initram"
+  [[ -s "$EARLY_MICROCODE_CPIO" ]] || die "EARLY_MICROCODE_CPIO must name the verified kernel microcode archive"
+  for tool in cpio zstd; do command -v "$tool" >/dev/null || die "required host tool missing: $tool"; done
+elif [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  die "RUNTIME_PROFILE=gui-initram requires BUILD_GUI_INITRAMFS=true"
+fi
 LOCAL_RELEASE_ASSETS_DIR="${LOCAL_RELEASE_ASSETS_DIR:-}"
 LOCAL_BINPKG_ARCHIVE="${LOCAL_BINPKG_ARCHIVE:-}"
 if [[ -z "$BINPKG_RUN_IDS" && -z "$LOCAL_RELEASE_ASSETS_DIR" && -z "$LOCAL_BINPKG_ARCHIVE" && "$SOURCE_FALLBACK" != true ]]; then
@@ -66,6 +78,9 @@ mkdir -p "$ROOT/etc/portage/package-sets" "$ROOT/etc/portage/profile/package.use
 if [[ -f "$ROOT/etc/portage/package.use" ]]; then mv "$ROOT/etc/portage/package.use" "$ROOT/etc/portage/package.use.stage3"; fi
 mkdir -p "$ROOT/etc/portage/package.use"
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/make.conf" "$ROOT/etc/portage/make.conf"
+if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  printf '%s\n' 'x11-base/xorg-server suid' > "$ROOT/etc/portage/package.use/zz-gui-initram"
+fi
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/profile/package.use.force" "$ROOT/etc/portage/profile/package.use.force/zz-d630-llvm"
 install -m 0644 "$GITHUB_WORKSPACE/config/bash/bashrc.d/10-portage-ask.sh" "$ROOT/etc/bash/bashrc.d/10-portage-ask.sh"
 install -m 0644 "$GITHUB_WORKSPACE/config/locale.gen" "$ROOT/etc/locale.gen"
@@ -140,7 +155,7 @@ elif [[ -n "$LOCAL_BINPKG_ARCHIVE" ]]; then
   printf 'Source: local archive\nArchive: %s\nPackage files: %s\n' "$LOCAL_BINPKG_ARCHIVE" "$PKG_COUNT" > "$OUT/LOCAL-BINPKG-IMPORT.txt"
 else
   for ID in $IDS; do
-    curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+    curl -fsSL --retry 3 "${GH_API_AUTH_ARGS[@]}" -H 'Accept: application/vnd.github+json' \
       "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/binpkgs-$ID" -o "$WORK/release.json"
     python3 - "$WORK/release.json" "$WORK/assets.tsv" <<'PY'
 import json, re, sys
@@ -180,6 +195,19 @@ sys-apps/shadow
 sys-apps/kmod
 EOF
   cat "$GITHUB_WORKSPACE/config/package-sets/tiny-console.list" >> "$WORK/atoms.txt"
+elif [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  cat > "$WORK/atoms.txt" <<'EOF'
+app-admin/sudo
+app-shells/bash
+net-misc/dhcpcd
+sys-apps/coreutils
+sys-apps/kmod
+sys-apps/openrc
+sys-apps/portage
+sys-apps/shadow
+sys-apps/util-linux
+EOF
+  cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
 else
   cat > "$WORK/atoms.txt" <<'EOF'
 app-admin/sudo
@@ -218,6 +246,21 @@ sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
 if grep -Evq '^[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
 cp "$WORK/atoms.txt" "$OUT/PACKAGES.txt"
 ATOMS="$(paste -sd ' ' "$WORK/atoms.txt")"
+
+if [[ "$RUNTIME_PROFILE" == gui-initram && "$SOURCE_FALLBACK" == false ]]; then
+  log "Require the GUI package atoms in the pinned binary-package release"
+  while IFS= read -r atom || [[ -n "$atom" ]]; do
+    atom="${atom%%#*}"
+    atom="${atom//[[:space:]]/}"
+    [[ -n "$atom" ]] || continue
+    category="${atom%%/*}"
+    package="${atom#*/}"
+    if ! find "$ROOT/var/cache/binpkgs/$category/$package" -maxdepth 1 -type f \
+      \( -name "$package-*.gpkg.tar" -o -name "$package-*.tbz2" \) -print -quit 2>/dev/null | grep -q .; then
+      die "pinned binpkg release does not contain a binary for required GUI atom $atom"
+    fi
+  done < "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list"
+fi
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
@@ -285,6 +328,9 @@ chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default' || echo "WARNIN
 for SERVICE in dbus NetworkManager bluetooth; do
   [[ -x "$ROOT/etc/init.d/$SERVICE" ]] && chroot "$ROOT" /bin/bash -lc "rc-update add '$SERVICE' default" || true
 done
+if [[ "$RUNTIME_PROFILE" == gui-initram && -x "$ROOT/etc/init.d/dhcpcd" ]]; then
+  chroot "$ROOT" /bin/bash -lc 'rc-update add dhcpcd default'
+fi
 if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
   chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
 fi
@@ -314,7 +360,7 @@ if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
   printf 'Source: recovered Actions artifact\nKernel release: %s\nModules: %s\n' "$MOD_REL" "$(basename "$MOD_ARCHIVE")" > "$OUT/KERNEL-MODULES.txt"
 elif [[ -n "$KERNEL_BUNDLE_TAG" ]]; then
   mkdir -p "$WORK/kernel"
-  curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+  curl -fsSL --retry 3 "${GH_API_AUTH_ARGS[@]}" -H 'Accept: application/vnd.github+json' \
     "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$KERNEL_BUNDLE_TAG" -o "$WORK/kernel/release.json"
   python3 - "$WORK/kernel/release.json" "$WORK/kernel/assets.tsv" <<'PY'
 import json,re,sys
@@ -351,14 +397,32 @@ fi
 
 log "Validate runtime root and build SquashFS"
 [[ -x "$ROOT/sbin/init" ]] || die "runtime root has no executable /sbin/init"
-if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; then
+if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then
   [[ -x "$ROOT/usr/bin/Xorg" || -x "$ROOT/usr/libexec/Xorg" ]] || die "graphical profile missing Xorg"
   [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "graphical profile missing openbox-session"
+fi
+if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
+  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session; do
+    [[ -x "$ROOT$executable" ]] || die "GUI runtime missing required executable $executable"
+  done
+  xorg_server="$ROOT/usr/bin/Xorg"
+  [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
+  [[ -x "$xorg_server" ]] || die "GUI runtime has no executable Xorg server"
+  chmod 4755 "$xorg_server"
+  mkdir -p "$ROOT/etc/X11"
+  cat > "$ROOT/etc/X11/Xwrapper.config" <<'EOF'
+allowed_users=console
+needs_root_rights=yes
+EOF
+  crocus_driver="$(find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null || true)"
+  [[ -n "$crocus_driver" ]] || die "Mesa Crocus driver is missing from the GUI runtime"
+  [[ "$(stat -c '%a' "$xorg_server")" == 4755 ]] || die "Xorg server is not installed setuid-root for local console graphics"
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
 rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
+chmod 1777 "$ROOT/var/tmp/portage"
 
 cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
 Project: AmrUser-48/d630-gentoo
@@ -366,8 +430,8 @@ Profile: $RUNTIME_PROFILE
 Base: Gentoo amd64 glibc/OpenRC Stage 3
 Flags: -O2 -pipe -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
-Root file: /d630-gentoo/squashfs (no extension)
-Writable overlay: RAM-only; changes are lost on reboot.
+Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
+Writable storage: RAM-only; changes are lost on reboot.
 First boot: create local account and password at console.
 $(cat "$OUT/KERNEL-MODULES.txt")
 EOF
@@ -380,15 +444,67 @@ This first boot image uses a volatile RAM OverlayFS. Changes and user accounts a
 
 The kernel and initramfs are separate deliverables. Supply their release tag to kernel_bundle_tag to add matching modules and firmware.
 EOF
-bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
-unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
-unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
-[[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
-sum_files=(squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
+  log "Create complete Gentoo desktop initramfs"
+  cat > "$ROOT/init" <<'INIT'
+#!/bin/sh
+set -eu
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+mkdir -p /dev /dev/pts /dev/shm /proc /sys /run /run/lock /tmp
+mount -t proc proc /proc 2>/dev/null || grep -q ' /proc proc ' /proc/mounts
+mount -t sysfs sysfs /sys 2>/dev/null || grep -q ' /sys sysfs ' /proc/mounts
+grep -q ' /dev devtmpfs ' /proc/mounts ||
+  mount -t devtmpfs -o mode=0755 devtmpfs /dev
+mount -t devpts devpts /dev/pts 2>/dev/null || grep -q ' /dev/pts devpts ' /proc/mounts
+mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run
+mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
+hostname d630-gui 2>/dev/null || :
+exec /sbin/init
+INIT
+  chmod 0755 "$ROOT/init"
+  root_cpio="$WORK/gui-rootfs.cpio"
+  root_zstd="$WORK/gui-rootfs.cpio.zst"
+  if ! (
+    cd "$ROOT"
+    find . -xdev -print0 | LC_ALL=C sort -z | cpio --null --create --format=newc --owner=0:0
+  ) > "$root_cpio"; then
+    die "could not create the GUI root CPIO archive"
+  fi
+  zstd -q -T0 -3 -f "$root_cpio" -o "$root_zstd"
+  zstd -q -t "$root_zstd"
+  cat "$EARLY_MICROCODE_CPIO" "$root_zstd" > "$OUT/gui-initram"
+  [[ -s "$OUT/gui-initram" ]] || die "GUI initramfs output is empty"
+  zstd -q -dc "$root_zstd" | cpio -it > "$OUT/GUI-INITRAMFS-FILES.txt" 2>"$OUT/gui-cpio-list.log" ||
+    die "could not list the generated GUI CPIO archive"
+  for path in ./init ./sbin/init ./usr/bin/openbox-session ./usr/bin/startx ./usr/bin/xterm; do
+    grep -Fxq "$path" "$OUT/GUI-INITRAMFS-FILES.txt" || die "GUI archive is missing $path"
+  done
+  file "$OUT/gui-initram" > "$OUT/GUI-INITRAMFS-INFO.txt"
+  du -h "$OUT/gui-initram" | tee -a "$GITHUB_STEP_SUMMARY"
+  {
+    echo "GUI initramfs: Gentoo OpenRC runtime root with Xorg, Crocus Mesa, xinit, xterm, and Openbox"
+    echo "Package source: pinned Core 2 binpkg release; source builds disabled"
+    echo "Target: Intel Core 2 Duo / Dell Latitude D630"
+    echo "Early microcode: original CPIO prepended unchanged"
+    echo "Changes: RAM-only; save them by rebuilding the initramfs to persistent storage"
+    echo "X startup: log in on tty1 and run startx; /etc/skel/.xinitrc starts Openbox"
+    echo
+    cat "$OUT/GUI-INITRAMFS-INFO.txt"
+  } > "$OUT/GUI-INITRAMFS-MANIFEST.txt"
+  sum_files=(gui-initram RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt GUI-INITRAMFS-MANIFEST.txt)
+else
+  log "Build Zstandard SquashFS from runtime-only root"
+  bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
+  unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
+  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
+  sum_files=(squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
   [[ ! -f "$OUT/$optional" ]] || sum_files+=("$optional")
 done
 (cd "$OUT" && sha256sum "${sum_files[@]}" > SHA256SUMS)
-du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
+[[ ! -s "$OUT/squashfs" ]] || du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
 cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
 log "Runtime image completed"

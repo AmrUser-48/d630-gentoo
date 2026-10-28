@@ -66,7 +66,7 @@ grep -Fq 'workflow_call:' .github/workflows/build-d630-kernel.yml
 bash -n scripts/build-squashfs-inplace.sh
 bash -n scripts/build-state-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
-grep -Fq 'if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; then' scripts/build-runtime-squashfs.sh
+grep -Fq 'if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' scripts/build-runtime-squashfs.sh
 ! grep -Fq 'if [[ "$RUNTIME_PROFILE" != console ]]; then' scripts/build-runtime-squashfs.sh
 test -s scripts/build-runtime-squashfs-local.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml

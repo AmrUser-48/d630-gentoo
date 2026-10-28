@@ -1,0 +1,184 @@
+name: Build D630 GUI initramfs
+run-name: "D630 GUI initramfs / #${{ github.run_number }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      binpkg_run_id:
+        description: "Run ID of a binpkgs release to reuse; missing/incompatible dependencies can be built from source"
+        required: true
+        type: string
+      source_fallback:
+        description: Build missing or incompatible binary packages from source
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: d630-gui-initramfs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build, boot-test, and publish GUI initramfs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      BINPKG_RUN_IDS: ${{ inputs.binpkg_run_id }}
+      SOURCE_FALLBACK: ${{ inputs.source_fallback }}
+      KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-39509781896
+      KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-39509781896
+      KERNEL_SHA256: ff825d64543b580705d1a07db9e3647f4e9046eb9fc6615c2d592ab339896461
+      CONFIG_SHA256: 0f74b376c8696ec0267e48c7a8426c3e53550fb6ab8ecd1830e47161e64ad1c6
+      MICROCODE_SHA256: e8b04c5456c1bed13049fbe82394b076ac988017d1d69a5bb9d0ffa3eec9c182
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out D630 Gentoo sources
+        uses: actions/checkout@v4
+
+      - name: Validate binary-package release run ID
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$BINPKG_RUN_IDS" =~ ^[0-9]+$ ]] || {
+            echo "::error::binpkg_run_id must be a numeric run ID."
+            exit 1
+          }
+
+      - name: Install host build and QEMU tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates cpio coreutils curl file git python3 qemu-system-x86 \
+            rsync squashfs-tools tar util-linux xz-utils zstd
+          mkdir -p output "$RUNNER_TEMP/gui-kernel"
+
+      - name: Download and verify D630 kernel and early microcode
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          fetch_verified() {
+            local asset="$1" digest="$2" destination="$3"
+            curl --fail --location --retry 4 --retry-all-errors "$KERNEL_URL/$asset" -o "$destination"
+            printf '%s  %s\n' "$digest" "$destination" | sha256sum --check -
+          }
+          fetch_verified kernel "$KERNEL_SHA256" output/kernel
+          fetch_verified d630-6.18.56.config "$CONFIG_SHA256" "$RUNNER_TEMP/gui-kernel/kernel.config"
+          fetch_verified early-microcode.cpio "$MICROCODE_SHA256" "$RUNNER_TEMP/early-microcode.cpio"
+          for symbol in CONFIG_BLK_DEV_INITRD CONFIG_RD_ZSTD CONFIG_DEVTMPFS CONFIG_PROC_FS CONFIG_SYSFS CONFIG_DRM CONFIG_DRM_I915 CONFIG_FB CONFIG_VT; do
+            grep -Fxq "$symbol=y" "$RUNNER_TEMP/gui-kernel/kernel.config" || {
+              echo "::error::Kernel config does not have required GUI support: $symbol"
+              exit 1
+            }
+          done
+
+      - name: Build GUI initramfs from Core 2 binary packages
+        shell: bash
+        env:
+          RUNTIME_PROFILE: gui-initram
+          BUILD_GUI_INITRAMFS: "true"
+          EARLY_MICROCODE_CPIO: ${{ runner.temp }}/early-microcode.cpio
+          KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-39509781896
+        run: |
+          set -Eeuo pipefail
+          sudo --preserve-env=RUNTIME_PROFILE,BUILD_GUI_INITRAMFS,EARLY_MICROCODE_CPIO,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,BINPKG_RUN_IDS,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
+            bash scripts/build-runtime-squashfs.sh
+
+      - name: Add GRUB entry and finalize release checksums
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cp grub2/d630-gui.cfg output/d630-gui.cfg
+          {
+            echo "D630 GUI initramfs"
+            echo "Kernel: Linux 6.18.56-d630-gentoo for Intel Core 2"
+            echo "Desktop: Gentoo Xorg, Mesa Crocus, xinit, xterm, and Openbox"
+            echo "Package source: Core 2 binpkgs release run ${BINPKG_RUN_IDS}"
+            echo "Source fallback enabled: ${SOURCE_FALLBACK}"
+            echo "First boot: create a local user, log in on tty1, then run startx to start Openbox"
+            echo "Xorg uses its setuid-root server on the local console because this binpkg release has no elogind"
+            echo "Root filesystem: RAM-only; changes disappear at reboot"
+            echo "Kernel config requires built-in DRM/i915, VT, framebuffer, and Zstandard initramfs support"
+          } > output/BUILD-MANIFEST.txt
+          (
+            cd output
+            sha256sum gui-initram kernel d630-gui.cfg BUILD-MANIFEST.txt \
+              GUI-INITRAMFS-MANIFEST.txt RUNTIME-MANIFEST.txt PACKAGES.txt \
+              INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
+      - name: QEMU boot test the GUI initramfs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +e
+          timeout --signal=TERM 180s qemu-system-x86_64 \
+            -machine pc -accel tcg -cpu core2duo -m 2048 -smp 2 \
+            -kernel output/kernel -initrd output/gui-initram \
+            -append 'console=ttyS0,115200n8 loglevel=4' \
+            -nographic -monitor none -no-reboot > output/gui-qemu-boot.log 2>&1
+          status=$?
+          set -e
+          if [[ "$status" -ne 124 && "$status" -ne 137 ]]; then
+            cat output/gui-qemu-boot.log >&2
+            echo "QEMU exited before the expected first-boot prompt (status $status)." >&2
+            exit 1
+          fi
+          grep -Fq 'Create a local username:' output/gui-qemu-boot.log || {
+            cat output/gui-qemu-boot.log >&2
+            echo "GUI initramfs did not reach the first-boot user prompt." >&2
+            exit 1
+          }
+          echo "QEMU boot reached the Gentoo first-boot user prompt." | tee output/QEMU-BOOT-TEST.txt
+          (cd output && sha256sum gui-initram kernel d630-gui.cfg BUILD-MANIFEST.txt \
+            GUI-INITRAMFS-MANIFEST.txt RUNTIME-MANIFEST.txt PACKAGES.txt \
+            INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt QEMU-BOOT-TEST.txt > SHA256SUMS \
+            && sha256sum --check SHA256SUMS)
+
+      - name: Publish GUI initramfs release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ github.token }}
+          tag_name: d630-gui-initram-${{ github.run_id }}
+          name: "D630 GUI initramfs / run ${{ github.run_number }}"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          draft: false
+          generate_release_notes: false
+          body_path: output/BUILD-MANIFEST.txt
+          files: |
+            output/gui-initram
+            output/kernel
+            output/d630-gui.cfg
+            output/BUILD-MANIFEST.txt
+            output/GUI-INITRAMFS-MANIFEST.txt
+            output/RUNTIME-MANIFEST.txt
+            output/PACKAGES.txt
+            output/INSTALLED-PACKAGES.txt
+            output/EMERGE-INFO.txt
+            output/KERNEL-MODULES.txt
+            output/SHA256SUMS
+            output/GUI-INITRAMFS-INFO.txt
+            output/GUI-INITRAMFS-FILES.txt
+            output/QEMU-BOOT-TEST.txt
+            output/gui-qemu-boot.log
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d630-gui-initramfs-run-${{ github.run_number }}
+          path: |
+            output/
+            ${{ runner.temp }}/d630-runtime-work/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
