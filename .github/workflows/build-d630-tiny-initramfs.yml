@@ -354,7 +354,7 @@ jobs:
             eof { puts stderr "QEMU exited before displaying the MOTD"; exit 1 }
           }
           expect {
-            -re {gmini@d630-tiny:} {}
+            -re {gmini@d630-tiny.*:} {}
             timeout { puts stderr "Setup image did not log in as gmini"; exit 1 }
             eof { puts stderr "QEMU exited before the gmini prompt"; exit 1 }
           }
@@ -363,10 +363,10 @@ jobs:
             -re {D630_TINY_SETUP_OK} {}
             timeout { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
             eof { puts stderr "QEMU exited during setup-user checks"; exit 1 }
-            -re {gmini@d630-tiny:} { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
+            -re {gmini@d630-tiny.*:} { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
           }
           expect {
-            -re {gmini@d630-tiny:} {}
+            -re {gmini@d630-tiny.*:} {}
             timeout { puts stderr "Setup shell prompt not returned"; exit 1 }
           }
           send -- {interface=; for path in /sys/class/net/*; do candidate=${path##*/}; case "$candidate" in lo) continue;; esac; [ -e "$path/device" ] || continue; interface=$candidate; break; done; [ -n "$interface" ] && doas udhcpc -q -i "$interface" -s /usr/share/udhcpc/default.script && echo D630_TINY_SETUP_DHCP_OK}
@@ -375,10 +375,10 @@ jobs:
             -re {D630_TINY_SETUP_DHCP_OK} {}
             timeout { puts stderr "Setup image did not receive a DHCP lease"; exit 1 }
             eof { puts stderr "QEMU exited during setup DHCP"; exit 1 }
-            -re {gmini@d630-tiny:} { puts stderr "Setup image did not receive a DHCP lease"; exit 1 }
+            -re {gmini@d630-tiny.*:} { puts stderr "Setup image did not receive a DHCP lease"; exit 1 }
           }
           expect {
-            -re {gmini@d630-tiny:} {}
+            -re {gmini@d630-tiny.*:} {}
             timeout { puts stderr "Setup shell prompt not returned after DHCP"; exit 1 }
           }
           send -- "curl --fail --location --silent --show-error --max-time 30 https://example.com/ -o /tmp/example.html && grep -q 'Example Domain' /tmp/example.html && echo D630_TINY_SETUP_INTERNET'_'OK\r"
