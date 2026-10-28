@@ -2,6 +2,8 @@
 
 D630 Tiny Linux is an experimental, text-mode Linux environment for the Dell Latitude D630. It boots the existing Linux 6.18.56 kernel with one external initramfs and runs entirely in RAM.
 
+**New to the project?** Start with the [First-time User Guide](USER-GUIDE.md). It explains how to try the image in QEMU, use the shell, connect to a network, install Tiny alongside Gentoo, and save changes.
+
 **Status:** the current image has been tested in QEMU. A successful QEMU boot does not guarantee that every function works on physical D630 hardware. The existing `/d630-gentoo/` boot files remain separate and should be kept as a fallback.
 
 ## Quick start
@@ -14,23 +16,38 @@ Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/lat
 | --- | --- |
 | [`kernel`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel) | Existing D630 Linux kernel |
 | [`initramfs`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs) | Combined, RAM-only user environment |
-| [`d630-tiny.cfg`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg) | GRUB menu entry |
+| [`d630-tiny.cfg`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg) | GRUB menu entry for installation |
 | [`SHA256SUMS`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS) | Build checksums |
 
 ### Test in QEMU
 
-On Debian, install the required tools, authenticate the GitHub CLI, then run the repository's QEMU launcher:
+On Debian or Ubuntu, install the tools and clone the repository:
 
 ```bash
 sudo apt update
-sudo apt install git gh qemu-system-x86
-gh auth login
+sudo apt install curl git qemu-system-x86
 git clone https://github.com/AmrUser-48/d630-gentoo.git
 cd d630-gentoo
-./tinyos/run-qemu.sh
 ```
 
-The launcher downloads the latest `kernel` and `initramfs`, verifies their SHA-256 checksums, and boots them with an emulated USB Ethernet adapter.
+Download the public release assets. No GitHub login is required:
+
+```bash
+release_dir="$HOME/d630-tiny-release"
+mkdir -p "$release_dir"
+for asset in kernel initramfs SHA256SUMS; do
+  curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/$asset" \
+    -o "$release_dir/$asset"
+done
+```
+
+Start the virtual machine:
+
+```bash
+./tinyos/run-qemu.sh --assets-dir "$HOME/d630-tiny-release"
+```
+
+The launcher verifies the downloaded kernel and initramfs against their SHA-256 checksums, then boots them with an emulated USB Ethernet adapter. To close QEMU, press **Ctrl-A**, release the keys, then press **X**.
 
 ### Install alongside the existing Gentoo system
 
@@ -39,6 +56,8 @@ The launcher downloads the latest `kernel` and `initramfs`, verifies their SHA-2
 3. Add the contents of `d630-tiny.cfg` to `/etc/grub.d/40_custom`.
 4. Regenerate the GRUB configuration using the command appropriate for the host system (for example, `sudo update-grub` on Debian).
 5. Select **D630 Tiny Linux** from the GRUB menu. Keep the existing Gentoo entry as your fallback.
+
+For the full installation steps, networking commands, chroot instructions, and guidance on preserving changes, see the [First-time User Guide](USER-GUIDE.md).
 
 ## What is included
 
@@ -86,7 +105,7 @@ QEMU provides an emulated USB Ethernet adapter; it does not emulate the D630's W
 for p in /sys/class/net/*; do
   [ -e "$p/device" ] && echo "${p##*/}"
 done
-udhcpc -q -i INTERFACE -s /usr/share/udhcpc/default.script
+doas udhcpc -q -i INTERFACE -s /usr/share/udhcpc/default.script
 curl -fL https://example.com/ -o /tmp/test.html
 ```
 
@@ -107,6 +126,7 @@ The helper checks for a Gentoo root and Bash, bind-mounts `/dev`, `/proc`, `/sys
 Mount a writable USB drive or other storage partition, create its `d630-tiny/` directory, and write the rebuilt image there:
 
 ```bash
+doas mkdir -p /mnt/usb/d630-tiny
 doas rebuild-initramfs /mnt/usb/d630-tiny/initramfs
 ```
 
