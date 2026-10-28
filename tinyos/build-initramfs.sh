@@ -35,9 +35,11 @@ tar --zstd -xf "$FIRMWARE_ARCHIVE" -C "$FWROOT"
   exit 1
 }
 cp "$BUSYBOX" "$ROOT/bin/busybox"
-"$ROOT/bin/busybox" --list | grep -Fxq sh
+APPLET_LIST="$FWROOT/busybox-applets.txt"
+"$ROOT/bin/busybox" --list > "$APPLET_LIST"
+grep -Fxq sh "$APPLET_LIST"
 for applet in mount mkdir sleep cat uname setsid cttyhack poweroff hostname dmesg grep; do
-  "$ROOT/bin/busybox" --list | grep -Fxq "$applet" || {
+  grep -Fxq "$applet" "$APPLET_LIST" || {
     echo "Required BusyBox applet missing: $applet" >&2
     exit 1
   }
