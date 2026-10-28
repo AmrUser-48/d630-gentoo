@@ -27,7 +27,7 @@ Use the already-mounted, GRUB-readable partition whose root contains the existin
 cd "$(findmnt -rn -o TARGET | while IFS= read -r m; do
     p="${m%/}/d630-gentoo"
     if [ -d "$p" ] && [ "$(findmnt -rn -T "$p" -o TARGET)" = "$m" ]; then
-        printf '%s\\n' "$m"
+        printf '%s\n' "$m"
         break
     fi
 done)" &&
