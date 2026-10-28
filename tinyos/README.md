@@ -37,25 +37,13 @@ The files are now at `/d630-tiny/kernel`, `/d630-tiny/initramfs`, and `/d630-tin
 
 ### Add the GRUB entry
 
-Open the existing custom GRUB file:
+Append the entry to the existing `/grubconfig/40-custom` file. Run this **once only**; do not append a duplicate entry if it is already there.
 
 ```sh
-sudoedit /etc/grub.d/40_custom
-```
-
-Remove any older **D630 Tiny Linux** block previously added from `d630-tiny.cfg`, then add this entry once:
-
-```grub
-menuentry 'D630 Tiny Linux (Gentoo Mini)' {
+echo "menuentry 'D630 Tiny Linux (Gentoo Mini)' {
     search --no-floppy --file --set=root /d630-tiny/tiny.cfg
     configfile /d630-tiny/tiny.cfg
-}
-```
-
-Save the file and update GRUB:
-
-```sh
-sudo update-grub
+}" | sudo tee -a /grubconfig/40-custom
 sudo reboot
 ```
 
