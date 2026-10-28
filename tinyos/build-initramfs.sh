@@ -132,7 +132,7 @@ fi
 sed 's#^\./##' "$OUT/tiny-file-list.raw" > "$OUT/tiny-file-list.txt"
 required_members=(init bin/busybox lib/firmware/iwlwifi-3945-2.ucode)
 if [[ -n "$NETWORK_ROOT" ]]; then
-  required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script usr/bin/curl lib/firmware/regulatory.db)
+  required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
 for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
@@ -141,6 +141,11 @@ for member in "${required_members[@]}"; do
     exit 1
   fi
 done
+if [[ -n "$NETWORK_ROOT" ]] && ! grep -Eq '^usr/(bin|sbin)/curl$' "$OUT/tiny-file-list.txt"; then
+  echo "::error::Archive has no Gentoo curl binary under /usr/bin or /usr/sbin." >&2
+  cat "$OUT/tiny-file-list.txt" >&2
+  exit 1
+fi
 echo "initramfs-build: required archive members verified"
 cat "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" > "$OUT/initramfs"
 test -s "$OUT/initramfs"
