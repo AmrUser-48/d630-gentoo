@@ -42,23 +42,24 @@ Use the mount point shown for `Res_syst`. If it is not mounted, mount that parti
 
 ### 2. Download the kernel and initramfs straight to that partition
 
-These commands put the boot files directly in the final location GRUB will read. Replace `/MOUNT/POINT` first.
+Run this block as your normal user. Replace `/MOUNT/POINT` once with the actual mount point of `Res_syst`. It creates the destination directory, downloads the release files to a temporary directory, verifies the kernel and initramfs, then uses `sudo install` only to copy the verified files into the boot partition.
 
 ```sh
-sudo mkdir -p /MOUNT/POINT/d630-tiny
-sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
-sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS -o /tmp/d630-tiny-SHA256SUMS
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg -o /tmp/d630-tiny.cfg
+mountpoint=/MOUNT/POINT
+tmpdir=$(mktemp -d) && cd "$tmpdir" &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o kernel &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o initramfs &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS -o SHA256SUMS &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg -o d630-tiny.cfg &&
+awk '$2 == "output/kernel" || $2 == "output/initramfs" { sub("output/", "", $2); print }' SHA256SUMS | sha256sum -c - &&
+sudo install -d "$mountpoint/d630-tiny" &&
+sudo install -m 0644 kernel "$mountpoint/d630-tiny/kernel" &&
+sudo install -m 0644 initramfs "$mountpoint/d630-tiny/initramfs" &&
+sudo install -m 0644 d630-tiny.cfg /tmp/d630-tiny.cfg &&
+sudo install -m 0644 SHA256SUMS /tmp/d630-tiny-SHA256SUMS
 ```
 
-The first two files are the actual boot files. Verify them before rebooting; replace `/MOUNT/POINT` with the real mount point in this command too:
-
-```sh
-awk '$2 == "output/kernel" || $2 == "output/initramfs" { sub("output/", "", $2); print }' /tmp/d630-tiny-SHA256SUMS | (cd /MOUNT/POINT/d630-tiny && sha256sum -c -)
-```
-
-Both files should report `OK`. `/tmp/d630-tiny.cfg` is only the GRUB menu-entry text; it is not a kernel or initramfs.
+The downloads and checksum verification run without root privileges. `install` creates `/d630-tiny/` if needed and copies the files with appropriate permissions.
 
 ### 3. Add the GRUB entry and reboot
 
