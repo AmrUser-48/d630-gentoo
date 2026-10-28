@@ -41,7 +41,7 @@ Run these commands as your normal user. They create `/d630-tiny/` and download t
 mkdir -p /MOUNT/POINT/d630-tiny
 curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
 curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg -o /MOUNT/POINT/d630-tiny/tiny.cfg
+curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg -o /MOUNT/POINT/d630-tiny/tiny.cfg
 ```
 
 The resulting files are:
