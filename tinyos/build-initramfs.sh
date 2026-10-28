@@ -132,6 +132,7 @@ if ! zstd -q -T0 -3 -f "$MAIN_CPIO" -o "$OUT/tiny-main.cpio.zst"; then
   echo "::error::Zstandard compression failed." >&2
   exit 1
 fi
+chmod 0644 "$OUT/tiny-main.cpio.zst"
 zstd -q -t "$OUT/tiny-main.cpio.zst"
 echo "initramfs-build: Zstandard archive verified ($(stat -c '%s' "$OUT/tiny-main.cpio.zst") bytes)"
 if ! cpio -it < "$MAIN_CPIO" > "$OUT/tiny-file-list.raw" 2> "$OUT/tiny-cpio-list.log"; then
