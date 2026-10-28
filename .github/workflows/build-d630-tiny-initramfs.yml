@@ -255,6 +255,7 @@ jobs:
             -re {\r\nD630_TINY_NETWORK_TOOLS_OK\r\n} {}
             timeout { puts stderr "Network tools are missing or failed to load"; exit 1 }
             eof { puts stderr "QEMU exited while checking network tools"; exit 1 }
+            -re {d630-tiny# } { puts stderr "Network tools are missing or failed to run"; exit 1 }
           }
           expect {
             -re {d630-tiny# } {}

@@ -53,7 +53,8 @@ for app in iw wpa_supplicant wpa_passphrase wpa_cli curl; do
       exit 1
     }
     (cd "$GENTOO_ROOT" && cp -L --parents "${library#/}" "$ROOT")
-  done < <(awk '/=> \// {print $3} /^\// {print $1}' <<< "$dependencies" | sort -u)
+  done < <(awk '/=>/ && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}' \
+    <<< "$dependencies" | sort -u)
 done
 
 ca_bundle="$GENTOO_ROOT/etc/ssl/certs/ca-certificates.crt"
@@ -93,7 +94,8 @@ for module in libnss_dns.so.2 libnss_files.so.2; do
       exit 1
     }
     (cd "$GENTOO_ROOT" && cp -L --parents "${dependency#/}" "$ROOT")
-  done < <(awk '/=> \// {print $3} /^\// {print $1}' <<< "$dependencies" | sort -u)
+  done < <(awk '/=>/ && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}' \
+    <<< "$dependencies" | sort -u)
 done
 
 regdb_found=false
