@@ -48,10 +48,17 @@ These commands put the boot files directly in the final location GRUB will read.
 sudo mkdir -p /MOUNT/POINT/d630-tiny
 sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
 sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS -o /tmp/d630-tiny-SHA256SUMS
 curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg -o /tmp/d630-tiny.cfg
 ```
 
-The first two files above are the actual boot files. `/tmp/d630-tiny.cfg` is only a temporary copy of the GRUB menu-entry text; it is not a kernel or initramfs.
+The first two files are the actual boot files. Verify them before rebooting; replace `/MOUNT/POINT` with the real mount point in this command too:
+
+```sh
+awk '$2 == "output/kernel" || $2 == "output/initramfs" { sub("output/", "", $2); print }' /tmp/d630-tiny-SHA256SUMS | (cd /MOUNT/POINT/d630-tiny && sha256sum -c -)
+```
+
+Both files should report `OK`. `/tmp/d630-tiny.cfg` is only the GRUB menu-entry text; it is not a kernel or initramfs.
 
 ### 3. Add the GRUB entry and reboot
 
