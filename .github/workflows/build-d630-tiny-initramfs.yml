@@ -129,15 +129,15 @@ jobs:
             timeout { puts stderr "D630 Tiny shell prompt not found"; exit 1 }
             eof { puts stderr "QEMU exited before shell prompt"; exit 1 }
           }
-          send -- "echo D630_TINY_QEMU_OK\r"
+          send -- "echo D630_TINY_QEMU'_'OK\r"
           expect {
-            -re {\r\nD630_TINY_QEMU_OK\r\n} {}
+            -re {D630_TINY_QEMU_OK} {}
             timeout { puts stderr "The interactive shell did not execute the test command"; exit 1 }
             eof { puts stderr "QEMU exited before the shell test"; exit 1 }
           }
-          send -- "echo D630_TINY_QEMU_DONE\r"
+          send -- "echo D630_TINY_QEMU'_'DONE\r"
           expect {
-            -re {\r\nD630_TINY_QEMU_DONE\r\n} {}
+            -re {D630_TINY_QEMU_DONE} {}
             timeout { puts stderr "Shell completion marker not returned"; exit 1 }
           }
           send -- "poweroff -f\r"
