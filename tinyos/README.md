@@ -10,16 +10,81 @@ This is a **standalone shell environment, not a complete Gentoo installation**. 
 
 | What you want to do | Go to |
 | --- | --- |
-| Download and try Tiny without changing your computer | [Try it in QEMU](#1-try-it-in-qemu) |
-| Learn the shell and root access | [Use the shell](#2-use-the-shell-and-administrative-commands) |
-| Connect to Wi-Fi or QEMU networking | [Connect to the internet](#3-connect-to-the-internet) |
-| Add a standalone program | [Run a standalone program or script](#4-run-a-standalone-program-or-script) |
-| Understand Gentoo packages and the separate desktop build | [Add Gentoo packages or a desktop](#5-add-gentoo-packages-or-a-desktop) |
-| Enter a Gentoo installation already on disk | [Use an installed Gentoo system](#6-use-an-installed-gentoo-system) |
-| Boot Tiny on the physical D630 | [Install Tiny on the D630](#7-install-tiny-on-the-d630) |
+| **Boot Mini on the physical laptop** | [Install and boot on the D630](#1-boot-tiny-on-the-physical-d630) |
+| Try Tiny safely in a virtual machine | [Run it in QEMU](#2-try-it-in-qemu) |
+| Learn the shell and root access | [Use the shell](#3-use-the-shell-and-administrative-commands) |
+| Connect to Wi-Fi or QEMU networking | [Connect to the internet](#4-connect-to-the-internet) |
+| Add a standalone program | [Run a standalone program or script](#5-run-a-standalone-program-or-script) |
+| Understand Gentoo packages and the separate desktop build | [Add Gentoo packages or a desktop](#6-add-gentoo-packages-or-a-desktop) |
+| Enter a Gentoo installation already on disk | [Use an installed Gentoo system](#7-use-an-installed-gentoo-system) |
 | Keep changes after reboot | [Save changes](#8-save-changes) |
 
-## 1. Try it in QEMU
+## 1. Boot Tiny on the physical D630
+
+These are the steps to boot the **actual laptop**, not QEMU. The release already contains the built kernel and initramfs; you do not need to compile Gentoo or start a build workflow. The existing `/d630-gentoo/` files will remain untouched.
+
+### Download the release
+
+Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the files from your laptop terminal. On Debian, install `curl` if needed:
+
+```sh
+sudo apt update
+sudo apt install -y curl
+mkdir -p "$HOME/Downloads/d630-tiny-release/output"
+
+for asset in kernel initramfs d630-tiny.cfg; do
+  curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/$asset" \
+    -o "$HOME/Downloads/d630-tiny-release/output/$asset"
+done
+
+curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS" \
+  -o "$HOME/Downloads/d630-tiny-release/SHA256SUMS"
+
+cd "$HOME/Downloads/d630-tiny-release"
+awk '$2 == "output/kernel" || $2 == "output/initramfs" {print}' SHA256SUMS | sha256sum -c -
+```
+
+The last command should report `OK` for both `output/kernel` and `output/initramfs`.
+
+### Copy the files beside your existing D630 boot files
+
+The GRUB entry looks for `/d630-tiny/kernel` and `/d630-tiny/initramfs` at the **root of the same GRUB-readable partition that currently contains `/d630-gentoo/`**. This is often the NTFS partition labelled `Res_syst`; do not assume the Linux `/boot` directory is that partition.
+
+Find the partition and its Linux mount point:
+
+```sh
+lsblk -f
+```
+
+If it is not mounted, mount it first. In the commands below, replace `/MOUNT/POINT` with the actual mount point of the partition that contains the existing `d630-gentoo` directory. Then run:
+
+```sh
+sudo mkdir -p /MOUNT/POINT/d630-tiny
+sudo install -m 0644 "$HOME/Downloads/d630-tiny-release/output/kernel" /MOUNT/POINT/d630-tiny/kernel
+sudo install -m 0644 "$HOME/Downloads/d630-tiny-release/output/initramfs" /MOUNT/POINT/d630-tiny/initramfs
+```
+
+This creates a separate `d630-tiny/` directory. It does not replace the old kernel or initramfs.
+
+### Add the GRUB menu entry and reboot
+
+Append the downloaded menu entry to GRUB's custom entries **once**:
+
+```sh
+sudo tee -a /etc/grub.d/40_custom < "$HOME/Downloads/d630-tiny-release/output/d630-tiny.cfg" >/dev/null
+sudo update-grub
+sudo reboot
+```
+
+On the GRUB screen, select **D630 Tiny Linux (Gentoo Mini)**. The system starts directly in its text shell as `gmini`; no password is required. To connect over the laptop's Wi-Fi, run:
+
+```sh
+doas wifi-connect
+```
+
+**Important:** this is the small, text-mode Mini OS, not a graphical desktop. Keep your existing Gentoo GRUB entry as a fallback. If you already added this menu entry before, do not append it a second time.
+
+## 2. Try it in QEMU
 
 QEMU runs Tiny in a virtual machine, so you can try the shell without changing your computer's boot configuration. The commands below run in the **host or Codespace terminal**, not inside Tiny.
 
@@ -207,36 +272,6 @@ doas gentoo-chroot /mnt/gentoo
 You are now working inside the Gentoo installation on disk. Commands and package changes affect that installation, not the running Tiny image. Type `exit` to leave the chroot.
 
 The helper checks that the target looks like a Gentoo root, bind-mounts `/dev`, `/proc`, `/sys`, and `/run` for the session, and unmounts those bind mounts when the shell exits. It does not create a Gentoo installation.
-
-## 7. Install Tiny on the D630
-
-This procedure adds a separate GRUB entry and keeps the existing Gentoo boot files intact.
-
-### Download the files
-
-On a computer with internet access, download `kernel`, `initramfs`, and `d630-tiny.cfg` from the [latest public release](https://github.com/AmrUser-48/d630-gentoo/releases/latest). Put them in a directory named `d630-tiny-release` on a USB drive.
-
-### Copy the files to the boot partition
-
-Boot the installed Gentoo system and make sure its GRUB-readable boot partition is mounted at `/boot`. Mount the USB drive; the commands below assume it is mounted at `/mnt/usb`.
-
-Run these commands on the installed Gentoo system:
-
-```sh
-doas mkdir -p /boot/d630-tiny
-doas cp /mnt/usb/d630-tiny-release/kernel /boot/d630-tiny/kernel
-doas cp /mnt/usb/d630-tiny-release/initramfs /boot/d630-tiny/initramfs
-```
-
-Open `/etc/grub.d/40_custom` in a text editor and append the contents of `/mnt/usb/d630-tiny-release/d630-tiny.cfg`. Then regenerate the GRUB menu:
-
-```sh
-doas grub-mkconfig -o /boot/grub/grub.cfg
-```
-
-The GRUB configuration path varies by system. Use the path configured by your installation.
-
-Reboot and choose **D630 Tiny Linux** from GRUB. Keep the original Gentoo boot entry as your fallback. Do not overwrite your existing Gentoo kernel or initramfs.
 
 ## 8. Save changes
 
