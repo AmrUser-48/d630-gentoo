@@ -55,8 +55,8 @@ awk '$2 == "output/kernel" || $2 == "output/initramfs" { sub("output/", "", $2);
 sudo install -d "$mountpoint/d630-tiny" &&
 sudo install -m 0644 kernel "$mountpoint/d630-tiny/kernel" &&
 sudo install -m 0644 initramfs "$mountpoint/d630-tiny/initramfs" &&
-sudo install -m 0644 d630-tiny.cfg /tmp/d630-tiny.cfg &&
-sudo install -m 0644 SHA256SUMS /tmp/d630-tiny-SHA256SUMS
+cp d630-tiny.cfg /tmp/d630-tiny.cfg &&
+cp SHA256SUMS /tmp/d630-tiny-SHA256SUMS
 ```
 
 The downloads and checksum verification run without root privileges. `install` creates `/d630-tiny/` if needed and copies the files with appropriate permissions.
