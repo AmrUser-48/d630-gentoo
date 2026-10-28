@@ -1,0 +1,16 @@
+app-admin/sudo
+app-shells/bash
+media-fonts/terminus-font
+media-libs/mesa
+net-misc/dhcpcd
+sys-apps/coreutils
+sys-apps/kmod
+sys-apps/openrc
+sys-apps/portage
+sys-apps/shadow
+sys-apps/util-linux
+x11-apps/xinit
+x11-base/xorg-drivers
+x11-base/xorg-server
+x11-terms/xterm
+x11-wm/openbox

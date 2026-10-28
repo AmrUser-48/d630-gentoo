@@ -1,0 +1,2 @@
+Compiler flags: -O2 -pipe -march=core2 -mtune=core2
+MAKEOPTS: -j8
