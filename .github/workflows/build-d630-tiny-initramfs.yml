@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "tinyos/**"
-      - "grub2/d630-tiny.cfg"
+      - "grub2/d630-tiny*.cfg"
       - ".github/workflows/build-d630-tiny-initramfs.yml"
   workflow_dispatch:
 
@@ -21,10 +21,12 @@ jobs:
   build:
     name: Reuse existing kernel, build initramfs, and QEMU-boot
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 120
     env:
       KERNEL_TAG: d630-kernel-6.18.56-run-39509781896
       KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-39509781896
+      BINPKG_TAG: binpkgs-39507549274
+      BINPKG_SHARD_SHA256: f0a4bbb964230b2db9c0a2b6e6478dbd57c2ff24f22f29788e1045b1bdea593e
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out tiny OS sources
@@ -35,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends busybox-static cpio zstd qemu-system-x86 expect curl ca-certificates file
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends busybox-static cpio zstd xz-utils qemu-system-x86 expect curl ca-certificates file
           command -v busybox
           command -v zstd
           command -v qemu-system-x86_64
@@ -61,7 +63,7 @@ jobs:
           fetch_verified d630-firmware.tar.zst f787539a7362c0432a116f87e4508089405561e8d2f1f47a245846a7c3f262e5 "$RUNNER_TEMP/d630-firmware.tar.zst"
 
           config=output/d630-6.18.56.config
-          for symbol in CONFIG_BLK_DEV_INITRD CONFIG_RD_ZSTD CONFIG_DEVTMPFS CONFIG_PROC_FS CONFIG_SYSFS; do
+          for symbol in CONFIG_BLK_DEV_INITRD CONFIG_RD_ZSTD CONFIG_DEVTMPFS CONFIG_PROC_FS CONFIG_SYSFS CONFIG_USB_USBNET CONFIG_USB_NET_CDCETHER; do
             grep -Fxq "$symbol=y" "$config" || {
               echo "::error::Existing kernel lacks required built-in option $symbol"
               exit 1
@@ -72,28 +74,111 @@ jobs:
           file output/kernel
           sha256sum output/kernel output/d630-6.18.56.config
 
-      - name: Build the standalone Zstandard initramfs
+      - name: Install networking packages in a Gentoo build root
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/d630-gentoo-network"
+          root="$work/root"
+          mkdir -p "$work/binpkgs"
+          cleanup() {
+            for mp in run sys proc dev; do
+              sudo mountpoint -q "$root/$mp" 2>/dev/null && sudo umount -R "$root/$mp" 2>/dev/null || true
+            done
+          }
+          trap cleanup EXIT
+
+          base=https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc
+          curl -fsSL --retry 4 --retry-all-errors "$base/latest-stage3-amd64-openrc.txt" -o "$work/stage3-latest.txt"
+          line="$(grep -E '^stage3-amd64-openrc-[0-9]{8}T[0-9]{6}Z\.tar\.xz [0-9]+$' "$work/stage3-latest.txt" | head -n 1)"
+          [[ -n "$line" ]] || { echo "Could not find current Gentoo OpenRC Stage 3." >&2; exit 1; }
+          archive="$(awk '{print $1}' <<< "$line")"
+          expected_size="$(awk '{print $2}' <<< "$line")"
+          curl -fL --retry 4 --retry-all-errors "$base/$archive" -o "$work/$archive"
+          [[ "$(stat -c '%s' "$work/$archive")" == "$expected_size" ]] || {
+            echo "Gentoo Stage 3 size mismatch." >&2
+            exit 1
+          }
+          curl -fsSL --retry 4 --retry-all-errors "$base/$archive.sha256" -o "$work/stage3.sha256"
+          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/stage3.sha256" | head -n 1)"
+          [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || { echo "Stage 3 checksum missing." >&2; exit 1; }
+          printf '%s  %s\n' "$expected_sha" "$work/$archive" | sha256sum --check -
+          sudo mkdir -p "$root"
+          sudo tar -xpf "$work/$archive" -C "$root" --numeric-owner --xattrs --xattrs-include='*' --same-permissions
+
+          sudo mkdir -p "$root/etc/portage/binrepos.conf" "$root/etc/portage/repos.conf" "$root/var/cache/binpkgs"
+          sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
+          sudo install -m 0644 config/portage/binrepos.conf/gentoobinhost.conf "$root/etc/portage/binrepos.conf/gentoobinhost.conf"
+          if [[ ! -f "$root/etc/portage/repos.conf/gentoo.conf" ]]; then
+            sudo tee "$root/etc/portage/repos.conf/gentoo.conf" >/dev/null <<'EOF'
+          [gentoo]
+          location = /var/db/repos/gentoo
+          sync-type = rsync
+          sync-uri = rsync://rsync.gentoo.org/gentoo-portage
+          auto-sync = yes
+          EOF
+          fi
+          sudo rm -f "$root/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$root/etc/resolv.conf"
+
+          curl -fL --retry 4 --retry-all-errors \
+            "https://github.com/AmrUser-48/d630-gentoo/releases/download/$BINPKG_TAG/binpkgs-part-001.tar.zst" \
+            -o "$work/binpkgs/binpkgs-part-001.tar.zst"
+          printf '%s  %s\n' "$BINPKG_SHARD_SHA256" "$work/binpkgs/binpkgs-part-001.tar.zst" |
+            sha256sum --check -
+          sudo tar --use-compress-program=unzstd -xf "$work/binpkgs/binpkgs-part-001.tar.zst" -C "$root/var/cache/binpkgs"
+
+          for mp in dev proc sys run; do
+            sudo mkdir -p "$root/$mp"
+            sudo mount --rbind "/$mp" "$root/$mp"
+            sudo mount --make-rslave "$root/$mp"
+          done
+          if ! sudo chroot "$root" /bin/bash -lc 'emerge-webrsync --quiet'; then
+            sudo chroot "$root" /bin/bash -lc 'emerge --ignore-default-opts --sync --quiet'
+          fi
+          sudo chroot "$root" /bin/bash -lc 'getuto'
+          sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix'
+          sudo chroot "$root" /bin/bash -lc \
+            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-misc/ca-certificates net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb'
+          echo "Installed Gentoo networking packages into the staging root using existing binpkgs where compatible." \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build minimal and internet-enabled initramfs variants
         shell: bash
         run: |
           set -euo pipefail
           bash tinyos/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output" "$GITHUB_WORKSPACE/tinyos/init"
 
+          network_root="$RUNNER_TEMP/d630-network-tools"
+          sudo bash tinyos/build-network-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$GITHUB_WORKSPACE/tinyos/wifi-connect" "$GITHUB_WORKSPACE/tinyos/udhcpc-default.script"
+          mkdir -p output/internet
+          bash tinyos/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output/internet" "$GITHUB_WORKSPACE/tinyos/init" "$network_root"
+          cp output/internet/initramfs output/initramfs-internet
+          cp output/internet/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst
+
           cp grub2/d630-tiny.cfg output/d630-tiny.cfg
+          cp grub2/d630-tiny-internet.cfg output/d630-tiny-internet.cfg
           cp tinyos/README.md output/README-D630-Tiny.md
           cp tinyos/init output/d630-tiny-init
           cp tinyos/build-initramfs.sh output/build-initramfs.sh
+          cp tinyos/build-network-tools.sh output/build-network-tools.sh
+          cp tinyos/wifi-connect output/wifi-connect
+          cp tinyos/udhcpc-default.script output/udhcpc-default.script
+          cp output/internet/INITRAMFS-MANIFEST.txt output/INITRAMFS-INTERNET-MANIFEST.txt
           cat > output/BUILD-MANIFEST.txt <<EOF
           Project: AmrUser-48/d630-gentoo / D630 Tiny Linux
           Kernel release asset tag: $KERNEL_TAG
           Kernel build: existing Linux 6.18.56-d630-gentoo (not rebuilt)
-          Root userspace: static BusyBox + custom /init
-          Initramfs: early Intel microcode CPIO + Zstandard level-3 newc CPIO
+          Root userspace: static BusyBox + custom /init; second variant adds Wi-Fi and download tools
+          Initramfs variants: minimal initramfs and internet-enabled initramfs-internet
+          Network userspace: Gentoo iw, WPA supplicant, BusyBox udhcpc, curl, wireless-regdb, CA certificates
+          Gentoo network package seed: $BINPKG_TAG; Portage source fallback enabled for missing/incompatible binaries
           CPU target: Intel Core 2 Duo / Dell Latitude D630
           Root filesystem: initramfs-only RAM root; no SquashFS or Gentoo init required
-          Validation: archive checks, BusyBox symlink checks, and QEMU interactive-shell test
+          Validation: archive checks, BusyBox symlink checks, QEMU shell tests, and DHCP/HTTPS test
           Workflow run: $GITHUB_RUN_ID
           EOF
-          sha256sum output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
+          sha256sum output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/d630-tiny-internet.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
           {
             echo "## D630 Tiny Linux"
             echo
@@ -101,7 +186,7 @@ jobs:
             echo
             echo "| Artifact | Size |"
             echo "|---|---:|"
-            for f in output/kernel output/initramfs output/tiny-main.cpio.zst; do
+            for f in output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst; do
               printf '| %s | %s bytes |\n' "$(basename "$f")" "$(stat -c '%s' "$f")"
             done
           } >> "$GITHUB_STEP_SUMMARY"
@@ -147,6 +232,56 @@ jobs:
           grep -Fq 'D630_TINY_QEMU_DONE' "$QEMU_LOG"
           echo "QEMU boot and interactive shell test passed." | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: QEMU test DHCP and HTTPS downloads with the internet-enabled initramfs
+        shell: bash
+        env:
+          KERNEL: ${{ github.workspace }}/output/kernel
+          INITRD: ${{ github.workspace }}/output/initramfs-internet
+          QEMU_BIN: /usr/bin/qemu-system-x86_64
+          QEMU_LOG: ${{ github.workspace }}/output/qemu-internet-boot.log
+        run: |
+          set -euo pipefail
+          expect <<'EXPECT'
+          set timeout 90
+          log_file -noappend $env(QEMU_LOG)
+          spawn $env(QEMU_BIN) -machine pc -accel tcg -cpu core2duo -m 512 -smp 2 -usb -device usb-net,netdev=net0 -netdev user,id=net0 -kernel $env(KERNEL) -initrd $env(INITRD) -append "console=ttyS0,115200n8 loglevel=4" -nographic -monitor none -no-reboot
+          expect {
+            -re {d630-tiny# } {}
+            timeout { puts stderr "Internet-enabled D630 Tiny shell prompt not found"; exit 1 }
+            eof { puts stderr "QEMU exited before reaching the internet-enabled shell"; exit 1 }
+          }
+          send -- "for app in iw wpa_supplicant wpa_passphrase wpa_cli curl wifi-connect; do command -v \"\$app\" >/dev/null || exit 1; done && iw --version >/dev/null && wpa_supplicant -v >/dev/null && wpa_passphrase test-network test-passphrase | grep -q 'psk=' && wpa_cli -v >/dev/null && curl --version >/dev/null && echo D630_TINY_NETWORK_TOOLS'_'OK\r"
+          expect {
+            -re {\r\nD630_TINY_NETWORK_TOOLS_OK\r\n} {}
+            timeout { puts stderr "Network tools are missing or failed to load"; exit 1 }
+            eof { puts stderr "QEMU exited while checking network tools"; exit 1 }
+          }
+          expect {
+            -re {d630-tiny# } {}
+            timeout { puts stderr "Shell prompt not returned after network tool checks"; exit 1 }
+          }
+          send -- "udhcpc -q -i usb0 -s /usr/share/udhcpc/default.script\r"
+          expect {
+            -re {lease of .* obtained} {}
+            timeout { puts stderr "QEMU USB network adapter did not receive a DHCP lease"; exit 1 }
+            eof { puts stderr "QEMU exited during DHCP setup"; exit 1 }
+          }
+          expect {
+            -re {d630-tiny# } {}
+            timeout { puts stderr "Shell prompt not returned after DHCP"; exit 1 }
+          }
+          send -- "curl --fail --location --silent --show-error --max-time 30 https://example.com/ -o /tmp/example.html && grep -q 'Example Domain' /tmp/example.html && echo D630_TINY_INTERNET'_'OK\r"
+          expect {
+            -re {\r\nD630_TINY_INTERNET_OK\r\n} {}
+            timeout { puts stderr "HTTPS download through QEMU user networking failed"; exit 1 }
+            eof { puts stderr "QEMU exited during HTTPS download"; exit 1 }
+          }
+          send -- "poweroff -f\r"
+          expect eof
+          EXPECT
+          grep -Fq 'D630_TINY_INTERNET_OK' "$QEMU_LOG"
+          echo "QEMU DHCP and HTTPS download test passed." | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Publish verified standalone bundle
         shell: bash
         run: |
@@ -155,11 +290,11 @@ jobs:
           cat > output/RELEASE-NOTES.md <<'NOTES'
           D630 Tiny Linux is a standalone, RAM-only BusyBox shell booting directly from the existing D630 kernel plus external initramfs.
 
-          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. The initramfs main archive uses Zstandard level 3, with the original early Intel microcode CPIO prepended. Intel PRO/Wireless 3945ABG firmware and license notices are included.
+          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. The minimal initramfs and separate initramfs-internet variant use Zstandard level 3, with the original early Intel microcode CPIO prepended. The internet variant's networking applications are Gentoo packages installed with Portage, reusing the existing Gentoo binpkgs where compatible; it includes Wi-Fi association, DHCP, HTTPS downloads, and CA certificates.
 
-          The workflow verified the pinned kernel/firmware hashes and QEMU-booted this exact kernel + exact generated initramfs to an interactive shell. This is not yet the graphical desktop and is not a claim of a physical D630 hardware boot.
+          The workflow verified the pinned kernel/firmware hashes and QEMU-tested the exact kernel and both initramfs variants. The internet variant obtained a DHCP lease and downloaded an HTTPS page through QEMU user networking. This is not yet the graphical desktop and is not a claim of a physical D630 Wi-Fi boot.
 
-          Install the assets named kernel and initramfs into a new /d630-tiny/ directory. Use d630-tiny.cfg as the GRUB entry. Do not overwrite /d630-gentoo/.
+          Install kernel and initramfs-internet into a new /d630-tiny/ directory. Use d630-tiny-internet.cfg as the GRUB entry. Do not overwrite /d630-gentoo/.
           NOTES
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux standalone shell / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/INITRAMFS-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux shell + internet tools / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/d630-tiny-internet.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/build-network-tools.sh output/wifi-connect output/udhcpc-default.script output/INITRAMFS-MANIFEST.txt output/INITRAMFS-INTERNET-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log output/qemu-internet-boot.log
           echo "Published $tag: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" | tee -a "$GITHUB_STEP_SUMMARY"

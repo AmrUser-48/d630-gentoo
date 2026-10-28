@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run wifi-connect as root." >&2
+    exit 1
+fi
+
+interface=${1:-}
+if [ -z "$interface" ]; then
+    interface=$(iw dev | sed -n 's/^[[:space:]]*Interface //p' | head -n 1)
+fi
+if [ -z "$interface" ]; then
+    echo "No Wi-Fi interface found. Check the physical wireless switch and kernel log." >&2
+    exit 1
+fi
+
+printf 'Wi-Fi network name (SSID): '
+IFS= read -r ssid
+if [ -z "$ssid" ]; then
+    echo "SSID cannot be empty." >&2
+    exit 1
+fi
+
+printf 'Wi-Fi WPA/WPA2 password: '
+IFS= read -r -s password
+printf '\n'
+if [ -z "$password" ]; then
+    echo "Password cannot be empty." >&2
+    exit 1
+fi
+
+if [ -d /sys/class/rfkill ]; then
+    for state in /sys/class/rfkill/rfkill*/soft; do
+        [ -w "$state" ] && printf '0\n' > "$state"
+    done
+fi
+
+ip link set "$interface" up
+umask 077
+mkdir -p /run/wpa_supplicant
+if ! printf '%s\n' "$password" | wpa_passphrase "$ssid" > /run/wpa_supplicant.conf; then
+    unset password
+    echo "Could not create Wi-Fi configuration." >&2
+    exit 1
+fi
+sed '/^[[:space:]]*#psk=/d' /run/wpa_supplicant.conf > /etc/wpa_supplicant.conf
+rm -f /run/wpa_supplicant.conf
+unset password
+
+wpa_supplicant -B -P /run/wpa_supplicant.pid -i "$interface" \
+    -c /etc/wpa_supplicant.conf -C /run/wpa_supplicant
+udhcpc -q -i "$interface" -s /usr/share/udhcpc/default.script
+echo "Connected on $interface. Try: curl -fL URL -o /tmp/download"

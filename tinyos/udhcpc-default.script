@@ -1,0 +1,22 @@
+#!/bin/sh
+
+case "$1" in
+    deconfig)
+        ifconfig "$interface" 0.0.0.0
+        ;;
+    bound|renew)
+        if [ -n "${broadcast:-}" ]; then
+            ifconfig "$interface" "$ip" netmask "$subnet" broadcast "$broadcast"
+        else
+            ifconfig "$interface" "$ip" netmask "$subnet"
+        fi
+        route del default >/dev/null 2>&1 || :
+        for gateway in ${router:-}; do
+            route add default gw "$gateway" dev "$interface" && break
+        done
+        : > /etc/resolv.conf
+        for nameserver in ${dns:-}; do
+            printf 'nameserver %s\n' "$nameserver" >> /etc/resolv.conf
+        done
+        ;;
+esac

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 BUSYBOX FIRMWARE_TAR_ZST EARLY_MICROCODE_CPIO OUTPUT_DIR INIT_SCRIPT" >&2
+if [[ $# -lt 5 || $# -gt 6 ]]; then
+  echo "Usage: $0 BUSYBOX FIRMWARE_TAR_ZST EARLY_MICROCODE_CPIO OUTPUT_DIR INIT_SCRIPT [NETWORK_ROOT]" >&2
   exit 2
 fi
 
@@ -10,10 +10,15 @@ FIRMWARE_ARCHIVE=$2
 EARLY_MICROCODE=$3
 OUT=$4
 INIT_SCRIPT=$5
+NETWORK_ROOT=${6:-}
 
 for f in "$BUSYBOX" "$FIRMWARE_ARCHIVE" "$EARLY_MICROCODE" "$INIT_SCRIPT"; do
   [[ -s "$f" ]] || { echo "Missing required input: $f" >&2; exit 1; }
 done
+if [[ -n "$NETWORK_ROOT" && ! -d "$NETWORK_ROOT" ]]; then
+  echo "Network tools root not found: $NETWORK_ROOT" >&2
+  exit 1
+fi
 command -v cpio >/dev/null
 command -v zstd >/dev/null
 command -v tar >/dev/null
@@ -48,6 +53,14 @@ for applet in mount mkdir sleep cat uname setsid cttyhack poweroff hostname dmes
     exit 1
   fi
 done
+if [[ -n "$NETWORK_ROOT" ]]; then
+  for applet in ip udhcpc ifconfig route sed head id; do
+    if ! grep -Fxq "$applet" "$APPLET_LIST"; then
+      echo "Required networking BusyBox applet missing: $applet" >&2
+      exit 1
+    fi
+  done
+fi
 echo "initramfs-build: BusyBox applets verified"
 "$ROOT/bin/busybox" --install -s "$ROOT/bin"
 while IFS= read -r -d '' link; do
@@ -61,6 +74,9 @@ echo "initramfs-build: /bin/sh link validated"
 cp "$INIT_SCRIPT" "$ROOT/init"
 chmod 0755 "$ROOT/init"
 cp -a "$FWROOT/lib/firmware/." "$ROOT/lib/firmware/"
+if [[ -n "$NETWORK_ROOT" ]]; then
+  cp -a "$NETWORK_ROOT/." "$ROOT/"
+fi
 if [[ -d "$FWROOT/usr/share/licenses" ]]; then
   mkdir -p "$ROOT/usr/share"
   cp -a "$FWROOT/usr/share/licenses" "$ROOT/usr/share/"
@@ -114,7 +130,11 @@ if ! cpio -it < "$MAIN_CPIO" > "$OUT/tiny-file-list.raw" 2> "$OUT/tiny-cpio-list
   exit 1
 fi
 sed 's#^\./##' "$OUT/tiny-file-list.raw" > "$OUT/tiny-file-list.txt"
-for member in init bin/busybox lib/firmware/iwlwifi-3945-2.ucode; do
+required_members=(init bin/busybox lib/firmware/iwlwifi-3945-2.ucode)
+if [[ -n "$NETWORK_ROOT" ]]; then
+  required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script usr/bin/curl lib/firmware/regulatory.db)
+fi
+for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
     echo "::error::Archive member missing: $member" >&2
     cat "$OUT/tiny-file-list.txt" >&2
@@ -131,6 +151,11 @@ test -s "$OUT/initramfs"
   echo "Early microcode: original uncompressed CPIO from the pinned D630 kernel release"
   echo "Firmware: Intel PRO/Wireless 3945ABG; license notices retained where provided"
   echo "Root model: RAM-only; no Gentoo root, SquashFS, OpenRC or systemd"
+  if [[ -n "$NETWORK_ROOT" ]]; then
+    echo "Networking: iw, WPA supplicant, BusyBox DHCP, rfkill, curl, and CA certificates"
+  else
+    echo "Networking: not included in this minimal shell variant"
+  fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"
   echo

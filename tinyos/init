@@ -1,10 +1,15 @@
 #!/bin/sh
 # D630 Tiny: standalone initramfs userspace. No Gentoo root or SquashFS required.
-PATH=/bin:/sbin
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 HOME=/root
 TERM=linux
 PS1='d630-tiny# '
 export PATH HOME TERM PS1
+if [ -x /usr/bin/curl ]; then
+    CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    SSL_CERT_FILE=$CURL_CA_BUNDLE
+    export CURL_CA_BUNDLE SSL_CERT_FILE
+fi
 
 mount -t devtmpfs -o mode=0755 devtmpfs /dev 2>/dev/null || :
 mkdir -p /dev/pts /dev/shm /proc /sys /run /tmp /root
@@ -30,7 +35,11 @@ grep MemTotal /proc/meminfo 2>/dev/null
 printf '\n'
 printf '  This is a RAM-only shell. Changes disappear at reboot.\n'
 printf '  Try: uname -a, free, dmesg, mount, ls /lib/firmware\n'
-printf '  Wi-Fi firmware is present; network association tools are not yet included.\n\n'
+if command -v wifi-connect >/dev/null 2>&1; then
+    printf '  Wi-Fi setup: wifi-connect | Downloads: curl -fL URL -o /tmp/file\n\n'
+else
+    printf '  Wi-Fi and download tools are in the internet-enabled initramfs variant.\n\n'
+fi
 
 while :; do
     setsid cttyhack /bin/sh -i
