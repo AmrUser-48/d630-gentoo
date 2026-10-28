@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -Eeuo pipefail
 
 if [[ $# -ne 1 || "$1" != /* ]]; then
