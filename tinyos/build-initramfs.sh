@@ -93,19 +93,35 @@ done < <(find "$ROOT/bin" -mindepth 1 -maxdepth 1 -type l -print0)
 
 echo "initramfs-build: create Zstandard CPIO"
 MAIN_CPIO="$(mktemp)"
-(
+if ! (
   cd "$ROOT"
   find . -print0 | LC_ALL=C sort -z | cpio --null --create --format=newc --owner=0:0
-) > "$MAIN_CPIO" 2>"$OUT/tiny-cpio-build.log"
-zstd -q -T0 -3 -f "$MAIN_CPIO" -o "$OUT/tiny-main.cpio.zst"
+) > "$MAIN_CPIO" 2> "$OUT/tiny-cpio-build.log"; then
+  echo "::error::CPIO archive creation failed; diagnostics follow." >&2
+  cat "$OUT/tiny-cpio-build.log" >&2
+  exit 1
+fi
+echo "initramfs-build: CPIO created ($(stat -c '%s' "$MAIN_CPIO") bytes)"
+if ! zstd -q -T0 -3 -f "$MAIN_CPIO" -o "$OUT/tiny-main.cpio.zst"; then
+  echo "::error::Zstandard compression failed." >&2
+  exit 1
+fi
 zstd -q -t "$OUT/tiny-main.cpio.zst"
-cpio -it < "$MAIN_CPIO" > "$OUT/tiny-file-list.txt" 2>"$OUT/tiny-cpio-list.log"
-grep -Fxq './init' "$OUT/tiny-file-list.txt"
-grep -Fxq './bin/busybox' "$OUT/tiny-file-list.txt"
-grep -Fxq './lib/firmware/iwlwifi-3945-2.ucode' "$OUT/tiny-file-list.txt"
-
-# Linux initramfs accepts concatenated archives: early microcode CPIO first,
-# followed by the Zstandard-compressed main root filesystem archive.
+echo "initramfs-build: Zstandard archive verified ($(stat -c '%s' "$OUT/tiny-main.cpio.zst") bytes)"
+if ! cpio -it < "$MAIN_CPIO" > "$OUT/tiny-file-list.raw" 2> "$OUT/tiny-cpio-list.log"; then
+  echo "::error::CPIO listing failed; diagnostics follow." >&2
+  cat "$OUT/tiny-cpio-list.log" >&2
+  exit 1
+fi
+sed 's#^\./##' "$OUT/tiny-file-list.raw" > "$OUT/tiny-file-list.txt"
+for member in init bin/busybox lib/firmware/iwlwifi-3945-2.ucode; do
+  if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
+    echo "::error::Archive member missing: $member" >&2
+    cat "$OUT/tiny-file-list.txt" >&2
+    exit 1
+  fi
+done
+echo "initramfs-build: required archive members verified"
 cat "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" > "$OUT/initramfs"
 test -s "$OUT/initramfs"
 {
