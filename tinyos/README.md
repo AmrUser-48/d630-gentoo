@@ -37,16 +37,17 @@ The files are now at `/d630-tiny/kernel`, `/d630-tiny/initramfs`, and `/d630-tin
 
 ### Add the GRUB entry
 
-Append the entry to the existing `/grubconfig/40-custom` file. Run this **once only**; do not append a duplicate entry if it is already there.
+On a Debian-based system using the standard GRUB setup, append the entry to `/etc/grub.d/40_custom`. Run this **once only**; do not append a duplicate entry if it is already present.
 
 ```sh
 echo "menuentry 'D630 Tiny Linux (Gentoo Mini)' {
     search --no-floppy --file --set=root /d630-tiny/tiny.cfg
     configfile /d630-tiny/tiny.cfg
-}" | sudo tee -a /grubconfig/40-custom
+}" | sudo tee -a /etc/grub.d/40_custom
+sudo update-grub
 ```
 
-This only appends the menu entry. It does not reboot the laptop or regenerate the GRUB configuration. Keep the existing Gentoo entry as a fallback; do not overwrite anything in `/d630-gentoo/`.
+This adds the menu entry and regenerates GRUB's menu; it does **not** reboot the laptop. If your system uses a different custom GRUB configuration file, add the same menu entry to the file your existing GRUB setup actually reads. Keep the existing Gentoo entry as a fallback; do not overwrite anything in `/d630-gentoo/`.
 
 After boot, Tiny starts in a text shell as `gmini`. To connect using the laptop's Wi-Fi, run:
 
