@@ -25,7 +25,16 @@ These are the steps to boot the **actual laptop**, not QEMU. The release already
 
 ### Download the release
 
-Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the files from your laptop terminal. On Debian, install `curl` if needed:
+Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the main files directly:
+
+| Download | Purpose |
+| --- | --- |
+| [**kernel**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel) | Linux kernel |
+| [**initramfs**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs) | Mini OS filesystem and tools |
+| [**d630-tiny.cfg**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg) | GRUB boot-menu entry |
+| [**SHA256SUMS**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS) | Checksums |
+
+Or download and verify the files from your laptop terminal. On Debian, install `curl` if needed:
 
 ```sh
 sudo apt update
@@ -125,7 +134,7 @@ To close QEMU, press **Ctrl-A**, release the keys, then press **X**.
 
 QEMU provides an emulated USB Ethernet adapter. It can test basic networking, but it does not emulate the D630's physical Intel Wi-Fi card.
 
-## 2. Use the shell and administrative commands
+## 3. Use the shell and administrative commands
 
 Tiny's normal account is `gmini`. It has no password. To open a root shell, run:
 
@@ -167,7 +176,7 @@ Press `q` to quit. Other included tools include:
 
 Writing model-specific registers can destabilize the computer. Do not use `wrmsr` unless you understand the exact register and value. Tiny does not write to model-specific registers automatically.
 
-## 3. Connect to the internet
+## 4. Connect to the internet
 
 ### Wi-Fi on the physical D630
 
@@ -206,7 +215,7 @@ curl -fL https://example.com/ -o /tmp/example.html
 
 If the download succeeds, DHCP and HTTPS access are working in the virtual machine.
 
-## 4. Run a standalone program or script
+## 5. Run a standalone program or script
 
 Tiny has no package manager. You can try a standalone Linux program or shell script in the RAM filesystem, then preserve it by rebuilding the initramfs.
 
@@ -236,7 +245,7 @@ This works only if the file is a Linux executable for the computer's CPU archite
 
 A shell script can also be placed in `/usr/local/bin`, but it must use an interpreter and commands already present. For example, a script beginning with `#!/bin/sh` can use the included BusyBox shell.
 
-## 5. Add Gentoo packages or a desktop
+## 6. Add Gentoo packages or a desktop
 
 ### Why copying one binary is not enough
 
@@ -259,7 +268,7 @@ A graphical desktop is a separate build path and does not expand the RAM-only `g
 
 When a dedicated GUI release is published, follow that release's own notes and verify that all required assets are present. A desktop image may require first-boot user setup and a console login followed by `startx`. QEMU success alone does not prove that the physical D630 display or graphics acceleration works.
 
-## 6. Use an installed Gentoo system
+## 7. Use an installed Gentoo system
 
 This is optional and only for users who already have Gentoo installed on disk. It does not add Gentoo or Portage to Tiny.
 
