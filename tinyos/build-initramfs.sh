@@ -29,6 +29,7 @@ trap cleanup EXIT
 mkdir -p "$OUT" "$ROOT"/{bin,sbin,etc,dev/pts,dev/shm,proc,sys,run,tmp,root,lib/firmware,usr/share}
 mkdir -p "$ROOT/lib/firmware/intel-ucode"
 
+echo "initramfs-build: extract verified firmware"
 tar --zstd -xf "$FIRMWARE_ARCHIVE" -C "$FWROOT"
 [[ -s "$FWROOT/lib/firmware/iwlwifi-3945-2.ucode" ]] || {
   echo "D630 Intel 3945ABG firmware missing in pinned firmware bundle." >&2
@@ -37,19 +38,25 @@ tar --zstd -xf "$FIRMWARE_ARCHIVE" -C "$FWROOT"
 cp "$BUSYBOX" "$ROOT/bin/busybox"
 APPLET_LIST="$FWROOT/busybox-applets.txt"
 "$ROOT/bin/busybox" --list > "$APPLET_LIST"
-grep -Fxq sh "$APPLET_LIST"
+if ! grep -Fxq ash "$APPLET_LIST" && ! grep -Fxq sh "$APPLET_LIST"; then
+  echo "Required BusyBox shell applet ash/sh is missing." >&2
+  exit 1
+fi
 for applet in mount mkdir sleep cat uname setsid cttyhack poweroff hostname dmesg grep; do
-  grep -Fxq "$applet" "$APPLET_LIST" || {
+  if ! grep -Fxq "$applet" "$APPLET_LIST"; then
     echo "Required BusyBox applet missing: $applet" >&2
     exit 1
-  }
+  fi
 done
+echo "initramfs-build: BusyBox applets verified"
 "$ROOT/bin/busybox" --install -s "$ROOT/bin"
 while IFS= read -r -d '' link; do
   ln -sfn busybox "$link"
 done < <(find "$ROOT/bin" -mindepth 1 -maxdepth 1 -type l -print0)
 ln -sfn busybox "$ROOT/bin/sh"
 ln -sfn busybox "$ROOT/bin/static-sh"
+chroot "$ROOT" /bin/sh -c 'exit 0'
+echo "initramfs-build: /bin/sh link validated"
 
 cp "$INIT_SCRIPT" "$ROOT/init"
 chmod 0755 "$ROOT/init"
@@ -84,6 +91,7 @@ while IFS= read -r -d '' link; do
   [[ -x "$(dirname "$link")/$target" ]] || { echo "Dangling BusyBox link: $link -> $target" >&2; exit 1; }
 done < <(find "$ROOT/bin" -mindepth 1 -maxdepth 1 -type l -print0)
 
+echo "initramfs-build: create Zstandard CPIO"
 MAIN_CPIO="$(mktemp)"
 (
   cd "$ROOT"
