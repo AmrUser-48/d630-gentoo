@@ -1,0 +1,165 @@
+name: Build D630 Tiny standalone initramfs
+run-name: "D630 Tiny standalone initramfs / #${{ github.run_number }}"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tinyos/**"
+      - "grub2/d630-tiny.cfg"
+      - ".github/workflows/build-d630-tiny-initramfs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: d630-tiny-initramfs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Reuse existing kernel, build initramfs, and QEMU-boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      KERNEL_TAG: d630-kernel-6.18.56-run-39509781896
+      KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-39509781896
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out tiny OS sources
+        uses: actions/checkout@v4
+
+      - name: Install initramfs and QEMU test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends busybox-static cpio zstd qemu-system-x86 expect curl ca-certificates file
+          command -v busybox
+          command -v zstd
+          command -v qemu-system-x86_64
+          command -v expect
+
+      - name: Download and verify the existing D630 kernel bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output "$RUNNER_TEMP/d630-firmware-root"
+          fetch_verified() {
+            local asset="$1" expected="$2" destination="$3"
+            curl --fail --location --retry 4 --retry-all-errors "$KERNEL_URL/$asset" -o "$destination"
+            printf '%s  %s\n' "$expected" "$destination" | sha256sum --check --status || {
+              echo "::error::SHA-256 mismatch: $asset"
+              exit 1
+            }
+            echo "Verified $asset ($(stat -c '%s' "$destination") bytes)"
+          }
+          fetch_verified kernel ff825d64543b580705d1a07db9e3647f4e9046eb9fc6615c2d592ab339896461 output/kernel
+          fetch_verified d630-6.18.56.config 0f74b376c8696ec0267e48c7a8426c3e53550fb6ab8ecd1830e47161e64ad1c6 output/d630-6.18.56.config
+          fetch_verified early-microcode.cpio e8b04c5456c1bed13049fbe82394b076ac988017d1d69a5bb9d0ffa3eec9c182 "$RUNNER_TEMP/early-microcode.cpio"
+          fetch_verified d630-firmware.tar.zst f787539a7362c0432a116f87e4508089405561e8d2f1f47a245846a7c3f262e5 "$RUNNER_TEMP/d630-firmware.tar.zst"
+
+          config=output/d630-6.18.56.config
+          for symbol in CONFIG_BLK_DEV_INITRD CONFIG_RD_ZSTD CONFIG_DEVTMPFS CONFIG_PROC_FS CONFIG_SYSFS; do
+            grep -Fxq "$symbol=y" "$config" || {
+              echo "::error::Existing kernel lacks required built-in option $symbol"
+              exit 1
+            }
+          done
+          grep -Fq 'CONFIG_LOCALVERSION="-d630-gentoo"' "$config"
+          tar --zstd -tf "$RUNNER_TEMP/d630-firmware.tar.zst" >/dev/null
+          file output/kernel
+          sha256sum output/kernel output/d630-6.18.56.config
+
+      - name: Build the standalone Zstandard initramfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tinyos/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output" "$GITHUB_WORKSPACE/tinyos/init"
+
+          cp grub2/d630-tiny.cfg output/d630-tiny.cfg
+          cp tinyos/README.md output/README-D630-Tiny.md
+          cp tinyos/init output/d630-tiny-init
+          cp tinyos/build-initramfs.sh output/build-initramfs.sh
+          cat > output/BUILD-MANIFEST.txt <<EOF
+          Project: AmrUser-48/d630-gentoo / D630 Tiny Linux
+          Kernel release asset tag: $KERNEL_TAG
+          Kernel build: existing Linux 6.18.56-d630-gentoo (not rebuilt)
+          Root userspace: static BusyBox + custom /init
+          Initramfs: early Intel microcode CPIO + Zstandard level-3 newc CPIO
+          CPU target: Intel Core 2 Duo / Dell Latitude D630
+          Root filesystem: initramfs-only RAM root; no SquashFS or Gentoo init required
+          Validation: archive checks, BusyBox symlink checks, and QEMU interactive-shell test
+          Workflow run: $GITHUB_RUN_ID
+          EOF
+          sha256sum output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
+          {
+            echo "## D630 Tiny Linux"
+            echo
+            echo "Existing kernel reused: $KERNEL_TAG (no kernel compilation performed)."
+            echo
+            echo "| Artifact | Size |"
+            echo "|---|---:|"
+            for f in output/kernel output/initramfs output/tiny-main.cpio.zst; do
+              printf '| %s | %s bytes |\n' "$(basename "$f")" "$(stat -c '%s' "$f")"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: QEMU boot the actual kernel and initramfs to an interactive shell
+        shell: bash
+        env:
+          KERNEL: ${{ github.workspace }}/output/kernel
+          INITRD: ${{ github.workspace }}/output/initramfs
+          QEMU_BIN: /usr/bin/qemu-system-x86_64
+          QEMU_LOG: ${{ github.workspace }}/output/qemu-boot.log
+        run: |
+          set -euo pipefail
+          expect <<'EXPECT'
+          set timeout 60
+          log_file -noappend $env(QEMU_LOG)
+          spawn $env(QEMU_BIN) -machine pc -accel tcg -cpu core2duo -m 512 -smp 2 -kernel $env(KERNEL) -initrd $env(INITRD) -append "console=ttyS0,115200n8 loglevel=4" -nographic -monitor none -no-reboot
+          expect {
+            -re {D630 TINY LINUX} {}
+            timeout { puts stderr "QEMU did not reach D630 Tiny /init banner"; exit 1 }
+            eof { puts stderr "QEMU exited before running /init"; exit 1 }
+          }
+          expect {
+            -re {d630-tiny# } {}
+            timeout { puts stderr "D630 Tiny shell prompt not found"; exit 1 }
+            eof { puts stderr "QEMU exited before shell prompt"; exit 1 }
+          }
+          send -- "echo D630_TINY_QEMU_OK\r"
+          expect {
+            -re {\r\nD630_TINY_QEMU_OK\r\n} {}
+            timeout { puts stderr "The interactive shell did not execute the test command"; exit 1 }
+            eof { puts stderr "QEMU exited before the shell test"; exit 1 }
+          }
+          send -- "echo D630_TINY_QEMU_DONE\r"
+          expect {
+            -re {\r\nD630_TINY_QEMU_DONE\r\n} {}
+            timeout { puts stderr "Shell completion marker not returned"; exit 1 }
+          }
+          send -- "poweroff -f\r"
+          expect eof
+          EXPECT
+          grep -Fq 'D630_TINY_QEMU_OK' "$QEMU_LOG"
+          grep -Fq 'D630_TINY_QEMU_DONE' "$QEMU_LOG"
+          echo "QEMU boot and interactive shell test passed." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish verified standalone bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="d630-tiny-shell-$GITHUB_RUN_ID"
+          cat > output/RELEASE-NOTES.md <<'NOTES'
+          D630 Tiny Linux is a standalone, RAM-only BusyBox shell booting directly from the existing D630 kernel plus external initramfs.
+
+          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. The initramfs main archive uses Zstandard level 3, with the original early Intel microcode CPIO prepended. Intel PRO/Wireless 3945ABG firmware and license notices are included.
+
+          The workflow verified the pinned kernel/firmware hashes and QEMU-booted this exact kernel + exact generated initramfs to an interactive shell. This is not yet the graphical desktop and is not a claim of a physical D630 hardware boot.
+
+          Install the assets named kernel and initramfs into a new /d630-tiny/ directory. Use d630-tiny.cfg as the GRUB entry. Do not overwrite /d630-gentoo/.
+          NOTES
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux standalone shell / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/INITRAMFS-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log
+          echo "Published $tag: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" | tee -a "$GITHUB_STEP_SUMMARY"
