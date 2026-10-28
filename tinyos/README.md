@@ -89,8 +89,6 @@ for asset in kernel initramfs SHA256SUMS; do
 done
 ```
 
-No GitHub login is needed to download a public release.
-
 ### Install QEMU and boot Tiny
 
 On a Debian- or Ubuntu-based host or Codespace, install QEMU:
