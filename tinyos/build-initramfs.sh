@@ -146,7 +146,7 @@ if [[ -n "$NETWORK_ROOT" ]]; then
   required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
 if [[ "$SETUP_MODE" == true ]]; then
-  required_members+=(bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/sbin/lf-preview etc/passwd etc/group etc/shadow etc/doas.conf etc/motd home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode)
+  required_members+=(bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/share/d630-tiny/early-microcode.cpio etc/passwd etc/group etc/shadow etc/doas.conf etc/motd home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode)
 fi
 for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
@@ -184,7 +184,7 @@ test -s "$OUT/initramfs"
     echo "Networking: not included in this minimal shell variant"
   fi
   if [[ "$SETUP_MODE" == true ]]; then
-    echo "Setup user: gmini, BusyBox login/MOTD, Gentoo Bash/lf/file, doas, and custom shell/file-manager configs"
+    echo "Setup user: gmini, BusyBox login/MOTD, Gentoo Bash/lf/file, doas, rebuild-initramfs, and custom configs"
   fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"

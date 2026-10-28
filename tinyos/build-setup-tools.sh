@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 9 ]]; then
-  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE LFRC LFCOLORS LFICONS LFPREVIEW" >&2
+if [[ $# -ne 11 ]]; then
+  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE LFRC LFCOLORS LFICONS LFPREVIEW REBUILD_SCRIPT EARLY_MICROCODE" >&2
   exit 2
 fi
 
@@ -15,11 +15,13 @@ LFRC=$6
 LFCOLORS=$7
 LFICONS=$8
 LFPREVIEW=$9
+REBUILD_SCRIPT=${10}
+EARLY_MICROCODE=${11}
 
 for path in "$GENTOO_ROOT" "$NETWORK_ROOT"; do
   [[ -d "$path" ]] || { echo "Required root not found: $path" >&2; exit 1; }
 done
-for file in "$BASHRC" "$BASH_PROFILE" "$LFRC" "$LFCOLORS" "$LFICONS" "$LFPREVIEW"; do
+for file in "$BASHRC" "$BASH_PROFILE" "$LFRC" "$LFCOLORS" "$LFICONS" "$LFPREVIEW" "$REBUILD_SCRIPT" "$EARLY_MICROCODE"; do
   [[ -s "$file" ]] || { echo "Required shell configuration is missing: $file" >&2; exit 1; }
 done
 
@@ -70,6 +72,8 @@ copy_binary bash /bin/bash
 copy_binary lf /usr/bin/lf
 copy_binary doas /usr/bin/doas
 copy_binary file /usr/bin/file
+copy_binary cpio /usr/bin/cpio
+copy_binary zstd /usr/bin/zstd
 chmod 4755 "$ROOT/usr/bin/doas"
 
 magic_db="$GENTOO_ROOT/usr/share/misc/magic.mgc"
@@ -88,6 +92,8 @@ mkdir -p "$ROOT/usr/share"
 cp -a "$terminfo" "$ROOT/usr/share/"
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
+install -D -m 0755 "$REBUILD_SCRIPT" "$ROOT/usr/sbin/rebuild-initramfs"
+install -D -m 0644 "$EARLY_MICROCODE" "$ROOT/usr/share/d630-tiny/early-microcode.cpio"
 cat > "$ROOT/etc/motd" <<'MOTD'
 ██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗
 ██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗██╔═══██╗
@@ -130,6 +136,8 @@ install -D -m 0755 "$LFPREVIEW" "$ROOT/usr/sbin/lf-preview"
 printf 'Gentoo Mini setup environment\n' > "$ROOT/etc/d630-tiny/setup-mode"
 
 for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/bin/file" \
+  "$ROOT/usr/bin/cpio" "$ROOT/usr/bin/zstd" "$ROOT/usr/sbin/rebuild-initramfs" \
+  "$ROOT/usr/share/d630-tiny/early-microcode.cpio" \
   "$ROOT/etc/passwd" "$ROOT/etc/group" "$ROOT/etc/shadow" \
   "$ROOT/etc/doas.conf" "$ROOT/etc/motd" "$ROOT/usr/sbin/lf-preview" "$ROOT/home/gmini/.bashrc" \
   "$ROOT/home/gmini/.bash_profile" "$ROOT/home/gmini/.config/lf/lfrc" \
