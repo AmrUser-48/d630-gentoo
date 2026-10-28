@@ -88,14 +88,14 @@ mkdir -p "$ROOT/usr/share"
 cp -a "$terminfo" "$ROOT/usr/share/"
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
-figlet_binary="$(chroot "$GENTOO_ROOT" /bin/sh -c 'command -v figlet')" || {
-  echo "Gentoo figlet package is missing." >&2
-  exit 1
-}
-if ! chroot "$GENTOO_ROOT" "$figlet_binary" -f 'ANSI Shadow.flf' Gentoo > "$ROOT/etc/motd"; then
-  echo "Could not generate the Gentoo MOTD with the ANSI Shadow font." >&2
-  exit 1
-fi
+cat > "$ROOT/etc/motd" <<'MOTD'
+██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗
+██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗██╔═══██╗
+██║  ███╗█████╗  ██╔██╗ ██║   ██║   ██║   ██║██║   ██║
+██║   ██║██╔══╝  ██║╚██╗██║   ██║   ██║   ██║██║   ██║
+╚██████╔╝███████╗██║ ╚████║   ██║   ╚██████╔╝╚██████╔╝
+ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝  ╚═════╝
+MOTD
 printf '\nGentoo Mini | D630 setup environment\n' >> "$ROOT/etc/motd"
 cat > "$ROOT/etc/passwd" <<'PASSWD'
 root:x:0:0:root:/root:/bin/sh

@@ -167,7 +167,7 @@ jobs:
           sudo chroot "$root" /bin/bash -lc 'getuto'
           sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix'
           sudo chroot "$root" /bin/bash -lc \
-            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-misc/ca-certificates app-misc/figlet app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/file'
+            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-misc/ca-certificates app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/file'
           echo "Installed Gentoo networking and setup packages into the staging root using existing binpkgs where compatible." \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -216,7 +216,7 @@ jobs:
           Root userspace: static BusyBox + custom /init; separate internet and Gentoo Mini setup variants
           Initramfs variants: minimal initramfs, initramfs-internet, and initramfs-setup
           Network userspace: Gentoo iw, WPA supplicant, BusyBox udhcpc, curl, wireless-regdb, CA certificates
-          Setup userspace: Gentoo Bash, lf, file, and figlet; Gentoo Guru commit $GURU_COMMIT; gmini MOTD generated with ANSI Shadow
+          Setup userspace: Gentoo Bash, lf, and file; Gentoo Guru commit $GURU_COMMIT; gmini MOTD uses the supplied Gentoo banner
           Gentoo network package seed: $BINPKG_TAG; Portage source fallback enabled for missing/incompatible binaries
           CPU target: Intel Core 2 Duo / Dell Latitude D630
           Root filesystem: initramfs-only RAM root; no SquashFS or Gentoo init required
@@ -350,7 +350,7 @@ jobs:
           }
           expect {
             -re {Gentoo Mini \| D630 setup environment} {}
-            timeout { puts stderr "Gentoo figlet MOTD was not displayed by login"; exit 1 }
+            timeout { puts stderr "Gentoo MOTD was not displayed by login"; exit 1 }
             eof { puts stderr "QEMU exited before displaying the MOTD"; exit 1 }
           }
           expect {
@@ -402,7 +402,7 @@ jobs:
           cat > output/RELEASE-NOTES.md <<'NOTES'
           D630 Tiny Linux is a standalone, RAM-only shell booting directly from the existing D630 kernel plus external initramfs.
 
-          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. It publishes minimal, internet, and setup initramfs variants using Zstandard level 3, with the original early Intel microcode CPIO prepended. The setup image logs in as gmini, shows a Gentoo figlet-generated `/etc/motd` through BusyBox login, and includes Gentoo Bash, lf, file, and passwordless `doas`. The lf config and icons/colors are adapted from AmrUser-48/deb12dots.
+          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. It publishes minimal, internet, and setup initramfs variants using Zstandard level 3, with the original early Intel microcode CPIO prepended. The setup image logs in as gmini, shows the Gentoo banner from `/etc/motd` through BusyBox login, and includes Gentoo Bash, lf, file, and passwordless `doas`. The lf config and icons/colors are adapted from AmrUser-48/deb12dots.
 
           The workflow verified the pinned kernel/firmware hashes and QEMU-tested the exact kernel and all initramfs variants, including setup-user login and DHCP/HTTPS downloads. This is not yet the graphical desktop and is not a claim of a physical D630 Wi-Fi boot.
 
