@@ -21,77 +21,55 @@ This is a **standalone shell environment, not a complete Gentoo installation**. 
 
 ## 1. Boot Tiny on the physical D630
 
-These are the steps to boot the **actual laptop**, not QEMU. The release already contains the built kernel and initramfs; you do not need to compile Gentoo or start a build workflow. The existing `/d630-gentoo/` files will remain untouched.
+These steps boot Mini on the **actual laptop**. You do not need to compile Gentoo or start a build workflow.
 
-### Download the release
+### 1. Find the boot partition
 
-Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the main files directly:
+The GRUB entry expects these files at the root of the same GRUB-readable partition that already contains `/d630-gentoo/`:
 
-| Download | Purpose |
-| --- | --- |
-| [**kernel**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel) | Linux kernel |
-| [**initramfs**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs) | Mini OS filesystem and tools |
-| [**d630-tiny.cfg**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg) | GRUB boot-menu entry |
-| [**SHA256SUMS**](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS) | Checksums |
-
-Or download and verify the files from your laptop terminal. On Debian, install `curl` if needed:
-
-```sh
-sudo apt update
-sudo apt install -y curl
-mkdir -p "$HOME/Downloads/d630-tiny-release/output"
-
-for asset in kernel initramfs d630-tiny.cfg; do
-  curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/$asset" \
-    -o "$HOME/Downloads/d630-tiny-release/output/$asset"
-done
-
-curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS" \
-  -o "$HOME/Downloads/d630-tiny-release/SHA256SUMS"
-
-cd "$HOME/Downloads/d630-tiny-release"
-awk '$2 == "output/kernel" || $2 == "output/initramfs" {print}' SHA256SUMS | sha256sum -c -
+```text
+/d630-tiny/kernel
+/d630-tiny/initramfs
 ```
 
-The last command should report `OK` for both `output/kernel` and `output/initramfs`.
-
-### Copy the files beside your existing D630 boot files
-
-The GRUB entry looks for `/d630-tiny/kernel` and `/d630-tiny/initramfs` at the **root of the same GRUB-readable partition that currently contains `/d630-gentoo/`**. This is often the NTFS partition labelled `Res_syst`; do not assume the Linux `/boot` directory is that partition.
-
-Find the partition and its Linux mount point:
+On this D630, that is the partition labelled `Res_syst`. Find where it is mounted:
 
 ```sh
-lsblk -f
+lsblk -o NAME,LABEL,FSTYPE,MOUNTPOINTS
 ```
 
-If it is not mounted, mount it first. In the commands below, replace `/MOUNT/POINT` with the actual mount point of the partition that contains the existing `d630-gentoo` directory. Then run:
+Use the mount point shown for `Res_syst`. If it is not mounted, mount that partition first. **Do not use your home directory or the Linux system's unrelated `/boot` directory as the boot-file destination.** Replace `/MOUNT/POINT` in the commands below with the actual mount point of `Res_syst`.
+
+### 2. Download the kernel and initramfs straight to that partition
+
+These commands put the boot files directly in the final location GRUB will read. Replace `/MOUNT/POINT` first.
 
 ```sh
 sudo mkdir -p /MOUNT/POINT/d630-tiny
-sudo install -m 0644 "$HOME/Downloads/d630-tiny-release/output/kernel" /MOUNT/POINT/d630-tiny/kernel
-sudo install -m 0644 "$HOME/Downloads/d630-tiny-release/output/initramfs" /MOUNT/POINT/d630-tiny/initramfs
+sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
+sudo curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg -o /tmp/d630-tiny.cfg
 ```
 
-This creates a separate `d630-tiny/` directory. It does not replace the old kernel or initramfs.
+The first two files above are the actual boot files. `/tmp/d630-tiny.cfg` is only a temporary copy of the GRUB menu-entry text; it is not a kernel or initramfs.
 
-### Add the GRUB menu entry and reboot
+### 3. Add the GRUB entry and reboot
 
-Append the downloaded menu entry to GRUB's custom entries **once**:
+Append the entry **only once**:
 
 ```sh
-sudo tee -a /etc/grub.d/40_custom < "$HOME/Downloads/d630-tiny-release/output/d630-tiny.cfg" >/dev/null
+sudo tee -a /etc/grub.d/40_custom < /tmp/d630-tiny.cfg >/dev/null
 sudo update-grub
 sudo reboot
 ```
 
-On the GRUB screen, select **D630 Tiny Linux (Gentoo Mini)**. The system starts directly in its text shell as `gmini`; no password is required. To connect over the laptop's Wi-Fi, run:
+On the GRUB screen, select **D630 Tiny Linux (Gentoo Mini)**. It starts in a text shell as `gmini`; no password is required. To connect using the laptop's Wi-Fi, run:
 
 ```sh
 doas wifi-connect
 ```
 
-**Important:** this is the small, text-mode Mini OS, not a graphical desktop. Keep your existing Gentoo GRUB entry as a fallback. If you already added this menu entry before, do not append it a second time.
+**Keep your existing Gentoo boot entry as a fallback. Do not overwrite anything in `/d630-gentoo/`.** If you already added this GRUB entry, do not append it again. This is the small, text-mode Mini OS, not a graphical desktop.
 
 ## 2. Try it in QEMU
 
