@@ -21,38 +21,20 @@ This is a **standalone shell environment, not a complete Gentoo installation**. 
 
 ## 1. Boot Tiny on the physical D630
 
-These steps boot Tiny on the actual laptop. No rebuild is needed.
-
-### 1. Find the boot partition
-
-The boot files go on the same GRUB-readable partition that already contains `/d630-gentoo/`. On this D630, that is labelled `Res_syst`. Find its mount point:
+The `Res_syst` partition is already mounted. These commands find its mount point by filesystem label, create `d630-tiny/` there, and download the three files directly into it. Run them as your normal user; no placeholder path and no `sudo` are needed.
 
 ```sh
-lsblk -o NAME,LABEL,FSTYPE,MOUNTPOINTS
+cd "$(findmnt -rn -S LABEL=Res_syst -o TARGET)" &&
+mkdir -vp d630-tiny &&
+cd d630-tiny &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o kernel &&
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o initramfs &&
+curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg -o tiny.cfg
 ```
 
-Use the mount point shown for `Res_syst`. It must be mounted and writable by your normal user. Replace `/MOUNT/POINT` below with that mount point.
+The files are now at `/d630-tiny/kernel`, `/d630-tiny/initramfs`, and `/d630-tiny/tiny.cfg` on the `Res_syst` partition, alongside the existing `/d630-gentoo/` directory.
 
-### 2. Create the directory and download the boot files
-
-Run these commands as your normal user. They create `/d630-tiny/` and download the kernel, initramfs, and GRUB boot script directly there. No `sudo` is needed for the downloads.
-
-```sh
-mkdir -vp /d630-tiny && cd /d630-tiny
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
-curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg -o /MOUNT/POINT/d630-tiny/tiny.cfg
-```
-
-The resulting files are:
-
-```text
-/d630-tiny/kernel
-/d630-tiny/initramfs
-/d630-tiny/tiny.cfg
-```
-
-### 3. Add the GRUB entry
+### Add the GRUB entry
 
 Open the existing custom GRUB file:
 
