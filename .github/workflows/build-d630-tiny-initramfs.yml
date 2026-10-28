@@ -166,6 +166,9 @@ jobs:
           fi
           sudo chroot "$root" /bin/bash -lc 'getuto'
           sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix'
+          sudo mkdir -p "$root/etc/portage/package.use"
+          echo 'app-admin/doas -pam' |
+            sudo tee "$root/etc/portage/package.use/doas" >/dev/null
           sudo chroot "$root" /bin/bash -lc \
             'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-misc/ca-certificates app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/file'
           echo "Installed Gentoo networking and setup packages into the staging root using existing binpkgs where compatible." \
