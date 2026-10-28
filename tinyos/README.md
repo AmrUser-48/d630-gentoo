@@ -6,19 +6,6 @@ This is a **standalone shell environment, not a complete Gentoo installation**. 
 
 **Current status:** the published image has been tested in QEMU. QEMU success does not guarantee that every feature works on physical D630 hardware. The existing `/d630-gentoo/` boot files are separate; keep them as a fallback.
 
-## Start here
-
-| What you want to do | Go to |
-| --- | --- |
-| **Boot Mini on the physical laptop** | [Install and boot on the D630](#1-boot-tiny-on-the-physical-d630) |
-| Try Tiny safely in a virtual machine | [Run it in QEMU](#2-try-it-in-qemu) |
-| Learn the shell and root access | [Use the shell](#3-use-the-shell-and-administrative-commands) |
-| Connect to Wi-Fi or QEMU networking | [Connect to the internet](#4-connect-to-the-internet) |
-| Add a standalone program | [Run a standalone program or script](#5-run-a-standalone-program-or-script) |
-| Understand Gentoo packages and the separate desktop build | [Add Gentoo packages or a desktop](#6-add-gentoo-packages-or-a-desktop) |
-| Enter a Gentoo installation already on disk | [Use an installed Gentoo system](#7-use-an-installed-gentoo-system) |
-| Keep changes after reboot | [Save changes](#8-save-changes) |
-
 ## 1. Boot Tiny on the physical D630
 
 Use the already-mounted, GRUB-readable partition whose root contains the existing `/d630-gentoo/` directory. The commands below detect its mount point automatically; they do not assume a filesystem label or a machine-specific path. Run them as your normal user.
