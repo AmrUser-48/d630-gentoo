@@ -1,149 +1,293 @@
 # D630 Tiny Linux
 
-D630 Tiny Linux is an experimental, text-mode Linux environment for the Dell Latitude D630. It boots the existing Linux 6.18.56 kernel with one external initramfs and runs entirely in RAM.
+D630 Tiny Linux is an experimental, text-mode Linux environment for the Dell Latitude D630. It boots the existing Linux 6.18.56 kernel with one external initramfs and runs from RAM.
 
-**New to the project?** Start with the [First-time User Guide](USER-GUIDE.md). It explains how to try the image in QEMU, use the shell, connect to a network, install Tiny alongside Gentoo, and save changes.
+This is a **standalone shell environment, not a complete Gentoo installation**. It has no Portage package manager. Changes made during a session disappear at reboot unless you save a rebuilt initramfs to persistent storage.
 
-**Status:** the current image has been tested in QEMU. A successful QEMU boot does not guarantee that every function works on physical D630 hardware. The existing `/d630-gentoo/` boot files remain separate and should be kept as a fallback.
+**Current status:** the published image has been tested in QEMU. QEMU success does not guarantee that every feature works on physical D630 hardware. The existing `/d630-gentoo/` boot files are separate; keep them as a fallback.
 
-## Quick start
+## Start here
 
-### Download the latest build
-
-Open the [latest release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the main files directly:
-
-| File | Purpose |
+| What you want to do | Go to |
 | --- | --- |
-| [`kernel`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel) | Existing D630 Linux kernel |
-| [`initramfs`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs) | Combined, RAM-only user environment |
-| [`d630-tiny.cfg`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/d630-tiny.cfg) | GRUB menu entry for installation |
-| [`SHA256SUMS`](https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/SHA256SUMS) | Build checksums |
+| Download and try Tiny without changing your computer | [Try it in QEMU](#1-try-it-in-qemu) |
+| Learn the shell and root access | [Use the shell](#2-use-the-shell-and-administrative-commands) |
+| Connect to Wi-Fi or QEMU networking | [Connect to the internet](#3-connect-to-the-internet) |
+| Add a standalone program | [Run a standalone program or script](#4-run-a-standalone-program-or-script) |
+| Understand Gentoo packages and the separate desktop build | [Add Gentoo packages or a desktop](#5-add-gentoo-packages-or-a-desktop) |
+| Enter a Gentoo installation already on disk | [Use an installed Gentoo system](#6-use-an-installed-gentoo-system) |
+| Boot Tiny on the physical D630 | [Install Tiny on the D630](#7-install-tiny-on-the-d630) |
+| Keep changes after reboot | [Save changes](#8-save-changes) |
 
-### Test in QEMU
+## 1. Try it in QEMU
 
-On Debian or Ubuntu, install the tools and clone the repository:
+QEMU runs Tiny in a virtual machine, so you can try the shell without changing your computer's boot configuration. The commands below run in the **host or Codespace terminal**, not inside Tiny.
 
-```bash
-sudo apt update
-sudo apt install curl git qemu-system-x86
-git clone https://github.com/AmrUser-48/d630-gentoo.git
-cd d630-gentoo
-```
+### Download the current release
 
-Download the public release assets. No GitHub login is required:
+Open the [latest public release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the files needed for testing:
 
-```bash
+```sh
 release_dir="$HOME/d630-tiny-release"
 mkdir -p "$release_dir"
+
 for asset in kernel initramfs SHA256SUMS; do
   curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/$asset" \
     -o "$release_dir/$asset"
 done
 ```
 
-Start the virtual machine:
+No GitHub login is needed to download a public release.
 
-```bash
+### Install QEMU and boot Tiny
+
+On a Debian- or Ubuntu-based host or Codespace, install QEMU:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y curl qemu-system-x86
+```
+
+From the repository's root directory, run the launcher:
+
+```sh
 ./tinyos/run-qemu.sh --assets-dir "$HOME/d630-tiny-release"
 ```
 
-The launcher verifies the downloaded kernel and initramfs against their SHA-256 checksums, then boots them with an emulated USB Ethernet adapter. To close QEMU, press **Ctrl-A**, release the keys, then press **X**.
+The launcher checks the kernel and initramfs against `SHA256SUMS` before booting. Tiny starts its shell automatically as the passwordless `gmini` user; no username or password prompt is needed.
 
-### Install alongside the existing Gentoo system
+To close QEMU, press **Ctrl-A**, release the keys, then press **X**.
 
-1. Download `kernel`, `initramfs`, and `d630-tiny.cfg` from the links above.
-2. On a GRUB-readable partition, create a new `/d630-tiny/` directory and copy `kernel` and `initramfs` into it. **Do not overwrite or remove `/d630-gentoo/`.**
-3. Add the contents of `d630-tiny.cfg` to `/etc/grub.d/40_custom`.
-4. Regenerate the GRUB configuration using the command appropriate for the host system (for example, `sudo update-grub` on Debian).
-5. Select **D630 Tiny Linux** from the GRUB menu. Keep the existing Gentoo entry as your fallback.
+QEMU provides an emulated USB Ethernet adapter. It can test basic networking, but it does not emulate the D630's physical Intel Wi-Fi card.
 
-For the full installation steps, networking commands, chroot instructions, and guidance on preserving changes, see the [First-time User Guide](USER-GUIDE.md).
+## 2. Use the shell and administrative commands
 
-## What is included
+Tiny's normal account is `gmini`. It has no password. To open a root shell, run:
+
+```sh
+doas /bin/bash
+```
+
+Check that the shell has root privileges:
+
+```sh
+id -u
+```
+
+The result should be `0`. Type `exit` to leave the root shell and return to `gmini`.
+
+For a single administrative command, use `doas` before the command instead:
+
+```sh
+doas wifi-connect
+```
+
+Open the file manager with:
+
+```sh
+lf
+```
+
+Press `q` to quit. Other included tools include:
+
+| Command | Purpose |
+| --- | --- |
+| `curl` | Download files from the internet |
+| `wifi-connect` | Configure a Wi-Fi connection |
+| `rdmsr` | Read CPU model-specific registers |
+| `wrmsr` | Write CPU model-specific registers |
+| `setfont` | Change the Linux console font |
+| `gentoo-chroot` | Enter an existing, mounted Gentoo installation |
+| `rebuild-initramfs` | Save the current Tiny filesystem as a new initramfs |
+
+Writing model-specific registers can destabilize the computer. Do not use `wrmsr` unless you understand the exact register and value. Tiny does not write to model-specific registers automatically.
+
+## 3. Connect to the internet
+
+### Wi-Fi on the physical D630
+
+At the `gmini` prompt, run:
+
+```sh
+doas wifi-connect
+```
+
+Follow the prompts to select a network and enter its passphrase. The D630's Intel 3945ABG adapter supports legacy 802.11a/b/g and WPA/WPA2-PSK. It may not connect to access points that require newer bands or security modes.
+
+Test the connection by downloading a small page:
+
+```sh
+curl -fL https://example.com/ -o /tmp/example.html
+```
+
+The downloaded file is temporary and will be erased at reboot.
+
+### Networking in QEMU
+
+QEMU uses an emulated USB Ethernet adapter, not the D630's Wi-Fi card. Find the guest's interface name:
+
+```sh
+for p in /sys/class/net/*; do
+  [ -e "$p/device" ] && echo "${p##*/}"
+done
+```
+
+Use the interface name printed by that command in place of `INTERFACE`:
+
+```sh
+doas udhcpc -q -i INTERFACE -s /usr/share/udhcpc/default.script
+curl -fL https://example.com/ -o /tmp/example.html
+```
+
+If the download succeeds, DHCP and HTTPS access are working in the virtual machine.
+
+## 4. Run a standalone program or script
+
+Tiny has no package manager. You can try a standalone Linux program or shell script in the RAM filesystem, then preserve it by rebuilding the initramfs.
+
+Download a program from a source you trust. Replace the example URL with the publisher's actual download URL:
+
+```sh
+curl -fL 'https://example.com/tool' -o /tmp/tool
+```
+
+Copy it into `/usr/local/bin` as root:
+
+```sh
+doas /bin/bash
+mkdir -p /usr/local/bin
+cp /tmp/tool /usr/local/bin/tool
+chmod 755 /usr/local/bin/tool
+exit
+```
+
+Run it:
+
+```sh
+/usr/local/bin/tool
+```
+
+This works only if the file is a Linux executable for the computer's CPU architecture and it is either statically linked or all required shared libraries are already in Tiny. A source archive, Windows program, or Debian `.deb` is not a ready-to-run executable for this environment.
+
+A shell script can also be placed in `/usr/local/bin`, but it must use an interpreter and commands already present. For example, a script beginning with `#!/bin/sh` can use the included BusyBox shell.
+
+## 5. Add Gentoo packages or a desktop
+
+### Why copying one binary is not enough
+
+Packages such as Xorg, Mesa, and Openbox need more than one executable. They can depend on shared libraries, drivers, modules, configuration files, and other runtime data. Copying an `openbox` binary or a Debian `.deb` into Tiny does not create a working desktop.
+
+To include Gentoo packages in a **new image**, make changes in the Gentoo build environment or its repository workflow:
+
+1. Add the required package atoms to the build's Gentoo package list and select the USE flags needed for the D630.
+2. Install them into the build root. A binary-package-only build works only when the configured binhost has compatible packages. Source compilation must be explicitly allowed when required packages are missing.
+3. Update the image-staging step to include the programs and their complete runtime files. A graphical stack usually needs Xorg modules, Mesa drivers, libraries, X11 data and configuration, and a window-manager/session startup configuration.
+4. Build a new image, verify that the required files are present, and boot-test it before using it on the physical D630.
+
+The current Tiny staging scripts copy a defined set of programs and shared libraries; they do not automatically package every file belonging to an arbitrary Gentoo package. The `rebuild-initramfs` helper saves changes made in a running Tiny session. It does not run Portage or convert Gentoo binary packages into an initramfs.
+
+### Graphical desktop: a separate image
+
+The current public **D630 Tiny Linux** release is text-only. It does **not** include a published `gui-initram` image or the `d630-gui.cfg` GRUB entry. Do not expect Xorg, Mesa, or Openbox to appear by copying files into `gmini`.
+
+A graphical desktop is a separate build path and does not expand the RAM-only `gmini` image. The planned desktop runtime includes a Gentoo root, Xorg, the Mesa Crocus driver for the D630's GM965 graphics, `xinit`, `xterm`, and Openbox. The repository has a [D630 Gentoo runtime SquashFS workflow](../.github/workflows/build-d630-runtime-squashfs.yml), but check its run and published assets before assuming a desktop image is ready to install.
+
+When a dedicated GUI release is published, follow that release's own notes and verify that all required assets are present. A desktop image may require first-boot user setup and a console login followed by `startx`. QEMU success alone does not prove that the physical D630 display or graphics acceleration works.
+
+## 6. Use an installed Gentoo system
+
+This is optional and only for users who already have Gentoo installed on disk. It does not add Gentoo or Portage to Tiny.
+
+Mount the installed Gentoo root filesystem at `/mnt/gentoo`, then run:
+
+```sh
+doas gentoo-chroot /mnt/gentoo
+```
+
+You are now working inside the Gentoo installation on disk. Commands and package changes affect that installation, not the running Tiny image. Type `exit` to leave the chroot.
+
+The helper checks that the target looks like a Gentoo root, bind-mounts `/dev`, `/proc`, `/sys`, and `/run` for the session, and unmounts those bind mounts when the shell exits. It does not create a Gentoo installation.
+
+## 7. Install Tiny on the D630
+
+This procedure adds a separate GRUB entry and keeps the existing Gentoo boot files intact.
+
+### Download the files
+
+On a computer with internet access, download `kernel`, `initramfs`, and `d630-tiny.cfg` from the [latest public release](https://github.com/AmrUser-48/d630-gentoo/releases/latest). Put them in a directory named `d630-tiny-release` on a USB drive.
+
+### Copy the files to the boot partition
+
+Boot the installed Gentoo system and make sure its GRUB-readable boot partition is mounted at `/boot`. Mount the USB drive; the commands below assume it is mounted at `/mnt/usb`.
+
+Run these commands on the installed Gentoo system:
+
+```sh
+doas mkdir -p /boot/d630-tiny
+doas cp /mnt/usb/d630-tiny-release/kernel /boot/d630-tiny/kernel
+doas cp /mnt/usb/d630-tiny-release/initramfs /boot/d630-tiny/initramfs
+```
+
+Open `/etc/grub.d/40_custom` in a text editor and append the contents of `/mnt/usb/d630-tiny-release/d630-tiny.cfg`. Then regenerate the GRUB menu:
+
+```sh
+doas grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+The GRUB configuration path varies by system. Use the path configured by your installation.
+
+Reboot and choose **D630 Tiny Linux** from GRUB. Keep the original Gentoo boot entry as your fallback. Do not overwrite your existing Gentoo kernel or initramfs.
+
+## 8. Save changes
+
+Changes in Tiny live in RAM and disappear at reboot. To keep them, save a rebuilt initramfs to a writable USB drive or another persistent filesystem.
+
+Mount the drive and create a destination directory. In this example, the USB drive is mounted at `/mnt/usb`:
+
+```sh
+doas mkdir -p /mnt/usb/d630-tiny
+doas rebuild-initramfs /mnt/usb/d630-tiny/initramfs
+```
+
+Replace `/mnt/usb` with the actual mount point. The destination must be on persistent storage, not the RAM root. The helper repacks the current filesystem, retains the original early Intel microcode archive, skips other mounted filesystems, and writes the new image to the destination. The currently running session is not changed.
+
+To use the rebuilt image on the next boot, copy it to the boot partition **from the installed Gentoo system**, not from the running Tiny session. Back up the current image first. These commands assume the boot partition is mounted at `/boot` and the USB drive at `/mnt/usb`:
+
+```sh
+doas cp /boot/d630-tiny/initramfs /boot/d630-tiny/initramfs.backup
+doas cp /mnt/usb/d630-tiny/initramfs /boot/d630-tiny/initramfs
+```
+
+Reboot and select D630 Tiny Linux from GRUB. If the rebuilt image does not boot, restore the backup or use the original Gentoo boot entry.
+
+## What's included
 
 The combined initramfs contains:
 
-- A statically linked BusyBox environment and a minimal `/init`, with `/dev`, `/proc`, `/sys`, `/run`, and `/tmp` set up at boot.
-- A passwordless local account named `gmini`, Gentoo-built Bash, `lf`, and a Gentoo banner displayed by BusyBox `login` from `/etc/motd`.
+- A statically linked BusyBox environment and a minimal `/init` with `/dev`, `/proc`, `/sys`, `/run`, and `/tmp` set up at boot.
+- A passwordless `gmini` account, Gentoo-built Bash, `lf`, and a Gentoo banner displayed by BusyBox `login` from `/etc/motd`.
 - Network utilities, DHCP, `curl`, passwordless `doas`, and `wifi-connect`.
 - `rdmsr` and `wrmsr` from a pinned Gentoo binary-package shard.
 - `setfont` and a small Terminus Powerline font subset for the Linux console and X11 font servers.
-- Intel 3945ABG Wi-Fi firmware and the requested i915/tigon firmware files, with upstream license notices.
-- Helpers to rebuild the initramfs to external storage and to enter an already-mounted Gentoo root.
+- Intel 3945ABG Wi-Fi firmware and requested i915/tigon firmware files, with upstream license notices.
+- Helpers to rebuild the initramfs to external storage and enter an already-mounted Gentoo root.
 
 The existing early Intel microcode CPIO archive is prepended unchanged. The main filesystem archive is Zstandard-compressed at level 3. The kernel itself is not rebuilt by this experiment.
 
 The `lf` configuration, colors, and icons are adapted from [`AmrUser-48/deb12dots`](https://github.com/AmrUser-48/deb12dots) at commit `6da2f0e`. The banner is plain MOTD text because the ANSI Shadow font is not included in Gentoo's figlet package.
 
-## First steps after boot
-
-Log in as `gmini`. The account has no password.
-
-### Connect to Wi-Fi
-
-Run:
-
-```bash
-doas wifi-connect
-```
-
-The D630's Intel 3945ABG driver is built into the kernel. The card supports legacy 802.11a/b/g and WPA/WPA2-PSK; compatibility depends on the access point's band and security settings.
-
-To download a file:
-
-```bash
-curl -fL URL -o /tmp/file
-```
-
-The filesystem is RAM-only. Changes and downloaded files disappear on reboot.
-
-### Network testing in QEMU
-
-QEMU provides an emulated USB Ethernet adapter; it does not emulate the D630's Wi-Fi card. Find the adapter name and obtain a DHCP lease before testing HTTPS downloads:
-
-```bash
-for p in /sys/class/net/*; do
-  [ -e "$p/device" ] && echo "${p##*/}"
-done
-doas udhcpc -q -i INTERFACE -s /usr/share/udhcpc/default.script
-curl -fL https://example.com/ -o /tmp/test.html
-```
-
-Replace `INTERFACE` with the detected interface name.
-
-### Use an existing Gentoo installation
-
-Mount the Gentoo root filesystem, then run:
-
-```bash
-doas gentoo-chroot /mnt/gentoo
-```
-
-The helper checks for a Gentoo root and Bash, bind-mounts `/dev`, `/proc`, `/sys`, and `/run` for the session, and unmounts those bind mounts when the shell exits. It does not create or install a Gentoo system. Changes inside the chroot affect the mounted installation.
-
-### Preserve changes by rebuilding the initramfs
-
-Mount a writable USB drive or other storage partition, create its `d630-tiny/` directory, and write the rebuilt image there:
-
-```bash
-doas mkdir -p /mnt/usb/d630-tiny
-doas rebuild-initramfs /mnt/usb/d630-tiny/initramfs
-```
-
-Replace `/mnt/usb` with the actual mount point. The helper repacks the current root, retains the original early-microcode archive, skips other mounted filesystems, and writes to the specified destination. It refuses to write into the RAM root. Back up the original initramfs before replacing any boot image.
-
-The rebuilt image can be selected from GRUB on the next boot after it has been copied to the boot partition.
-
 ## Build and verification
 
 The [GitHub Actions workflow](https://github.com/AmrUser-48/d630-gentoo/actions/workflows/build-d630-tiny-initramfs.yml) downloads the pinned kernel and firmware release, checks SHA-256 values and required kernel options, stages the requested firmware and selected fonts with license notices, and builds the combined initramfs.
 
-The workflow validates the CPIO contents and symlinks, then uses the actual kernel and initramfs in QEMU to test login, the MOTD, setup tools, firmware presence, DHCP, HTTPS downloads, chroot input validation, and rebuilding to a separate filesystem.
+The workflow validates CPIO contents and symlinks, then boots the actual kernel and initramfs in QEMU to test login, the MOTD, setup tools, firmware presence, DHCP, HTTPS downloads, chroot input validation, and rebuilding to a separate filesystem.
 
-## Scope and limitations
+## Troubleshooting and limitations
 
-- This is a compact shell environment, **not** a graphical desktop or a complete Gentoo installation.
-- It has no package manager and does not install Gentoo packages.
-- `rdmsr` and `wrmsr` are available, but the startup process does not write to model-specific registers automatically.
-- Most extra i915 firmware files target newer GPUs and are not used by the D630's GM965 graphics.
-- QEMU testing covers the emulated USB network adapter, not the physical Intel 3945ABG Wi-Fi hardware.
+- **QEMU does not connect to the physical Wi-Fi card.** It uses an emulated USB Ethernet adapter. Test the Intel 3945ABG adapter on the actual D630.
+- **Changes disappear after reboot.** This is expected. Save a new initramfs to persistent storage if you want to keep them.
+- **A downloaded program will not start.** Check that it is a Linux executable for the correct CPU architecture and that its required shared libraries are present.
+- **A desktop does not start.** The current published Tiny image is text-only; use a separate GUI build when its required assets are published.
+- **The system boots in QEMU.** This verifies the tested virtual environment only. It does not guarantee physical Wi-Fi, graphics acceleration, or every D630 hardware feature will work.
+
+See the [latest release page](https://github.com/AmrUser-48/d630-gentoo/releases/latest) for the current downloadable assets.
