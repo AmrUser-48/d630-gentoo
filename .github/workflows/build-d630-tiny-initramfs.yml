@@ -139,11 +139,11 @@ jobs:
           sudo chroot "$root" /bin/bash -lc 'getuto'
           sudo chroot "$root" /bin/bash -lc 'emaint binhost --fix'
           sudo chroot "$root" /bin/bash -lc \
-            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-misc/ca-certificates net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb'
-          echo "Installed Gentoo networking packages into the staging root using existing binpkgs where compatible." \
+            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-misc/ca-certificates app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb'
+          echo "Installed Gentoo networking and setup packages into the staging root using existing binpkgs where compatible." \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Build minimal and internet-enabled initramfs variants
+      - name: Build minimal, internet, and setup initramfs variants
         shell: bash
         run: |
           set -euo pipefail
@@ -156,29 +156,42 @@ jobs:
           cp output/internet/initramfs output/initramfs-internet
           cp output/internet/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst
 
+          setup_root="$RUNNER_TEMP/d630-tiny-setup-tools"
+          sudo bash tinyos/build-setup-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$setup_root" "$GITHUB_WORKSPACE/tinyos/gmini.bashrc" "$GITHUB_WORKSPACE/tinyos/gmini.bash_profile"
+          mkdir -p output/setup
+          bash tinyos/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output/setup" "$GITHUB_WORKSPACE/tinyos/init" "$setup_root"
+          cp output/setup/initramfs output/initramfs-setup
+          cp output/setup/tiny-main.cpio.zst output/tiny-main-setup.cpio.zst
+
           cp grub2/d630-tiny.cfg output/d630-tiny.cfg
           cp grub2/d630-tiny-internet.cfg output/d630-tiny-internet.cfg
+          cp grub2/d630-tiny-setup.cfg output/d630-tiny-setup.cfg
           cp tinyos/README.md output/README-D630-Tiny.md
           cp tinyos/init output/d630-tiny-init
           cp tinyos/build-initramfs.sh output/build-initramfs.sh
           cp tinyos/build-network-tools.sh output/build-network-tools.sh
+          cp tinyos/build-setup-tools.sh output/build-setup-tools.sh
+          cp tinyos/gmini.bashrc output/gmini.bashrc
+          cp tinyos/gmini.bash_profile output/gmini.bash_profile
           cp tinyos/wifi-connect output/wifi-connect
           cp tinyos/udhcpc-default.script output/udhcpc-default.script
           cp output/internet/INITRAMFS-MANIFEST.txt output/INITRAMFS-INTERNET-MANIFEST.txt
+          cp output/setup/INITRAMFS-MANIFEST.txt output/INITRAMFS-SETUP-MANIFEST.txt
           cat > output/BUILD-MANIFEST.txt <<EOF
           Project: AmrUser-48/d630-gentoo / D630 Tiny Linux
           Kernel release asset tag: $KERNEL_TAG
           Kernel build: existing Linux 6.18.56-d630-gentoo (not rebuilt)
-          Root userspace: static BusyBox + custom /init; second variant adds Wi-Fi and download tools
-          Initramfs variants: minimal initramfs and internet-enabled initramfs-internet
+          Root userspace: static BusyBox + custom /init; separate internet and Gentoo Mini setup variants
+          Initramfs variants: minimal initramfs, initramfs-internet, and initramfs-setup
           Network userspace: Gentoo iw, WPA supplicant, BusyBox udhcpc, curl, wireless-regdb, CA certificates
+          Setup userspace: Gentoo Bash and lf; passwordless local gmini account
           Gentoo network package seed: $BINPKG_TAG; Portage source fallback enabled for missing/incompatible binaries
           CPU target: Intel Core 2 Duo / Dell Latitude D630
           Root filesystem: initramfs-only RAM root; no SquashFS or Gentoo init required
-          Validation: archive checks, BusyBox symlink checks, QEMU shell tests, and DHCP/HTTPS test
+          Validation: archive checks, BusyBox symlink checks, QEMU shell tests, DHCP/HTTPS tests, and setup-user test
           Workflow run: $GITHUB_RUN_ID
           EOF
-          sha256sum output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/d630-tiny-internet.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
+          sha256sum output/kernel output/initramfs output/initramfs-internet output/initramfs-setup output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/tiny-main-setup.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/d630-tiny-internet.cfg output/d630-tiny-setup.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
           {
             echo "## D630 Tiny Linux"
             echo
@@ -186,7 +199,7 @@ jobs:
             echo
             echo "| Artifact | Size |"
             echo "|---|---:|"
-            for f in output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst; do
+            for f in output/kernel output/initramfs output/initramfs-internet output/initramfs-setup output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/tiny-main-setup.cpio.zst; do
               printf '| %s | %s bytes |\n' "$(basename "$f")" "$(stat -c '%s' "$f")"
             done
           } >> "$GITHUB_STEP_SUMMARY"
@@ -285,19 +298,78 @@ jobs:
           grep -Fq 'D630_TINY_INTERNET_OK' "$QEMU_LOG"
           echo "QEMU DHCP and HTTPS download test passed." | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: QEMU test Gentoo Mini setup user, Bash, lf, and networking
+        shell: bash
+        env:
+          KERNEL: ${{ github.workspace }}/output/kernel
+          INITRD: ${{ github.workspace }}/output/initramfs-setup
+          QEMU_BIN: /usr/bin/qemu-system-x86_64
+          QEMU_LOG: ${{ github.workspace }}/output/qemu-setup-boot.log
+        run: |
+          set -euo pipefail
+          expect <<'EXPECT'
+          set timeout 90
+          log_file -noappend $env(QEMU_LOG)
+          spawn $env(QEMU_BIN) -machine pc -accel tcg -cpu core2duo -m 512 -smp 2 -usb -device usb-net,netdev=net0 -netdev user,id=net0 -kernel $env(KERNEL) -initrd $env(INITRD) -append "console=ttyS0,115200n8 loglevel=4" -nographic -monitor none -no-reboot
+          expect {
+            -re {Setup shell: gmini \(Bash\)} {}
+            timeout { puts stderr "Setup image banner was not found"; exit 1 }
+            eof { puts stderr "QEMU exited before the setup shell"; exit 1 }
+          }
+          expect {
+            -re {gmini@d630-tiny:} {}
+            timeout { puts stderr "Setup image did not log in as gmini"; exit 1 }
+            eof { puts stderr "QEMU exited before the gmini prompt"; exit 1 }
+          }
+          send -- "test \"\$(id -un)\" = gmini && test \"\$SHELL\" = /bin/bash && test -n \"\$BASH_VERSION\" && bash --version >/dev/null && lf --version >/dev/null && alias ll | grep -q 'ls -alF' && test \"\$(doas id -u)\" = 0 && echo D630_TINY_SETUP'_'OK\r"
+          expect {
+            -re {D630_TINY_SETUP_OK} {}
+            timeout { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
+            eof { puts stderr "QEMU exited during setup-user checks"; exit 1 }
+            -re {gmini@d630-tiny:} { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
+          }
+          expect {
+            -re {gmini@d630-tiny:} {}
+            timeout { puts stderr "Setup shell prompt not returned"; exit 1 }
+          }
+          send -- {interface=; for path in /sys/class/net/*; do candidate=${path##*/}; case "$candidate" in lo) continue;; esac; [ -e "$path/device" ] || continue; interface=$candidate; break; done; [ -n "$interface" ] && doas udhcpc -q -i "$interface" -s /usr/share/udhcpc/default.script && echo D630_TINY_SETUP_DHCP_OK}
+          send -- "\r"
+          expect {
+            -re {D630_TINY_SETUP_DHCP_OK} {}
+            timeout { puts stderr "Setup image did not receive a DHCP lease"; exit 1 }
+            eof { puts stderr "QEMU exited during setup DHCP"; exit 1 }
+            -re {gmini@d630-tiny:} { puts stderr "Setup image did not receive a DHCP lease"; exit 1 }
+          }
+          expect {
+            -re {gmini@d630-tiny:} {}
+            timeout { puts stderr "Setup shell prompt not returned after DHCP"; exit 1 }
+          }
+          send -- "curl --fail --location --silent --show-error --max-time 30 https://example.com/ -o /tmp/example.html && grep -q 'Example Domain' /tmp/example.html && echo D630_TINY_SETUP_INTERNET'_'OK\r"
+          expect {
+            -re {D630_TINY_SETUP_INTERNET_OK} {}
+            timeout { puts stderr "Setup image HTTPS download failed"; exit 1 }
+            eof { puts stderr "QEMU exited during setup HTTPS download"; exit 1 }
+          }
+          send -- "poweroff -f\r"
+          expect eof
+          EXPECT
+          grep -Fq 'D630_TINY_SETUP_OK' "$QEMU_LOG"
+          grep -Fq 'D630_TINY_SETUP_INTERNET_OK' "$QEMU_LOG"
+          echo "QEMU setup-user and network tests passed." | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Publish verified standalone bundle
         shell: bash
         run: |
           set -euo pipefail
           tag="d630-tiny-shell-$GITHUB_RUN_ID"
           cat > output/RELEASE-NOTES.md <<'NOTES'
-          D630 Tiny Linux is a standalone, RAM-only BusyBox shell booting directly from the existing D630 kernel plus external initramfs.
+          D630 Tiny Linux is a standalone, RAM-only shell booting directly from the existing D630 kernel plus external initramfs.
 
-          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. The minimal initramfs and separate initramfs-internet variant use Zstandard level 3, with the original early Intel microcode CPIO prepended. The internet variant's networking applications are Gentoo packages installed with Portage, reusing the existing Gentoo binpkgs where compatible; it includes Wi-Fi association, DHCP, HTTPS downloads, and CA certificates.
+          This prototype contains no Gentoo root, SquashFS, OpenRC, or systemd. It publishes minimal, internet, and setup initramfs variants using Zstandard level 3, with the original early Intel microcode CPIO prepended. The separate setup image boots as passwordless local user gmini with Gentoo Bash and lf, and includes passwordless `doas` for local administration plus Gentoo-built Wi-Fi, DHCP, and HTTPS tools. `.bashrc` configures a colored prompt and common aliases.
 
-          The workflow verified the pinned kernel/firmware hashes and QEMU-tested the exact kernel and both initramfs variants. The internet variant obtained a DHCP lease and downloaded an HTTPS page through QEMU user networking. This is not yet the graphical desktop and is not a claim of a physical D630 Wi-Fi boot.
+          The workflow verified the pinned kernel/firmware hashes and QEMU-tested the exact kernel and all initramfs variants, including setup-user login and DHCP/HTTPS downloads. This is not yet the graphical desktop and is not a claim of a physical D630 Wi-Fi boot.
 
-          Install kernel and initramfs-internet into a new /d630-tiny/ directory. Use d630-tiny-internet.cfg as the GRUB entry. Do not overwrite /d630-gentoo/.
+          Install kernel and the desired initramfs into a new /d630-tiny/ directory. Use the matching GRUB entry. Do not overwrite /d630-gentoo/.
           NOTES
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux shell + internet tools / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/initramfs-internet output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/d630-tiny-internet.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/build-network-tools.sh output/wifi-connect output/udhcpc-default.script output/INITRAMFS-MANIFEST.txt output/INITRAMFS-INTERNET-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log output/qemu-internet-boot.log
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux shell + setup tools / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/initramfs-internet output/initramfs-setup output/tiny-main.cpio.zst output/tiny-main-internet.cpio.zst output/tiny-main-setup.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/d630-tiny-internet.cfg output/d630-tiny-setup.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/build-network-tools.sh output/build-setup-tools.sh output/gmini.bashrc output/gmini.bash_profile output/wifi-connect output/udhcpc-default.script output/INITRAMFS-MANIFEST.txt output/INITRAMFS-INTERNET-MANIFEST.txt output/INITRAMFS-SETUP-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log output/qemu-internet-boot.log output/qemu-setup-boot.log
           echo "Published $tag: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" | tee -a "$GITHUB_STEP_SUMMARY"

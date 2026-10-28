@@ -34,15 +34,23 @@ printf '  RAM:    '
 grep MemTotal /proc/meminfo 2>/dev/null
 printf '\n'
 printf '  This is a RAM-only shell. Changes disappear at reboot.\n'
-printf '  Try: uname -a, free, dmesg, mount, ls /lib/firmware\n'
-if command -v wifi-connect >/dev/null 2>&1; then
+if [ -f /etc/d630-tiny/setup-mode ]; then
+    printf '  Setup shell: gmini (Bash) | File manager: lf\n'
+    printf '  Network: wifi-connect | Downloads: curl -fL URL -o /tmp/file\n\n'
+elif command -v wifi-connect >/dev/null 2>&1; then
     printf '  Wi-Fi setup: wifi-connect | Downloads: curl -fL URL -o /tmp/file\n\n'
 else
+    printf '  Try: uname -a, free, dmesg, mount, ls /lib/firmware\n'
     printf '  Wi-Fi and download tools are in the internet-enabled initramfs variant.\n\n'
 fi
 
 while :; do
-    setsid cttyhack /bin/sh -i
+    if [ -f /etc/d630-tiny/setup-mode ]; then
+        chown -R 1000:1000 /home/gmini
+        setsid cttyhack su -l gmini
+    else
+        setsid cttyhack /bin/sh -i
+    fi
     printf '\n[d630-tiny] shell exited; restarting console shell...\n'
     sleep 1
 done

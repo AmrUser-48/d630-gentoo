@@ -2,17 +2,23 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [--internet] [--assets-dir DIRECTORY]" >&2
+  echo "Usage: $0 [--internet | --setup] [--assets-dir DIRECTORY]" >&2
   exit 2
 }
 
 internet=false
+setup=false
 assets_dir=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --internet)
       [[ "$internet" == false ]] || usage
       internet=true
+      shift
+      ;;
+    --setup)
+      [[ "$setup" == false ]] || usage
+      setup=true
       shift
       ;;
     --assets-dir)
@@ -26,9 +32,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$internet" == true && "$setup" == true ]]; then
+  usage
+fi
+
 tag=$(gh release view --repo AmrUser-48/d630-gentoo --json tagName --jq .tagName)
 initramfs_asset=initramfs
-if [[ "$internet" == true ]]; then
+if [[ "$setup" == true ]]; then
+  initramfs_asset=initramfs-setup
+elif [[ "$internet" == true ]]; then
   initramfs_asset=initramfs-internet
 fi
 
@@ -41,6 +53,8 @@ if [[ -z "$assets_dir" ]]; then
     echo "Release $tag does not include '$initramfs_asset'." >&2
     if [[ "$internet" == true ]]; then
       echo "The internet-enabled initramfs has not been published yet; use the standard initramfs or wait for the build workflow." >&2
+    elif [[ "$setup" == true ]]; then
+      echo "The Gentoo Mini setup initramfs has not been published yet; use the standard initramfs or wait for the build workflow." >&2
     fi
     exit 1
   fi
@@ -71,7 +85,7 @@ qemu_args=(
   -append 'console=ttyS0,115200n8 loglevel=4' \
   -nographic -monitor none
 )
-if [[ "$initramfs_asset" == initramfs-internet ]]; then
+if [[ "$initramfs_asset" == initramfs-internet || "$initramfs_asset" == initramfs-setup ]]; then
   qemu_args+=(-usb -device usb-net,netdev=net0 -netdev user,id=net0)
 fi
 

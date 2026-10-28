@@ -61,6 +61,16 @@ if [[ -n "$NETWORK_ROOT" ]]; then
     fi
   done
 fi
+SETUP_MODE=false
+if [[ -n "$NETWORK_ROOT" && -f "$NETWORK_ROOT/etc/d630-tiny/setup-mode" ]]; then
+  SETUP_MODE=true
+  for applet in su chown; do
+    if ! grep -Fxq "$applet" "$APPLET_LIST"; then
+      echo "Required setup BusyBox applet missing: $applet" >&2
+      exit 1
+    fi
+  done
+fi
 echo "initramfs-build: BusyBox applets verified"
 "$ROOT/bin/busybox" --install -s "$ROOT/bin"
 while IFS= read -r -d '' link; do
@@ -134,6 +144,9 @@ required_members=(init bin/busybox lib/firmware/iwlwifi-3945-2.ucode)
 if [[ -n "$NETWORK_ROOT" ]]; then
   required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
+if [[ "$SETUP_MODE" == true ]]; then
+  required_members+=(bin/bash usr/bin/lf usr/bin/doas etc/passwd etc/group etc/shadow etc/doas.conf home/gmini/.bashrc home/gmini/.bash_profile etc/d630-tiny/setup-mode)
+fi
 for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
     echo "::error::Archive member missing: $member" >&2
@@ -144,6 +157,10 @@ done
 if [[ -n "$NETWORK_ROOT" ]] && ! grep -Eq '^usr/(bin|sbin)/curl$' "$OUT/tiny-file-list.txt"; then
   echo "::error::Archive has no Gentoo curl binary under /usr/bin or /usr/sbin." >&2
   cat "$OUT/tiny-file-list.txt" >&2
+  exit 1
+fi
+if [[ "$SETUP_MODE" == true ]] && ! grep -Fxq 'gmini:x:1000:1000:Gentoo Mini:/home/gmini:/bin/bash' "$NETWORK_ROOT/etc/passwd"; then
+  echo "::error::Setup account gmini is missing or has an unexpected shell." >&2
   exit 1
 fi
 echo "initramfs-build: required archive members verified"
@@ -160,6 +177,9 @@ test -s "$OUT/initramfs"
     echo "Networking: iw, WPA supplicant, BusyBox DHCP, rfkill, curl, and CA certificates"
   else
     echo "Networking: not included in this minimal shell variant"
+  fi
+  if [[ "$SETUP_MODE" == true ]]; then
+    echo "Setup user: gmini (passwordless local console), Bash, lf, and custom Bash startup files"
   fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"
