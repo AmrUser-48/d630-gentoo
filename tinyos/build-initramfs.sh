@@ -55,7 +55,7 @@ while IFS= read -r -d '' link; do
 done < <(find "$ROOT/bin" -mindepth 1 -maxdepth 1 -type l -print0)
 ln -sfn busybox "$ROOT/bin/sh"
 ln -sfn busybox "$ROOT/bin/static-sh"
-chroot "$ROOT" /bin/sh -c 'exit 0'
+"$ROOT/bin/sh" -c 'exit 0'
 echo "initramfs-build: /bin/sh link validated"
 
 cp "$INIT_SCRIPT" "$ROOT/init"
