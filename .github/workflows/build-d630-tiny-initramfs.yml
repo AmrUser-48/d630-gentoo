@@ -27,6 +27,7 @@ jobs:
       KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-39509781896
       BINPKG_TAG: binpkgs-39507549274
       BINPKG_SHARD_SHA256: f0a4bbb964230b2db9c0a2b6e6478dbd57c2ff24f22f29788e1045b1bdea593e
+      GURU_COMMIT: de0f47139c9afd9ae187b4b1f94ec7c5550c315c
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out tiny OS sources
@@ -121,6 +122,33 @@ jobs:
           sudo rm -f "$root/etc/resolv.conf"
           sudo cp -L /etc/resolv.conf "$root/etc/resolv.conf"
 
+          guru="$work/guru"
+          git init "$guru"
+          git -C "$guru" remote add origin https://github.com/gentoo/guru.git
+          git -C "$guru" fetch --depth=1 origin "$GURU_COMMIT"
+          git -C "$guru" sparse-checkout init --no-cone
+          git -C "$guru" sparse-checkout set --no-cone \
+            '/app-misc/lf/**' '/metadata/layout.conf' \
+            '/profiles/categories' '/profiles/repo_name'
+          git -C "$guru" checkout --detach "$GURU_COMMIT"
+          test -s "$guru/app-misc/lf/lf-42.ebuild"
+          grep -Fxq guru "$guru/profiles/repo_name"
+          guru_root="$root/var/db/repos/guru"
+          sudo mkdir -p "$guru_root/app-misc" "$guru_root/metadata" "$guru_root/profiles"
+          sudo cp -a "$guru/app-misc/lf" "$guru_root/app-misc/"
+          sudo cp -a "$guru/metadata/layout.conf" "$guru_root/metadata/"
+          sudo cp -a "$guru/profiles/categories" "$guru_root/profiles/"
+          sudo cp -a "$guru/profiles/repo_name" "$guru_root/profiles/"
+          sudo chown -R root:root "$guru_root"
+          sudo tee "$root/etc/portage/repos.conf/guru.conf" >/dev/null <<'EOF'
+          [guru]
+          location = /var/db/repos/guru
+          auto-sync = no
+          EOF
+          sudo mkdir -p "$root/etc/portage/package.accept_keywords"
+          echo 'app-misc/lf ~amd64' |
+            sudo tee "$root/etc/portage/package.accept_keywords/lf" >/dev/null
+
           curl -fL --retry 4 --retry-all-errors \
             "https://github.com/AmrUser-48/d630-gentoo/releases/download/$BINPKG_TAG/binpkgs-part-001.tar.zst" \
             -o "$work/binpkgs/binpkgs-part-001.tar.zst"
@@ -184,7 +212,7 @@ jobs:
           Root userspace: static BusyBox + custom /init; separate internet and Gentoo Mini setup variants
           Initramfs variants: minimal initramfs, initramfs-internet, and initramfs-setup
           Network userspace: Gentoo iw, WPA supplicant, BusyBox udhcpc, curl, wireless-regdb, CA certificates
-          Setup userspace: Gentoo Bash and lf; passwordless local gmini account
+          Setup userspace: Gentoo Bash and lf (Gentoo Guru commit $GURU_COMMIT); passwordless local gmini account
           Gentoo network package seed: $BINPKG_TAG; Portage source fallback enabled for missing/incompatible binaries
           CPU target: Intel Core 2 Duo / Dell Latitude D630
           Root filesystem: initramfs-only RAM root; no SquashFS or Gentoo init required
