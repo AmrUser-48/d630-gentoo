@@ -250,7 +250,7 @@ jobs:
           log_file -noappend $env(QEMU_LOG)
           spawn $env(QEMU_BIN) -machine pc -accel tcg -cpu core2duo -m 512 -smp 2 -kernel $env(KERNEL) -initrd $env(INITRD) -append "console=ttyS0,115200n8 loglevel=4" -nographic -monitor none -no-reboot
           expect {
-            -re {Tiny Linux for Dell Latitude D630} {}
+            -re {D630 Tiny Linux} {}
             timeout { puts stderr "QEMU did not reach D630 Tiny /init banner"; exit 1 }
             eof { puts stderr "QEMU exited before running /init"; exit 1 }
           }
