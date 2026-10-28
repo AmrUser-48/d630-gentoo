@@ -44,10 +44,9 @@ echo "menuentry 'D630 Tiny Linux (Gentoo Mini)' {
     search --no-floppy --file --set=root /d630-tiny/tiny.cfg
     configfile /d630-tiny/tiny.cfg
 }" | sudo tee -a /grubconfig/40-custom
-sudo reboot
 ```
 
-Select **D630 Tiny Linux (Gentoo Mini)**. The menu entry loads `/d630-tiny/tiny.cfg`, which boots the kernel and initramfs from that same directory. Keep the existing Gentoo entry as a fallback; do not overwrite anything in `/d630-gentoo/`.
+This only appends the menu entry. It does not reboot the laptop or regenerate the GRUB configuration. Keep the existing Gentoo entry as a fallback; do not overwrite anything in `/d630-gentoo/`.
 
 After boot, Tiny starts in a text shell as `gmini`. To connect using the laptop's Wi-Fi, run:
 
