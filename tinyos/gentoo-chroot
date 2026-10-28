@@ -1,0 +1,84 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+if [[ $# -ne 1 || "$1" != /* ]]; then
+  echo "Usage: doas gentoo-chroot /mounted/gentoo-root" >&2
+  exit 2
+fi
+if [[ "$EUID" -ne 0 ]]; then
+  echo "Run this command as root, for example: doas gentoo-chroot /mnt/gentoo" >&2
+  exit 1
+fi
+[[ -d "$1" ]] || {
+  echo "Gentoo root directory does not exist: $1" >&2
+  exit 1
+}
+
+root=$(cd -P -- "$1" && pwd)
+[[ "$root" != "/" ]] || {
+  echo "Refusing to chroot into the running root filesystem." >&2
+  exit 1
+}
+[[ "$root" != *[[:space:]]* ]] || {
+  echo "Gentoo root path must not contain whitespace: $root" >&2
+  exit 1
+}
+[[ -s "$root/etc/gentoo-release" && -x "$root/bin/bash" ]] || {
+  echo "Not a usable Gentoo root (expected etc/gentoo-release and bin/bash): $root" >&2
+  exit 1
+}
+
+for mountpoint in dev proc sys run; do
+  if [[ -L "$root/$mountpoint" ]]; then
+    echo "Refusing to bind over a symlink: $root/$mountpoint" >&2
+    exit 1
+  fi
+  mkdir -p "$root/$mountpoint"
+done
+
+mounted=()
+unmount_tree() {
+  local base=$1 mountpoint failed=0
+  while IFS=$'\t' read -r _ mountpoint; do
+    [[ -n "$mountpoint" ]] || continue
+    if ! umount "$mountpoint"; then
+      echo "Could not unmount chroot mount: $mountpoint" >&2
+      failed=1
+    fi
+  done < <(
+    awk -v base="$base" \
+      '$2 == base || index($2, base "/") == 1 { printf "%d\t%s\n", length($2), $2 }' \
+      /proc/mounts | LC_ALL=C sort -rn -k1,1 | cut -f2-
+  )
+  return "$failed"
+}
+cleanup() {
+  local status=$? index
+  trap - EXIT HUP INT TERM
+  for ((index=${#mounted[@]} - 1; index >= 0; index--)); do
+    if ! unmount_tree "$root/${mounted[index]}"; then
+      status=1
+    fi
+  done
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+for mountpoint in dev proc sys run; do
+  [[ -d "$root/$mountpoint" && ! -L "$root/$mountpoint" ]] || {
+    echo "Chroot mount target is not a real directory: $root/$mountpoint" >&2
+    exit 1
+  }
+  if awk -v target="$root/$mountpoint" '$2 == target { found=1 } END { exit !found }' /proc/mounts; then
+    echo "Refusing to replace an already-mounted chroot path: $root/$mountpoint" >&2
+    exit 1
+  fi
+  mount --rbind "/$mountpoint" "$root/$mountpoint"
+  mounted+=("$mountpoint")
+  mount --make-rslave "$root/$mountpoint"
+done
+
+cd /
+chroot "$root" /bin/bash -l

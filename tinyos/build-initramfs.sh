@@ -11,6 +11,7 @@ EARLY_MICROCODE=$3
 OUT=$4
 INIT_SCRIPT=$5
 NETWORK_ROOT=${6:-}
+FIRMWARE_LIST="$(cd -- "$(dirname -- "$INIT_SCRIPT")" && pwd)/firmware-files.list"
 
 for f in "$BUSYBOX" "$FIRMWARE_ARCHIVE" "$EARLY_MICROCODE" "$INIT_SCRIPT"; do
   [[ -s "$f" ]] || { echo "Missing required input: $f" >&2; exit 1; }
@@ -64,12 +65,16 @@ fi
 SETUP_MODE=false
 if [[ -n "$NETWORK_ROOT" && -f "$NETWORK_ROOT/etc/d630-tiny/setup-mode" ]]; then
   SETUP_MODE=true
-  for applet in login chown; do
+  for applet in login chown umount chroot awk sort cut; do
     if ! grep -Fxq "$applet" "$APPLET_LIST"; then
       echo "Required setup BusyBox applet missing: $applet" >&2
       exit 1
     fi
   done
+  [[ -s "$FIRMWARE_LIST" ]] || {
+    echo "Requested firmware manifest is missing: $FIRMWARE_LIST" >&2
+    exit 1
+  }
 fi
 echo "initramfs-build: BusyBox applets verified"
 "$ROOT/bin/busybox" --install -s "$ROOT/bin"
@@ -86,6 +91,25 @@ chmod 0755 "$ROOT/init"
 cp -a "$FWROOT/lib/firmware/." "$ROOT/lib/firmware/"
 if [[ -n "$NETWORK_ROOT" ]]; then
   cp -a "$NETWORK_ROOT/." "$ROOT/"
+fi
+if [[ "$SETUP_MODE" == true ]]; then
+  firmware_count=0
+  while IFS= read -r firmware || [[ -n "$firmware" ]]; do
+    [[ -z "$firmware" || "$firmware" == \#* ]] && continue
+    [[ "$firmware" =~ ^(i915|tigon)/[A-Za-z0-9._-]+$ ]] || {
+      echo "Invalid firmware path in $FIRMWARE_LIST: $firmware" >&2
+      exit 1
+    }
+    [[ -s "$ROOT/lib/firmware/$firmware" ]] || {
+      echo "Requested firmware is absent from the staged image: $firmware" >&2
+      exit 1
+    }
+    ((firmware_count += 1))
+  done < "$FIRMWARE_LIST"
+  [[ "$firmware_count" -eq 40 ]] || {
+    echo "Expected 40 requested i915/tigon firmware files, found $firmware_count." >&2
+    exit 1
+  }
 fi
 if [[ -d "$FWROOT/usr/share/licenses" ]]; then
   mkdir -p "$ROOT/usr/share"
@@ -146,7 +170,21 @@ if [[ -n "$NETWORK_ROOT" ]]; then
   required_members+=(usr/sbin/wifi-connect usr/share/udhcpc/default.script lib/firmware/regulatory.db)
 fi
 if [[ "$SETUP_MODE" == true ]]; then
-  required_members+=(bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/share/d630-tiny/early-microcode.cpio etc/passwd etc/group etc/shadow etc/doas.conf etc/motd home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode)
+  required_members+=(
+    bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/bin/setfont
+    usr/sbin/rdmsr usr/sbin/wrmsr usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/sbin/gentoo-chroot
+    usr/share/d630-tiny/early-microcode.cpio usr/share/d630-tiny/firmware-files.list
+    usr/share/fonts/misc/ter-powerline-x16n.pcf.gz usr/share/fonts/misc/ter-powerline-x16b.pcf.gz
+    usr/share/consolefonts/ter-powerline-v16n.psf.gz usr/share/consolefonts/ter-powerline-v16b.psf.gz
+    usr/share/licenses/terminus-powerline/LICENSE.txt usr/share/licenses/linux-firmware/WHENCE
+    usr/share/licenses/linux-firmware/LICENSES etc/passwd etc/group etc/shadow etc/doas.conf etc/motd
+    home/gmini/.bashrc home/gmini/.bash_profile home/gmini/.config/lf/lfrc
+    home/gmini/.config/lf/colors home/gmini/.config/lf/icons etc/d630-tiny/setup-mode
+  )
+  while IFS= read -r firmware || [[ -n "$firmware" ]]; do
+    [[ -z "$firmware" || "$firmware" == \#* ]] && continue
+    required_members+=("lib/firmware/$firmware")
+  done < "$FIRMWARE_LIST"
 fi
 for member in "${required_members[@]}"; do
   if ! grep -Fxq "$member" "$OUT/tiny-file-list.txt"; then
@@ -184,7 +222,8 @@ test -s "$OUT/initramfs"
     echo "Networking: not included in this minimal shell variant"
   fi
   if [[ "$SETUP_MODE" == true ]]; then
-    echo "Setup user: gmini, BusyBox login/MOTD, Gentoo Bash/lf/file, doas, rebuild-initramfs, and custom configs"
+    echo "Firmware additions: 36 requested i915 files and 4 tigon files, with WHENCE and LICENSES retained"
+    echo "Setup user: gmini, Gentoo Bash/lf/file, msr-tools from binpkg, setfont, selected Terminus Powerline PCF/PSF, gentoo-chroot, and rebuild-initramfs"
   fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 11 ]]; then
-  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE LFRC LFCOLORS LFICONS LFPREVIEW REBUILD_SCRIPT EARLY_MICROCODE" >&2
+if [[ $# -ne 12 ]]; then
+  echo "Usage: $0 GENTOO_ROOT NETWORK_ROOT OUTPUT_ROOT BASHRC BASH_PROFILE LFRC LFCOLORS LFICONS LFPREVIEW REBUILD_SCRIPT EARLY_MICROCODE POWERLINE_FONTS_ROOT" >&2
   exit 2
 fi
 
@@ -17,11 +17,14 @@ LFICONS=$8
 LFPREVIEW=$9
 REBUILD_SCRIPT=${10}
 EARLY_MICROCODE=${11}
+POWERLINE_FONTS_ROOT=${12}
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+FIRMWARE_LIST="$SCRIPT_DIR/firmware-files.list"
 
-for path in "$GENTOO_ROOT" "$NETWORK_ROOT"; do
+for path in "$GENTOO_ROOT" "$NETWORK_ROOT" "$POWERLINE_FONTS_ROOT"; do
   [[ -d "$path" ]] || { echo "Required root not found: $path" >&2; exit 1; }
 done
-for file in "$BASHRC" "$BASH_PROFILE" "$LFRC" "$LFCOLORS" "$LFICONS" "$LFPREVIEW" "$REBUILD_SCRIPT" "$EARLY_MICROCODE"; do
+for file in "$BASHRC" "$BASH_PROFILE" "$LFRC" "$LFCOLORS" "$LFICONS" "$LFPREVIEW" "$REBUILD_SCRIPT" "$EARLY_MICROCODE" "$FIRMWARE_LIST" "$SCRIPT_DIR/gentoo-chroot"; do
   [[ -s "$file" ]] || { echo "Required shell configuration is missing: $file" >&2; exit 1; }
 done
 
@@ -74,6 +77,9 @@ copy_binary doas /usr/bin/doas
 copy_binary file /usr/bin/file
 copy_binary cpio /usr/bin/cpio
 copy_binary zstd /usr/bin/zstd
+copy_binary rdmsr /usr/sbin/rdmsr
+copy_binary wrmsr /usr/sbin/wrmsr
+copy_binary setfont /usr/bin/setfont
 chmod 4755 "$ROOT/usr/bin/doas"
 
 magic_db="$GENTOO_ROOT/usr/share/misc/magic.mgc"
@@ -93,7 +99,58 @@ cp -a "$terminfo" "$ROOT/usr/share/"
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
 install -D -m 0755 "$REBUILD_SCRIPT" "$ROOT/usr/sbin/rebuild-initramfs"
+install -D -m 0755 "$SCRIPT_DIR/gentoo-chroot" "$ROOT/usr/sbin/gentoo-chroot"
 install -D -m 0644 "$EARLY_MICROCODE" "$ROOT/usr/share/d630-tiny/early-microcode.cpio"
+install -D -m 0644 "$FIRMWARE_LIST" "$ROOT/usr/share/d630-tiny/firmware-files.list"
+
+firmware_count=0
+while IFS= read -r firmware || [[ -n "$firmware" ]]; do
+  [[ -z "$firmware" || "$firmware" == \#* ]] && continue
+  [[ "$firmware" =~ ^(i915|tigon)/[A-Za-z0-9._-]+$ ]] || {
+    echo "Invalid firmware path in $FIRMWARE_LIST: $firmware" >&2
+    exit 1
+  }
+  source="$GENTOO_ROOT/lib/firmware/$firmware"
+  [[ -s "$source" ]] || source="$GENTOO_ROOT/usr/lib/firmware/$firmware"
+  [[ -s "$source" ]] || {
+    echo "Requested firmware is missing from sys-kernel/linux-firmware: $firmware" >&2
+    exit 1
+  }
+  install -D -m 0644 "$source" "$ROOT/lib/firmware/$firmware"
+  ((firmware_count += 1))
+done < "$FIRMWARE_LIST"
+[[ "$firmware_count" -eq 40 ]] || {
+  echo "Expected 40 requested i915/tigon firmware files, found $firmware_count." >&2
+  exit 1
+}
+
+firmware_docs=$(find "$GENTOO_ROOT/usr/share/doc" -maxdepth 1 -type d -name 'linux-firmware-*' -print -quit)
+[[ -n "$firmware_docs" && -s "$firmware_docs/WHENCE" && -d "$firmware_docs/LICENSES" ]] || {
+  echo "Linux firmware license notices are missing from the Gentoo staging root." >&2
+  exit 1
+}
+mkdir -p "$ROOT/usr/share/licenses/linux-firmware"
+cp -a "$firmware_docs/WHENCE" "$firmware_docs/LICENSES" "$ROOT/usr/share/licenses/linux-firmware/"
+
+for font in ter-powerline-x16n.pcf.gz ter-powerline-x16b.pcf.gz; do
+  [[ -s "$POWERLINE_FONTS_ROOT/PCF/$font" ]] || {
+    echo "Required Terminus Powerline PCF font is missing: $font" >&2
+    exit 1
+  }
+  install -D -m 0644 "$POWERLINE_FONTS_ROOT/PCF/$font" "$ROOT/usr/share/fonts/misc/$font"
+done
+for font in ter-powerline-v16n.psf.gz ter-powerline-v16b.psf.gz; do
+  [[ -s "$POWERLINE_FONTS_ROOT/PSF/$font" ]] || {
+    echo "Required Terminus Powerline console font is missing: $font" >&2
+    exit 1
+  }
+  install -D -m 0644 "$POWERLINE_FONTS_ROOT/PSF/$font" "$ROOT/usr/share/consolefonts/$font"
+done
+[[ -s "$POWERLINE_FONTS_ROOT/LICENSE.txt" ]] || {
+  echo "Terminus Powerline font license is missing." >&2
+  exit 1
+}
+install -D -m 0644 "$POWERLINE_FONTS_ROOT/LICENSE.txt" "$ROOT/usr/share/licenses/terminus-powerline/LICENSE.txt"
 cat > "$ROOT/etc/motd" <<'MOTD'
  ██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗
 ██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗██╔═══██╗
@@ -136,7 +193,14 @@ install -D -m 0755 "$LFPREVIEW" "$ROOT/usr/sbin/lf-preview"
 printf 'Gentoo Mini setup environment\n' > "$ROOT/etc/d630-tiny/setup-mode"
 
 for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/bin/file" \
-  "$ROOT/usr/bin/cpio" "$ROOT/usr/bin/zstd" "$ROOT/usr/sbin/rebuild-initramfs" \
+  "$ROOT/usr/bin/cpio" "$ROOT/usr/bin/zstd" "$ROOT/usr/sbin/rdmsr" "$ROOT/usr/sbin/wrmsr" \
+  "$ROOT/usr/bin/setfont" "$ROOT/usr/sbin/gentoo-chroot" "$ROOT/usr/sbin/rebuild-initramfs" \
+  "$ROOT/usr/share/fonts/misc/ter-powerline-x16n.pcf.gz" \
+  "$ROOT/usr/share/fonts/misc/ter-powerline-x16b.pcf.gz" \
+  "$ROOT/usr/share/consolefonts/ter-powerline-v16n.psf.gz" \
+  "$ROOT/usr/share/consolefonts/ter-powerline-v16b.psf.gz" \
+  "$ROOT/usr/share/licenses/terminus-powerline/LICENSE.txt" \
+  "$ROOT/usr/share/d630-tiny/firmware-files.list" \
   "$ROOT/usr/share/d630-tiny/early-microcode.cpio" \
   "$ROOT/etc/passwd" "$ROOT/etc/group" "$ROOT/etc/shadow" \
   "$ROOT/etc/doas.conf" "$ROOT/etc/motd" "$ROOT/usr/sbin/lf-preview" "$ROOT/home/gmini/.bashrc" \
@@ -145,6 +209,14 @@ for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/
   "$ROOT/etc/d630-tiny/setup-mode"; do
   [[ -s "$file" ]] || { echo "Setup image file is missing: $file" >&2; exit 1; }
 done
+[[ "$(wc -l < "$FIRMWARE_LIST")" -eq 40 ]] || {
+  echo "Firmware manifest must contain exactly 40 files." >&2
+  exit 1
+}
+[[ -d "$ROOT/usr/share/licenses/linux-firmware/LICENSES" && -s "$ROOT/usr/share/licenses/linux-firmware/WHENCE" ]] || {
+  echo "Firmware license notices were not staged." >&2
+  exit 1
+}
 [[ "$(stat -c '%a' "$ROOT/usr/bin/doas")" == 4755 ]] || {
   echo "Gentoo doas must be installed setuid root in the setup image." >&2
   exit 1
