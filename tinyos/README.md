@@ -27,9 +27,10 @@ The `Res_syst` partition is already mounted. These commands find its mount point
 cd "$(findmnt -rn -S LABEL=Res_syst -o TARGET)" &&
 mkdir -vp d630-tiny &&
 cd d630-tiny &&
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o kernel &&
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o initramfs &&
-curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg -o tiny.cfg
+curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel &&
+curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs &&
+curl -fLO https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg &&
+mv d630-tiny.cfg tiny.cfg
 ```
 
 The files are now at `/d630-tiny/kernel`, `/d630-tiny/initramfs`, and `/d630-tiny/tiny.cfg` on the `Res_syst` partition, alongside the existing `/d630-gentoo/` directory.
