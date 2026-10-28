@@ -38,7 +38,7 @@ Use the mount point shown for `Res_syst`. It must be mounted and writable by you
 Run these commands as your normal user. They create `/d630-tiny/` and download the kernel, initramfs, and GRUB boot script directly there. No `sudo` is needed for the downloads.
 
 ```sh
-mkdir -p /MOUNT/POINT/d630-tiny
+mkdir -vp /d630-tiny && cd /d630-tiny
 curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel -o /MOUNT/POINT/d630-tiny/kernel
 curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs -o /MOUNT/POINT/d630-tiny/initramfs
 curl -fL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg -o /MOUNT/POINT/d630-tiny/tiny.cfg
