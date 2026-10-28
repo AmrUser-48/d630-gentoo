@@ -21,10 +21,16 @@ This is a **standalone shell environment, not a complete Gentoo installation**. 
 
 ## 1. Boot Tiny on the physical D630
 
-The `Res_syst` partition is already mounted. These commands find its mount point by filesystem label, create `d630-tiny/` there, and download the three files directly into it. Run them as your normal user; no placeholder path and no `sudo` are needed.
+Use the already-mounted, GRUB-readable partition whose root contains the existing `/d630-gentoo/` directory. The commands below detect its mount point automatically; they do not assume a filesystem label or a machine-specific path. Run them as your normal user.
 
 ```sh
-cd "$(findmnt -rn -S LABEL=Res_syst -o TARGET)" &&
+cd "$(findmnt -rn -o TARGET | while IFS= read -r m; do
+    p="${m%/}/d630-gentoo"
+    if [ -d "$p" ] && [ "$(findmnt -rn -T "$p" -o TARGET)" = "$m" ]; then
+        printf '%s\\n' "$m"
+        break
+    fi
+done)" &&
 mkdir -vp d630-tiny &&
 cd d630-tiny &&
 curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel &&
@@ -33,7 +39,7 @@ curl -fLO https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d6
 mv d630-tiny.cfg tiny.cfg
 ```
 
-The files are now at `/d630-tiny/kernel`, `/d630-tiny/initramfs`, and `/d630-tiny/tiny.cfg` on the `Res_syst` partition, alongside the existing `/d630-gentoo/` directory.
+This creates `/d630-tiny/` at the root of that partition and downloads `kernel`, `initramfs`, and `tiny.cfg` there. If the directory cannot be found or the partition is not writable, the command chain stops rather than downloading the files to an unrelated location.
 
 ### Add the GRUB entry
 
