@@ -252,7 +252,7 @@ jobs:
           }
           send -- "for app in iw wpa_supplicant wpa_passphrase wpa_cli curl wifi-connect; do command -v \"\$app\" >/dev/null || exit 1; done && iw --version >/dev/null && wpa_supplicant -v >/dev/null && wpa_passphrase test-network test-passphrase | grep -q 'psk=' && wpa_cli -v >/dev/null && curl --version >/dev/null && echo D630_TINY_NETWORK_TOOLS'_'OK\r"
           expect {
-            -re {\r\nD630_TINY_NETWORK_TOOLS_OK\r\n} {}
+            -re {D630_TINY_NETWORK_TOOLS_OK} {}
             timeout { puts stderr "Network tools are missing or failed to load"; exit 1 }
             eof { puts stderr "QEMU exited while checking network tools"; exit 1 }
             -re {d630-tiny# } { puts stderr "Network tools are missing or failed to run"; exit 1 }
@@ -273,7 +273,7 @@ jobs:
           }
           send -- "curl --fail --location --silent --show-error --max-time 30 https://example.com/ -o /tmp/example.html && grep -q 'Example Domain' /tmp/example.html && echo D630_TINY_INTERNET'_'OK\r"
           expect {
-            -re {\r\nD630_TINY_INTERNET_OK\r\n} {}
+            -re {D630_TINY_INTERNET_OK} {}
             timeout { puts stderr "HTTPS download through QEMU user networking failed"; exit 1 }
             eof { puts stderr "QEMU exited during HTTPS download"; exit 1 }
           }
