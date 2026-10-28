@@ -95,7 +95,7 @@ mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
 install -D -m 0755 "$REBUILD_SCRIPT" "$ROOT/usr/sbin/rebuild-initramfs"
 install -D -m 0644 "$EARLY_MICROCODE" "$ROOT/usr/share/d630-tiny/early-microcode.cpio"
 cat > "$ROOT/etc/motd" <<'MOTD'
-██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗
+ ██████╗ ███████╗███╗   ██╗████████╗ ██████╗  ██████╗
 ██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗██╔═══██╗
 ██║  ███╗█████╗  ██╔██╗ ██║   ██║   ██║   ██║██║   ██║
 ██║   ██║██╔══╝  ██║╚██╗██║   ██║   ██║   ██║██║   ██║
