@@ -2,3 +2,5 @@
 # app-misc/lf is keyworded ~amd64 in GURU; SoX-ng is currently ~amd64 in Gentoo.
 app-misc/lf ~amd64
 media-sound/sox ~amd64
+# Tealdeer is currently keyworded ~amd64 in GURU.
+app-misc/tealdeer ~amd64
