@@ -26,7 +26,7 @@ on:
         type: string
         default: ""
       source_fallback:
-        description: "Allow source builds for missing packages; Openbox always installs Mesa from its required binpkg first"
+        description: "Allow source builds for missing packages. Openbox always builds missing CLI apps and still requires Mesa from a binary package."
         required: true
         type: boolean
         default: false
@@ -53,7 +53,7 @@ jobs:
       RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
       BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
-      SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
+      SOURCE_FALLBACK: ${{ inputs.runtime_profile == 'openbox' || inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
 
