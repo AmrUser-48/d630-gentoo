@@ -60,7 +60,7 @@ This can be a Windows NTFS partition or another filesystem supported by GRUB. Th
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
-The [D630 Gentoo Openbox live release](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29) provides the generated boot files: [kernel](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/kernel), [initramfs](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/initramfs), and [SquashFS root](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/squashfs). Download the [kernel/initramfs checksums](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/SHA256SUMS) and [SquashFS checksum](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/SQUASHFS-SHA256.txt) too. Git does not contain the large SquashFS binary. The runtime has OpenRC, Openbox, Xterm, and Mesa; it omits Portage, LLVM/Clang, Python/Perl, and compiler binaries. Its live account is `gentoo` with password `gentoo`; this fixed password is for local testing only. The older ISO loopback configuration remains a reference, not a supported installer.
+The [D630 Gentoo Openbox live release](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29) provides the generated boot files: [kernel](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/kernel), [initramfs](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/initramfs), and [SquashFS root](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/squashfs). Download the [kernel/initramfs checksums](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/SHA256SUMS) and [SquashFS checksum](https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-gentoo-openbox-2026.10.29/SQUASHFS-SHA256.txt) too. Git does not contain the large SquashFS binary. The intended runtime includes OpenRC, Openbox, Xterm, Mesa/Crocus, and the practical CLI tools listed in the runtime checklist below. Do not assume a published or locally generated SquashFS meets that target until its contents have been checked: the current builder still needs the trimming and package-selection fixes documented below. The live account is `gentoo` with password `gentoo`; this fixed password is for local testing only. The older ISO loopback configuration remains a reference, not a supported installer.
 
 ## Test the live system in QEMU
 
@@ -134,9 +134,44 @@ Use the command and output path for the installed distribution; do not run both 
 2. Keep the final runtime small and practical for rescue work, without sacrificing support for the target laptop's hardware or common disk formats.
 3. Build on GitHub Actions rather than on the D630, whose Core 2 Duo is too slow for large Gentoo builds.
 4. Optimize compiled software for the Core 2 family, not for the remote build runner.
-5. Keep the build system separate from the final live root. Keep the compiler toolchain, development headers, source trees and build caches out of the base runtime image. Since this is a daily-use Gentoo system, Portage should remain available for package management; prefer CI-built binary packages on the slow D630, and keep the ebuild repository/distfiles out of the base image until needed.
+5. Keep the build system separate from the final live root. Keep Portage/emerge, the ebuild repository, package database, compilers, development headers, build-time language runtimes, source trees, caches, manuals and unused locale data out of the immutable three-file Openbox runtime. Keep Portage and binary packages in the separate interactive builder/state releases; the live SquashFS is a runtime, not the build environment.
 6. Prefer a reproducible, inspectable build pipeline and small incremental changes over a large untested one-shot build.
 7. Deliver a genuinely usable daily system, not a disposable rescue shell: persistent installed system files and user data are core requirements. Keep the live ISO as a testing/installation entry point, then produce and verify the disk-install target.
+
+## Openbox runtime SquashFS: content contract and size reduction
+
+The `openbox` profile must produce a usable live desktop, not a copy of a Gentoo build root. Target size is **at most 300 MiB compressed**. The current builder has known gaps: `scripts/build-runtime-squashfs.sh` adds only `config/package-sets/gui-initram.list` for the `openbox` profile, so it does not install the CLI applications from `config/package-sets/cli.list`; `scripts/build-squashfs.sh` deliberately preserves `/usr/share/man`; and the final trimming does not yet enforce the locale policy below. Fix the package selection and final staging rules rather than relying on `depclean` alone.
+
+### Add and keep
+
+The `openbox` atom set must include both the required GUI packages and the practical CLI applications. At minimum, require and verify these executables in the final image:
+
+- CLI file management and diagnostics: `lf`, `mc`, `htop`, `btop`, `fd`, `rg`.
+- Usable shell/editor/session tools: `bash`, `zsh`, `nano`, `nvim`, `tmux`.
+- GUI session: `Xorg`, Mesa's `crocus_dri.so`, Xorg drivers, `startx`, `xterm`, Openbox, a small usable font set, D-Bus and elogind.
+- Boot and hardware support: OpenRC, agetty, user/account utilities needed by first boot, network tools required by the target, and the matching D630 kernel modules and firmware. Keep the required runtime shared libraries for every selected executable.
+
+Use `config/package-sets/gui-initram.list` as the GUI foundation and add the chosen runtime CLI atoms from `config/package-sets/cli.list` to the `openbox` profile. Do not make `sys-apps/man-db` a required runtime package if all man pages are removed. Add browser, file-manager, media-player and other larger desktop applications only to a profile that explicitly promises them; do not claim they are present merely because the build root has them.
+
+### Strip from the runtime staging copy
+
+Remove these from the final SquashFS, while retaining them in the separate build root and binpkg cache:
+
+- **Portage and package-manager state:** `emerge`, `emerge-webrsync`, `emaint`, `ebuild`, `portageq`, other Portage helpers, `/etc/portage`, `/usr/lib*/portage`, `/usr/share/portage`, `/var/db/pkg`, `/var/db/repos`, `/var/lib/portage`, `/var/cache/binpkgs`, `/var/cache/distfiles`, `/var/cache/edb`, `/var/tmp/portage`, and Portage build logs. Also remove now-unused `app-portage/*`, `app-admin/eselect`, and `sys-apps/locale-gen` runtime payloads.
+- **Manuals and documentation:** all of `/usr/share/man`, `/usr/share/info`, `/usr/share/doc`, `/usr/share/gtk-doc`, `/usr/share/help`, `/usr/share/gnome/help`, and equivalent package documentation trees. Remove `sys-apps/man-db` from the runtime atom set if no manual pages are shipped. The current packer explicitly says it preserves man pages; change that behavior and validate the output.
+- **Locale and translation waste:** ship only the `en_US.UTF-8` locale required by `config/env.d/02locale`; remove other generated locale data and non-English translation catalogs under `/usr/share/locale`. After trimming, verify that `locale -a` still reports `en_US.utf8` (spelling may be normalized by libc) and that ordinary CLI/GUI programs start with `LANG=en_US.UTF-8`.
+- **Build/development payloads:** GCC/binutils compilers and tools, headers, static archives (`*.a`), libtool files (`*.la`), `pkgconfig` and CMake development metadata, source/debug trees, bytecode caches, build helpers and build-only dependencies such as LLVM/Clang where the runtime does not need them. Retain versioned runtime shared libraries (for example, libstdc++) only where selected programs require them. Do not remove libraries solely by filename; check runtime dependencies and test dynamically loaded drivers/plugins.
+- **Transient data and caches:** contents of `/tmp`, `/run`, `/var/tmp`, package/download caches, build logs and repository checkouts. Keep required configuration, licenses, timezone data, fonts, firmware and runtime device/service files.
+
+Do not run package cleanup against the saved interactive build root. Perform package pruning and file-level trimming on the disposable runtime root/staging copy only.
+
+### Mandatory validation before publishing an SFS
+
+1. Save the resolved runtime package list and verify it includes `app-misc/lf`, `sys-process/htop`, and the other selected CLI applications, as well as the GUI stack.
+2. After the final packer has run, verify the actual SquashFS—not only the pre-trim root—with `unsquashfs -ll output/squashfs` and targeted checks.
+3. Fail the build if selected commands are absent (`lf`, `mc`, `htop`, `btop`, `fd`, `rg`, `zsh`, `nvim`, `nano`, `tmux`, `startx`, `xterm`, `openbox-session`) or if clearly forbidden payloads remain (`emerge`/Portage, `/etc/portage`, `/var/db/pkg`, manuals, non-English locale data, compiler executables, headers, static/development metadata, or build caches).
+4. Verify `/sbin/init`, the `/etc/init.d` services, `/home/gentoo/.xinitrc`, Xorg, Mesa Crocus and all required runtime libraries survive trimming. Check the generated SquashFS checksum and compressed size.
+5. Boot-test the built kernel + initramfs + this exact SquashFS in QEMU, then separately test Intel GM965/Crocus, Wi-Fi, Bluetooth, audio and input on the physical D630. Report the actual image size and each test outcome; never infer success from the workflow alone.
 
 ## Interactive Gentoo build runner
 
