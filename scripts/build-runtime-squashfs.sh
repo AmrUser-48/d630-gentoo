@@ -377,19 +377,19 @@ exec openbox-session
 EOF
   chmod 0644 "$ROOT/etc/skel/.xinitrc"
 fi
-# Always replace the Stage 3 getty definition: merely creating the service
-# conditionally can leave its password-prompting default in the final image.
-cat > "$ROOT/etc/init.d/agetty.tty1" <<'EOF'
-#!/sbin/openrc-run
-description="D630 local tty1 automatic login"
-command="/sbin/agetty"
-command_args="--autologin gentoo --noclear tty1 linux"
-command_background="yes"
-pidfile="/run/agetty.tty1.pid"
-EOF
-chmod 0755 "$ROOT/etc/init.d/agetty.tty1"
+# Create the live user during sysinit, before init starts the tty1 login.
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
-chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default' || echo "WARNING: could not enable agetty.tty1"
+
+# Do not overwrite /etc/init.d/agetty.tty1: in Gentoo Stage 3 it may be a
+# symlink to the generic agetty service. Use init's inittab entry directly so
+# the --autologin argument cannot be lost through OpenRC service defaults.
+chroot "$ROOT" /bin/bash -lc 'rc-update del agetty.tty1 default' >/dev/null 2>&1 || true
+rm -f "$ROOT/etc/init.d/agetty.tty1"
+[[ -f "$ROOT/etc/inittab" ]] || die "Stage 3 has no /etc/inittab; cannot configure tty1 autologin"
+sed -i -E '/^[[:space:]]*[^:]+:[^:]*:respawn:.*agetty.*tty1/d' "$ROOT/etc/inittab"
+printf '\nc1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux\n' >> "$ROOT/etc/inittab"
+grep -Fq 'c1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux' "$ROOT/etc/inittab" ||
+  die "tty1 autologin entry was not written to /etc/inittab"
 if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
   chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
 fi
