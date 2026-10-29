@@ -249,6 +249,9 @@ EOF
     daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
   esac
 fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  sed -i '/^sys-apps\\/man-db$/d' "$WORK/atoms.txt"
+fi
 sed -i 's/#.*$//; /^[[:space:]]*$/d' "$WORK/atoms.txt"
 sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
 if grep -Evq '^[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
