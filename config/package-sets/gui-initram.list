@@ -11,3 +11,5 @@ x11-misc/xdg-utils
 x11-misc/xclip
 sys-apps/file
 sys-apps/less
+x11-apps/xrdb
+x11-apps/xmodmap
