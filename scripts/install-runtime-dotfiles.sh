@@ -86,4 +86,9 @@ PAGER="less"
 OPENER="xdg-open"
 EOF
 
+# The pinned dotfiles were originally written for Debian, where lesspipe emits
+# shell code when invoked without a filename. Gentoo's lesspipe can instead emit
+# a usage message; eval'ing that text breaks every interactive Bash login.
+sed -i '/command -v lesspipe/,+2d' "$SKEL/.aaliases"
+
 echo "Installed dotfiles into /etc/skel; Neovim and lf configs are self-contained."
