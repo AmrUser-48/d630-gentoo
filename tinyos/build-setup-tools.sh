@@ -67,6 +67,14 @@ copy_binary() {
       exit 1
     }
     (cd "$GENTOO_ROOT" && cp -L --parents "${library#/}" "$ROOT")
+    # GCC keeps some runtime libraries in its private lib directory. The
+    # initramfs has no Gentoo ld.so cache/config, so expose those by SONAME
+    # in the standard system library directory as well.
+    case "$library" in
+      /usr/lib/gcc/*|/usr/lib64/gcc/*|/lib/gcc/*|/lib64/gcc/*)
+        install -D -m 0644 "$GENTOO_ROOT$library" "$ROOT/usr/lib64/$(basename "$library")"
+        ;;
+    esac
   done < <(awk '/=>/ && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}' \
     <<< "$dependencies" | sort -u)
 }
