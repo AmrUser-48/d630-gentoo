@@ -180,7 +180,7 @@ jobs:
           sudo chroot "$root" /bin/bash -lc \
             'emerge --ignore-default-opts --ask=n --verbose --getbinpkg --usepkgonly sys-apps/msr-tools'
           sudo chroot "$root" /bin/bash -lc \
-            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-arch/cpio app-arch/zstd app-misc/ca-certificates app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/file sys-apps/kbd sys-apps/msr-tools sys-kernel/linux-firmware'
+            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg app-admin/doas app-arch/cpio app-arch/zstd app-i18n/fbterm app-misc/ca-certificates app-misc/lf app-shells/bash net-misc/curl net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb sys-apps/file sys-apps/kbd sys-apps/msr-tools sys-kernel/linux-firmware'
           echo "Installed setup/network packages; sys-apps/msr-tools was required to install from the pinned binpkg shard." \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -230,6 +230,7 @@ jobs:
           cp tinyos/gmini-lf-icons output/gmini-lf-icons
           cp tinyos/lf-preview output/lf-preview
           cp tinyos/rebuild-initramfs.sh output/rebuild-initramfs.sh
+          cp tinyos/export-wifi-profile.sh output/export-wifi-profile.sh
           cp tinyos/wifi-connect output/wifi-connect
           cp tinyos/udhcpc-default.script output/udhcpc-default.script
           cat > output/BUILD-MANIFEST.txt <<EOF
@@ -239,7 +240,8 @@ jobs:
           Root userspace: one combined static BusyBox + Gentoo Mini setup and network initramfs
           Initramfs: initramfs (gmini login, Gentoo Bash/lf, Wi-Fi tools, DHCP, curl)
           Network userspace: Gentoo iw, WPA supplicant, BusyBox udhcpc, curl, wireless-regdb, CA certificates
-          Setup userspace: Gentoo Bash, lf, file, setfont, rdmsr/wrmsr, gentoo-chroot, and selected Terminus Powerline PCF/PSF fonts; msr-tools installed from $BINPKG_TAG
+          Setup userspace: Gentoo Bash, lf, file, fbterm, openvt, setfont, rdmsr/wrmsr, gentoo-chroot, and selected Terminus Powerline PCF/PSF fonts; msr-tools installed from $BINPKG_TAG
+          Host helper: export-wifi-profile.sh exports a local NetworkManager WPA/WPA2-Personal profile without publishing the key
           Firmware: D630 Intel 3945ABG plus the 40 requested i915 and tigon files; firmware license notices retained
           Gentoo package seed: $BINPKG_TAG; Portage source fallback enabled except msr-tools, which is binpkg-only
           CPU target: Intel Core 2 Duo / Dell Latitude D630
@@ -247,7 +249,7 @@ jobs:
           Validation: archive checks, BusyBox symlink checks, and QEMU login, MOTD, setup-user, tools, firmware, DHCP, HTTPS, chroot guard, and self-rebuild tests
           Workflow run: $GITHUB_RUN_ID
           EOF
-          sha256sum output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/BUILD-MANIFEST.txt > output/SHA256SUMS
+          sha256sum output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/d630-tiny.cfg output/BUILD-MANIFEST.txt output/export-wifi-profile.sh > output/SHA256SUMS
           {
             echo "## D630 Tiny Linux"
             echo
@@ -288,7 +290,7 @@ jobs:
             timeout { puts stderr "Setup image did not log in as gmini"; exit 1 }
             eof { puts stderr "QEMU exited before the gmini prompt"; exit 1 }
           }
-          send -- "test \"\$(id -un)\" = gmini && test \"\$SHELL\" = /bin/bash && test -n \"\$BASH_VERSION\" && bash --version >/dev/null && lf --version >/dev/null && file --version >/dev/null && iw --version >/dev/null && wpa_supplicant -v >/dev/null && curl --version >/dev/null && command -v wifi-connect >/dev/null && command -v rebuild-initramfs >/dev/null && command -v gentoo-chroot >/dev/null && command -v rdmsr >/dev/null && command -v wrmsr >/dev/null && command -v setfont >/dev/null && test -s /usr/share/fonts/misc/ter-powerline-x16n.pcf.gz && test -s /usr/share/fonts/misc/ter-powerline-x16b.pcf.gz && test -s /usr/share/consolefonts/ter-powerline-v16n.psf.gz && test -s /usr/share/consolefonts/ter-powerline-v16b.psf.gz && while IFS= read -r firmware; do test -s \"/lib/firmware/\$firmware\" || exit 1; done < /usr/share/d630-tiny/firmware-files.list && alias ll | grep -q 'ls -alF' && test -s ~/.config/lf/lfrc && test -s ~/.config/lf/colors && test -s ~/.config/lf/icons && test \"\$(doas id -u)\" = 0 && echo D630_TINY_SETUP'_'OK\r"
+          send -- "test \"\$(id -un)\" = gmini && test \"\$SHELL\" = /bin/bash && test -n \"\$BASH_VERSION\" && bash --version >/dev/null && lf --version >/dev/null && file --version >/dev/null && iw --version >/dev/null && wpa_supplicant -v >/dev/null && curl --version >/dev/null && command -v wifi-connect >/dev/null && doas wifi-connect --help | grep -q -- '--config' && doas wifi-connect --diagnose >/tmp/wifi-diagnose.log 2>&1 && grep -q 'Wi-Fi interfaces:' /tmp/wifi-diagnose.log && command -v rebuild-initramfs >/dev/null && command -v gentoo-chroot >/dev/null && command -v rdmsr >/dev/null && command -v wrmsr >/dev/null && command -v setfont >/dev/null && command -v openvt >/dev/null && fbterm --version >/dev/null && fc-match -f '%{family} %{style}' 'xos4 Terminess Powerline' | grep -q 'Terminess Powerline Regular' && test -s ~/.fbtermrc && test -s /usr/share/fonts/misc/ter-powerline-x16n.pcf.gz && test -s /usr/share/fonts/misc/ter-powerline-x16b.pcf.gz && test -s /usr/share/consolefonts/ter-powerline-v16n.psf.gz && test -s /usr/share/consolefonts/ter-powerline-v16b.psf.gz && while IFS= read -r firmware; do test -s \"/lib/firmware/\$firmware\" || exit 1; done < /usr/share/d630-tiny/firmware-files.list && alias ll | grep -q 'ls -alF' && test -s ~/.config/lf/lfrc && test -s ~/.config/lf/colors && test -s ~/.config/lf/icons && test \"\$(doas id -u)\" = 0 && echo D630_TINY_SETUP'_'OK\r"
           expect {
             -re {D630_TINY_SETUP_OK} {}
             timeout { puts stderr "gmini Bash or lf setup check failed"; exit 1 }
@@ -362,5 +364,5 @@ jobs:
 
           Install kernel and initramfs into a new /d630-tiny/ directory. Use d630-tiny.cfg. Do not overwrite /d630-gentoo/.
           NOTES
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux single initramfs / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/build-network-tools.sh output/build-setup-tools.sh output/firmware-files.list output/gentoo-chroot output/gmini.bashrc output/gmini.bash_profile output/gmini-lfrc output/gmini-lf-colors output/gmini-lf-icons output/lf-preview output/rebuild-initramfs.sh output/wifi-connect output/udhcpc-default.script output/INITRAMFS-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "D630 Tiny Linux single initramfs / run $GITHUB_RUN_NUMBER" --notes-file output/RELEASE-NOTES.md --target "$GITHUB_SHA" output/kernel output/initramfs output/tiny-main.cpio.zst output/d630-6.18.56.config output/BUILD-MANIFEST.txt output/d630-tiny.cfg output/README-D630-Tiny.md output/d630-tiny-init output/build-initramfs.sh output/build-network-tools.sh output/build-setup-tools.sh output/export-wifi-profile.sh output/firmware-files.list output/gentoo-chroot output/gmini.bashrc output/gmini.bash_profile output/gmini-lfrc output/gmini-lf-colors output/gmini-lf-icons output/lf-preview output/rebuild-initramfs.sh output/wifi-connect output/udhcpc-default.script output/INITRAMFS-MANIFEST.txt output/SHA256SUMS output/qemu-boot.log
           echo "Published $tag: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" | tee -a "$GITHUB_STEP_SUMMARY"

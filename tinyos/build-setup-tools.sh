@@ -80,6 +80,9 @@ copy_binary zstd /usr/bin/zstd
 copy_binary rdmsr /usr/sbin/rdmsr
 copy_binary wrmsr /usr/sbin/wrmsr
 copy_binary setfont /usr/bin/setfont
+copy_binary openvt /usr/bin/openvt
+copy_binary fbterm /usr/bin/fbterm
+copy_binary fc-match /usr/bin/fc-match
 chmod 4755 "$ROOT/usr/bin/doas"
 
 magic_db="$GENTOO_ROOT/usr/share/misc/magic.mgc"
@@ -96,6 +99,15 @@ terminfo="$GENTOO_ROOT/usr/share/terminfo"
 }
 mkdir -p "$ROOT/usr/share"
 cp -a "$terminfo" "$ROOT/usr/share/"
+
+for config_dir in etc/fonts usr/share/fontconfig; do
+  [[ -d "$GENTOO_ROOT/$config_dir" ]] || {
+    echo "Gentoo fontconfig files are missing: $config_dir" >&2
+    exit 1
+  }
+  mkdir -p "$ROOT/$(dirname "$config_dir")"
+  cp -a "$GENTOO_ROOT/$config_dir" "$ROOT/$(dirname "$config_dir")/"
+done
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
 install -D -m 0755 "$REBUILD_SCRIPT" "$ROOT/usr/sbin/rebuild-initramfs"
@@ -195,12 +207,18 @@ install -m 0644 "$BASH_PROFILE" "$ROOT/home/gmini/.bash_profile"
 install -D -m 0644 "$LFRC" "$ROOT/home/gmini/.config/lf/lfrc"
 install -D -m 0644 "$LFCOLORS" "$ROOT/home/gmini/.config/lf/colors"
 install -D -m 0644 "$LFICONS" "$ROOT/home/gmini/.config/lf/icons"
+cat > "$ROOT/home/gmini/.fbtermrc" <<'FBTERM'
+font-names=xos4 Terminess Powerline
+font-size=16
+FBTERM
 install -D -m 0755 "$LFPREVIEW" "$ROOT/usr/sbin/lf-preview"
 printf 'Gentoo Mini setup environment\n' > "$ROOT/etc/d630-tiny/setup-mode"
 
 for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/bin/file" \
   "$ROOT/usr/bin/cpio" "$ROOT/usr/bin/zstd" "$ROOT/usr/sbin/rdmsr" "$ROOT/usr/sbin/wrmsr" \
-  "$ROOT/usr/bin/setfont" "$ROOT/usr/sbin/gentoo-chroot" "$ROOT/usr/sbin/rebuild-initramfs" \
+  "$ROOT/usr/bin/setfont" "$ROOT/usr/bin/openvt" "$ROOT/usr/bin/fbterm" \
+  "$ROOT/usr/bin/fc-match" \
+  "$ROOT/usr/sbin/gentoo-chroot" "$ROOT/usr/sbin/rebuild-initramfs" \
   "$ROOT/usr/share/fonts/misc/ter-powerline-x16n.pcf.gz" \
   "$ROOT/usr/share/fonts/misc/ter-powerline-x16b.pcf.gz" \
   "$ROOT/usr/share/consolefonts/ter-powerline-v16n.psf.gz" \
@@ -209,7 +227,7 @@ for file in "$ROOT/bin/bash" "$ROOT/usr/bin/lf" "$ROOT/usr/bin/doas" "$ROOT/usr/
   "$ROOT/usr/share/d630-tiny/firmware-files.list" \
   "$ROOT/usr/share/d630-tiny/early-microcode.cpio" \
   "$ROOT/etc/passwd" "$ROOT/etc/group" "$ROOT/etc/shadow" \
-  "$ROOT/etc/doas.conf" "$ROOT/etc/motd" "$ROOT/usr/sbin/lf-preview" "$ROOT/home/gmini/.bashrc" \
+  "$ROOT/etc/doas.conf" "$ROOT/etc/motd" "$ROOT/usr/sbin/lf-preview" "$ROOT/home/gmini/.fbtermrc" "$ROOT/home/gmini/.bashrc" \
   "$ROOT/home/gmini/.bash_profile" "$ROOT/home/gmini/.config/lf/lfrc" \
   "$ROOT/home/gmini/.config/lf/colors" "$ROOT/home/gmini/.config/lf/icons" \
   "$ROOT/etc/d630-tiny/setup-mode"; do

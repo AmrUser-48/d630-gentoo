@@ -50,6 +50,86 @@ doas wifi-connect
 
 This is the text-mode Mini OS, not the graphical desktop.
 
+The normal Terminus Powerline console font is selected during startup. To start a framebuffer terminal on another virtual console, run:
+
+```sh
+doas openvt -c 2 -s -- fbterm -n "xos4 Terminess Powerline" -- /bin/login -f gmini
+```
+
+This needs a working `/dev/fb0` framebuffer; the shipped kernel provides Intel i915 framebuffer emulation. Switch back with **Alt-F1**. Inside FbTerm, **Ctrl-Alt-C** opens another FbTerm window and **Ctrl-Alt-1** through **Ctrl-Alt-9** switch windows. If the framebuffer is unavailable, the original text console remains usable.
+
+### Update the installed kernel and initramfs
+
+Run this from your normal Linux installation, not from Tiny: Tiny runs from RAM, so changes made inside it disappear when you reboot. Make sure the partition containing `/d630-tiny/kernel` and `/d630-tiny/initramfs` is mounted and writable. This downloads the latest matching kernel/initramfs pair, verifies both against the release checksums, saves a backup of the current pair and GRUB config, then replaces the installed files.
+
+```sh
+sudo bash <<'UPDATE'
+set -euo pipefail
+
+boot_dir=""
+while IFS= read -r mountpoint; do
+  candidate="${mountpoint%/}/d630-tiny"
+  if [[ -f "$candidate/kernel" &&
+        -f "$candidate/initramfs" &&
+        -f "$candidate/tiny.cfg" &&
+        "$(findmnt -rn -T "$candidate" -o TARGET)" == "$mountpoint" ]]; then
+    boot_dir=$candidate
+    break
+  fi
+done < <(findmnt -rn -o TARGET)
+
+[[ -n "$boot_dir" ]] || {
+  echo "Could not find a mounted partition containing /d630-tiny/kernel, initramfs, and tiny.cfg." >&2
+  exit 1
+}
+
+stage=$(mktemp -d "$boot_dir/.update.XXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+base_url=https://github.com/AmrUser-48/d630-gentoo/releases/latest/download
+
+for asset in kernel initramfs SHA256SUMS; do
+  curl -fL "$base_url/$asset" -o "$stage/$asset"
+done
+
+awk '
+  $2 == "output/kernel" || $2 == "output/initramfs" {
+    sub("output/", "", $2)
+    print
+    found[$2] = 1
+  }
+  END {
+    if (!found["kernel"] || !found["initramfs"]) exit 1
+  }
+' "$stage/SHA256SUMS" | (cd "$stage" && sha256sum -c -)
+
+backup_dir=$(mktemp -d "$boot_dir/.backup-$(date +%Y%m%d-%H%M%S).XXXXXX")
+cp -p "$boot_dir/kernel" "$boot_dir/initramfs" "$boot_dir/tiny.cfg" "$backup_dir/"
+mv -f -- "$stage/kernel" "$boot_dir/kernel"
+mv -f -- "$stage/initramfs" "$boot_dir/initramfs"
+sync
+
+echo "Updated kernel and initramfs in $boot_dir"
+echo "Previous files saved in $backup_dir"
+echo "Reboot and choose D630 Tiny Linux from GRUB to use the update."
+UPDATE
+```
+
+Keep the backup until you have successfully booted the updated image. To roll back, copy the old `kernel`, `initramfs`, and `tiny.cfg` from the printed backup directory back into `/d630-tiny/`.
+
+### Kernel boot-parameter cheat sheet
+
+At the GRUB menu, highlight D630 Tiny and press **e**. Add or change parameters at the end of the line beginning with `linux`; press **Ctrl-X** or **F10** to boot. This edit applies only to that boot. To make it permanent, edit the `linux` line in `/d630-tiny/tiny.cfg`.
+
+| Parameter | What it does |
+| --- | --- |
+| `quiet` | Hide most routine kernel messages; already enabled by the default menu. |
+| `loglevel=7 ignore_loglevel` | Show detailed kernel messages during boot; useful for diagnosing hangs or missing hardware. |
+| `nomodeset` | Diagnostic workaround for a blank or garbled display; may reduce graphics features. |
+| `panic=10` | Reboot 10 seconds after a kernel panic instead of waiting indefinitely. |
+| `console=ttyS0,115200n8` | Send the console to a serial port; useful for QEMU serial logs, generally not for the laptop's built-in display. |
+
+For example, to see boot messages, temporarily change the line from `quiet loglevel=4` to `loglevel=7 ignore_loglevel`. Tiny runs from its initramfs and RAM; a `root=` parameter is not needed. Avoid `acpi=off` as a routine fix on the D630 because it disables laptop power-management features.
+
 ## 2. Try it in QEMU
 
 QEMU runs Tiny in a virtual machine, so you can try the shell without changing your computer's boot configuration. The commands below run in the **host or Codespace terminal**, not inside Tiny.
@@ -105,6 +185,18 @@ id -u
 
 The result should be `0`. Type `exit` to leave the root shell and return to `gmini`.
 
+### Open another virtual console
+
+Tiny starts one shell automatically. The kernel supports virtual terminals, but the initramfs does not start a shell on every VT. From the running Tiny shell, open another one with:
+
+```sh
+doas openvt -c 2 -s -- /bin/bash -l
+```
+
+`-c 2` selects VT 2 and `-s` switches to it. Use `-c 3`, `-c 4`, and so on for other consoles. Switch between them with **Alt-F1**, **Alt-F2**, etc. (some laptop/desktop setups require **Ctrl-Alt-Fn**). Exit the shell on the extra VT when you are done. Kernel boot parameters such as `console=` do not start extra virtual-terminal shells.
+
+To start the framebuffer terminal instead, use the FbTerm command shown in the boot section above. The default FbTerm font is the normal-weight Terminus Powerline bitmap font, not the bold variant.
+
 For a single administrative command, use `doas` before the command instead:
 
 ```sh
@@ -123,6 +215,8 @@ Press `q` to quit. Other included tools include:
 | --- | --- |
 | `curl` | Download files from the internet |
 | `wifi-connect` | Configure a Wi-Fi connection |
+| `fbterm` | Run a framebuffer terminal (requires `/dev/fb0`; use `openvt` as shown above) |
+| `openvt` | Start a command on another virtual console |
 | `rdmsr` | Read CPU model-specific registers |
 | `wrmsr` | Write CPU model-specific registers |
 | `setfont` | Change the Linux console font |
@@ -141,7 +235,43 @@ At the `gmini` prompt, run:
 doas wifi-connect
 ```
 
-Follow the prompts to select a network and enter its passphrase. The D630's Intel 3945ABG adapter supports legacy 802.11a/b/g and WPA/WPA2-PSK. It may not connect to access points that require newer bands or security modes.
+The script lists visible network names before prompting. Enter the SSID exactly as shown and its WPA/WPA2 passphrase. The D630's Intel 3945ABG adapter supports legacy 802.11a/b/g and WPA/WPA2-PSK; it cannot connect to WPA3-only or enterprise-authenticated networks.
+
+Your active NetworkManager row identifies the connection as `-_-` on `wlan0`. From your normal Linux installation, download the host-side helper and export that saved WPA/WPA2-Personal profile without displaying or sending the key:
+
+```sh
+helper=$(mktemp)
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/export-wifi-profile.sh -o "$helper"
+bash "$helper" '-_-' "$HOME/.config/d630-tiny"
+rm -f "$helper"
+findmnt -no SOURCE,FSTYPE "$HOME"
+```
+
+Keep the printed device and filesystem type for the filesystem containing your home directory. The profile is written as `~/.config/d630-tiny/wifi.conf` with owner-only permissions; it is **not** part of the repository or release image. It contains a reusable network key, so do not copy it to a shared/FAT boot partition or share it. This helper supports saved WPA/WPA2-Personal passphrases; it does not support WPA3-only, enterprise, or unsaved profiles.
+
+After Tiny boots, mount the normal Linux filesystem that contains your home directory (replace the device and filesystem type with the values you recorded; an encrypted filesystem must first be unlocked, which Tiny does not currently do):
+
+```sh
+doas mkdir -p /mnt/host
+doas mount -t ext4 /dev/sda2 /mnt/host
+doas wifi-connect --config /mnt/host/home/YOUR_HOST_USER/.config/d630-tiny/wifi.conf wlan0
+doas umount /mnt/host
+```
+
+Use the actual host username, root partition, and filesystem type in place of the examples. The key stays on your normal Linux filesystem; it is copied into Tiny's RAM only when connecting. Once connected, remove the profile from the normal OS when you no longer need it:
+
+```sh
+rm "$HOME/.config/d630-tiny/wifi.conf"
+rmdir "$HOME/.config/d630-tiny"
+```
+
+If it fails, run this and note whether it reports a missing interface, a hard radio block, WPA authentication timeout, or DHCP failure:
+
+```sh
+doas wifi-connect --diagnose
+```
+
+For the saved local profile, use `doas wifi-connect --config /path/to/wifi.conf wlan0`. Also keep the error and diagnostics printed by the failed attempt. Check the laptop's wireless switch/Fn key if the radio is hard-blocked. Review SSIDs or other identifying network names before sharing diagnostic output; the script does not print the Wi-Fi passphrase. These Wi-Fi changes require the updated initramfs before they are available on the laptop.
 
 Test the connection by downloading a small page:
 

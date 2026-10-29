@@ -183,6 +183,8 @@ if [[ "$SETUP_MODE" == true ]]; then
   }
   required_members+=(
     bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/bin/setfont
+    usr/bin/openvt usr/bin/fbterm usr/bin/fc-match home/gmini/.fbtermrc
+    etc/fonts/fonts.conf
     usr/sbin/rdmsr usr/sbin/wrmsr usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/sbin/gentoo-chroot
     usr/share/d630-tiny/early-microcode.cpio usr/share/d630-tiny/firmware-files.list
     usr/share/fonts/misc/ter-powerline-x16n.pcf.gz usr/share/fonts/misc/ter-powerline-x16b.pcf.gz
@@ -234,7 +236,7 @@ test -s "$OUT/initramfs"
   fi
   if [[ "$SETUP_MODE" == true ]]; then
     echo "Firmware additions: 36 requested i915 files and 4 tigon files, with WHENCE and LICENSES retained"
-    echo "Setup user: gmini, Gentoo Bash/lf/file, msr-tools from binpkg, setfont, selected Terminus Powerline PCF/PSF, gentoo-chroot, and rebuild-initramfs"
+    echo "Setup user: gmini, Gentoo Bash/lf/file, fbterm/openvt, msr-tools from binpkg, normal Terminus Powerline console font, gentoo-chroot, and rebuild-initramfs"
   fi
   echo
   file "$BUSYBOX" "$EARLY_MICROCODE" "$OUT/tiny-main.cpio.zst" "$OUT/initramfs"

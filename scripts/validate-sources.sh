@@ -103,6 +103,8 @@ grep -q 'd630.persistence=auto' iso/boot/grub/loopback.cfg
 grep -q 'd630.persistence=volatile' iso/boot/grub/loopback.cfg
 sh -n initramfs/init
 sh -n scripts/create-persistence-image.sh
+sh -n tinyos/init tinyos/wifi-connect
+bash -n tinyos/export-wifi-profile.sh tinyos/build-setup-tools.sh tinyos/build-initramfs.sh
 bash -n scripts/gentoo-build-set
 bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh

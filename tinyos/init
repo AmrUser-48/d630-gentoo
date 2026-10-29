@@ -21,6 +21,12 @@ mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || :
 hostname d630-tiny 2>/dev/null || :
 dmesg -n 4 2>/dev/null || :
 
+if [ -c /dev/tty0 ] && [ -x /usr/bin/setfont ] &&
+    [ -r /usr/share/consolefonts/ter-powerline-v16n.psf.gz ]; then
+    /usr/bin/setfont -C /dev/tty0 /usr/share/consolefonts/ter-powerline-v16n.psf.gz ||
+        echo "[d630-tiny] Warning: could not load the normal Terminus Powerline console font."
+fi
+
 printf '\n  D630 Tiny Linux\n\n'
 printf '  Kernel: '
 uname -r
