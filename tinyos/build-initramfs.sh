@@ -182,7 +182,7 @@ if [[ "$SETUP_MODE" == true ]]; then
     exit 1
   }
   required_members+=(
-    bin/bash bin/login usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/bin/setfont
+    bin/bash bin/login usr/lib64/libstdc++.so.6 usr/bin/lf usr/bin/doas usr/bin/file usr/bin/cpio usr/bin/zstd usr/bin/setfont
     usr/bin/openvt usr/bin/fbterm usr/bin/fc-match home/gmini/.fbtermrc
     etc/fonts/fonts.conf
     usr/sbin/rdmsr usr/sbin/wrmsr usr/sbin/lf-preview usr/sbin/rebuild-initramfs usr/sbin/gentoo-chroot
