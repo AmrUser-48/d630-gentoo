@@ -133,7 +133,7 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
 
   echo "Removing Portage, language runtimes, development tools, and compiler binaries."
   for atom in \
-    sys-apps/portage app-portage/gemato app-portage/getuto app-portage/portage-utils \
+    sys-apps/portage sys-apps/man-db app-portage/gemato app-portage/getuto app-portage/portage-utils \
     app-admin/eselect app-admin/perl-cleaner sys-apps/locale-gen \
     dev-lang/python dev-lang/python-exec dev-lang/python-exec-conf dev-lang/perl \
     dev-build/make \
@@ -259,7 +259,8 @@ tmp_output=""
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
   tmp_filelist="$(mktemp "${TMPDIR:-/var/tmp}/d630-squashfs-list.XXXXXXXX")"
   unsquashfs -ll "$output" > "$tmp_filelist"
-  for path in usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg; do
+  for path in usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg \
+    usr/bin/zsh usr/bin/nano usr/bin/tmux usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do
     grep -Eq "squashfs-root/${path}([[:space:]]|$)" "$tmp_filelist" || {
       echo "Required runtime application is absent from the final SquashFS: /${path}" >&2
       exit 1
@@ -270,7 +271,7 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
     grep -E 'squashfs-root/(etc/portage|var/db/pkg|usr/lib(64)?/portage|usr/share/man|usr/share/info|usr/share/doc|usr/share/gtk-doc|usr/share/help|usr/share/i18n|usr/include|var/cache/binpkgs|var/cache/distfiles|var/tmp/portage)(/|$)' "$tmp_filelist" | head -30 >&2
     exit 1
   fi
-  if grep -Eq 'squashfs-root/usr/bin/(emerge|emerge-webrsync|ebuild|emaint|portageq|gcc|g\+\+|make|ld\.bfd)([[:space:]]|$)' "$tmp_filelist"; then
+  if grep -Eq 'squashfs-root/usr/bin/(emerge|emerge-webrsync|ebuild|emaint|portageq|gcc|g\+\+|gcc-config|binutils-config|cc|c\+\+|cpp|make|ld|ld\.bfd)([[:space:]]|$)' "$tmp_filelist"; then
     echo "Portage or compiler executables remain in the final minimal SquashFS." >&2
     exit 1
   fi
@@ -280,7 +281,11 @@ fi
 
 echo
 du -shx "$src" "$output"
-echo "Preserved: /usr/share/man and /usr/share/licenses."
+if [[ "$MINIMAL_RUNTIME" == true ]]; then
+  echo "Preserved runtime files, licenses, and required configuration; manuals and unused locale data removed."
+else
+  echo "Preserved: /usr/share/man and /usr/share/licenses."
+fi
 echo "Removed from the image staging copy: documentation/info trees, Portage build/download caches, ebuild repository checkout, headers and common development metadata."
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
   echo "Removed Portage, Python/Perl, development tools, GCC/binutils compilers, and package metadata."
