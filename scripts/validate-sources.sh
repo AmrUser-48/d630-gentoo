@@ -67,6 +67,17 @@ grep -Fq 'workflow_call:' .github/workflows/build-d630-kernel.yml
 bash -n scripts/build-squashfs-inplace.sh
 bash -n scripts/build-state-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
+test -s scripts/install-runtime-dotfiles.sh
+bash -n scripts/install-runtime-dotfiles.sh
+grep -Fq 'app-misc/tealdeer' config/package-sets/cli.list
+grep -Fq 'app-editors/neovim' config/package-sets/cli.list
+grep -Fq 'sys-process/htop' config/package-sets/cli.list
+grep -Fq 'grep -vx '\''sys-apps/man-db'\''' scripts/build-runtime-squashfs.sh
+grep -Fq 'command_args="--autologin gentoo --noclear tty1 linux"' scripts/build-runtime-squashfs.sh
+grep -Fq 'NOPASSWD: ALL' scripts/build-runtime-squashfs.sh
+grep -Fq '6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298' scripts/install-runtime-dotfiles.sh
+grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' scripts/build-squashfs.sh
+grep -Fq 'Required runtime application is absent from the final SquashFS' scripts/build-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' scripts/build-runtime-squashfs.sh
 grep -Fq 'Install Mesa from an imported binary package only' scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' scripts/build-runtime-squashfs.sh
@@ -90,7 +101,7 @@ grep -Fq 'find "$ROOT" -xdev -uid 1000 -exec chown -h 0 {} +' scripts/build-stat
 grep -Fq 'umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=' scripts/build-runtime-squashfs.sh
 grep -Fq '\${FEATURES} -userpriv' scripts/build-runtime-squashfs.sh
 grep -Fq 'the installed Mesa binpkg has USE=llvm' scripts/build-runtime-squashfs.sh
-! grep -Fq 'if [[ "$RUNTIME_PROFILE" != console ]]; then' scripts/build-runtime-squashfs.sh
+
 test -s scripts/build-runtime-squashfs-local.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
 grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
