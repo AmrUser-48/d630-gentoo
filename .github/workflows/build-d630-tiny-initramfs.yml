@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      KERNEL_TAG: d630-kernel-6.18.56-run-39509781896
-      KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-39509781896
+      KERNEL_TAG: d630-kernel-6.18.56-run-40813428910
+      KERNEL_URL: https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-kernel-6.18.56-run-40813428910
       BINPKG_TAG: binpkgs-39507549274
       BINPKG_SHARD_SHA256: f0a4bbb964230b2db9c0a2b6e6478dbd57c2ff24f22f29788e1045b1bdea593e
       GURU_COMMIT: de0f47139c9afd9ae187b4b1f94ec7c5550c315c
@@ -59,10 +59,10 @@ jobs:
             }
             echo "Verified $asset ($(stat -c '%s' "$destination") bytes)"
           }
-          fetch_verified kernel ff825d64543b580705d1a07db9e3647f4e9046eb9fc6615c2d592ab339896461 output/kernel
-          fetch_verified d630-6.18.56.config 0f74b376c8696ec0267e48c7a8426c3e53550fb6ab8ecd1830e47161e64ad1c6 output/d630-6.18.56.config
-          fetch_verified early-microcode.cpio e8b04c5456c1bed13049fbe82394b076ac988017d1d69a5bb9d0ffa3eec9c182 "$RUNNER_TEMP/early-microcode.cpio"
-          fetch_verified d630-firmware.tar.zst f787539a7362c0432a116f87e4508089405561e8d2f1f47a245846a7c3f262e5 "$RUNNER_TEMP/d630-firmware.tar.zst"
+          fetch_verified kernel 51bf6b7dc5f37c3181058db918ae369e54cc015f0ff29f7c0db40009d835ea66 output/kernel
+          fetch_verified d630-6.18.56.config f306ebc48b30276d039813a25edd7d5760efeaa801bee46a8fdc6b85a94cbd64 output/d630-6.18.56.config
+          fetch_verified early-microcode.cpio ff8a4e3568f6634b30120f3892935b5c30e2150498287d3a6c1772db359a0f6b "$RUNNER_TEMP/early-microcode.cpio"
+          fetch_verified d630-firmware.tar.zst 34fa3ced747174978209e9a9018d20184e6ffa1506bbf5d69cdea6c3f6b520e3 "$RUNNER_TEMP/d630-firmware.tar.zst"
 
           config=output/d630-6.18.56.config
           for symbol in CONFIG_BLK_DEV_INITRD CONFIG_RD_ZSTD CONFIG_DEVTMPFS CONFIG_PROC_FS CONFIG_SYSFS CONFIG_USB_USBNET CONFIG_USB_NET_CDCETHER CONFIG_X86_MSR; do
@@ -72,6 +72,10 @@ jobs:
             }
           done
           grep -Fq 'CONFIG_LOCALVERSION="-d630-gentoo"' "$config"
+          if grep -Fxq 'CONFIG_X86_VERBOSE_BOOTUP=y' "$config"; then
+            echo "::error::Kernel must disable x86 decompressor progress output."
+            exit 1
+          fi
           tar --zstd -tf "$RUNNER_TEMP/d630-firmware.tar.zst" >/dev/null
           file output/kernel
           sha256sum output/kernel output/d630-6.18.56.config
