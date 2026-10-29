@@ -250,7 +250,7 @@ EOF
   esac
 fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-  sed -i '/^sys-apps\\/man-db$/d' "$WORK/atoms.txt"
+  sed -i '/^sys-apps\/man-db$/d' "$WORK/atoms.txt"
 fi
 sed -i 's/#.*$//; /^[[:space:]]*$/d' "$WORK/atoms.txt"
 sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
