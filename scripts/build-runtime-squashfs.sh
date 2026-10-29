@@ -78,9 +78,6 @@ mkdir -p "$ROOT/etc/portage/package-sets" "$ROOT/etc/portage/profile/package.use
 if [[ -f "$ROOT/etc/portage/package.use" ]]; then mv "$ROOT/etc/portage/package.use" "$ROOT/etc/portage/package.use.stage3"; fi
 mkdir -p "$ROOT/etc/portage/package.use"
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/make.conf" "$ROOT/etc/portage/make.conf"
-if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
-  printf '%s\n' 'x11-base/xorg-server suid' > "$ROOT/etc/portage/package.use/zz-gui-initram"
-fi
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/profile/package.use.force" "$ROOT/etc/portage/profile/package.use.force/zz-d630-llvm"
 install -m 0644 "$GITHUB_WORKSPACE/config/bash/bashrc.d/10-portage-ask.sh" "$ROOT/etc/bash/bashrc.d/10-portage-ask.sh"
 install -m 0644 "$GITHUB_WORKSPACE/config/locale.gen" "$ROOT/etc/locale.gen"
@@ -270,6 +267,15 @@ else
 fi
 chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v useradd && command -v groupadd && command -v passwd && command -v visudo'
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --ask=n --verbose --depclean --with-bdeps=n' |& tee "$OUT/depclean.log"
+if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  for atom in llvm-core/llvm llvm-core/clang llvm-runtimes/libclc dev-util/mesa_clc; do
+    category="${atom%%/*}"
+    package="${atom#*/}"
+    if find "$ROOT/var/db/pkg/$category" -mindepth 1 -maxdepth 1 -type d -name "$package-*" -print -quit 2>/dev/null | grep -q .; then
+      die "GUI runtime retained build-only Mesa compiler dependency $atom after depclean"
+    fi
+  done
+fi
 
 log "Configure console login, first-boot account creation, and OpenRC"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
@@ -325,6 +331,10 @@ EOF
 fi
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default' || echo "WARNING: could not enable agetty.tty1"
+if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
+  chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
+fi
 for SERVICE in dbus NetworkManager bluetooth; do
   [[ -x "$ROOT/etc/init.d/$SERVICE" ]] && chroot "$ROOT" /bin/bash -lc "rc-update add '$SERVICE' default" || true
 done
@@ -408,12 +418,11 @@ if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
   xorg_server="$ROOT/usr/bin/Xorg"
   [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
   [[ -x "$xorg_server" ]] || die "GUI runtime has no executable Xorg server"
-  chmod 4755 "$xorg_server"
-  mkdir -p "$ROOT/etc/X11"
-  cat > "$ROOT/etc/X11/Xwrapper.config" <<'EOF'
-allowed_users=console
-needs_root_rights=yes
-EOF
+  xorg_pkg="$(find "$ROOT/var/db/pkg/x11-base" -mindepth 1 -maxdepth 1 -type d -name 'xorg-server-*' -print -quit)"
+  [[ -n "$xorg_pkg" && -s "$xorg_pkg/USE" ]] || die "Xorg package USE metadata is missing"
+  grep -qw elogind "$xorg_pkg/USE" || die "Xorg was not built with elogind support"
+  if grep -qw suid "$xorg_pkg/USE"; then die "Xorg was built with USE=suid"; fi
+  [[ ! -u "$xorg_server" ]] || die "Xorg executable unexpectedly has the setuid bit"
   crocus_driver="$(find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null || true)"
   [[ -n "$crocus_driver" ]] || die "Mesa Crocus driver is missing from the GUI runtime"
   [[ "$(stat -c '%a' "$xorg_server")" == 4755 ]] || die "Xorg server is not installed setuid-root for local console graphics"

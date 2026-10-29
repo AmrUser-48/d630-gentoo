@@ -13,7 +13,7 @@ llvm-runtimes/libclc VIDEO_CARDS: -*
 # On xorg-drivers, "intel" selects xorg-server/modesetting and "i915" selects xf86-video-intel.
 x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
 x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics
-x11-base/xorg-server -minimal
+x11-base/xorg-server -minimal elogind -suid
 x11-drivers/xf86-video-intel dri
 sys-auth/pambase elogind
 sys-auth/polkit elogind

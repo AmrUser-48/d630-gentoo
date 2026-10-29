@@ -102,7 +102,7 @@ jobs:
             echo "Package source: Core 2 binpkgs release run ${BINPKG_RUN_IDS}"
             echo "Source fallback enabled: ${SOURCE_FALLBACK}"
             echo "First boot: create a local user, log in on tty1, then run startx to start Openbox"
-            echo "Xorg uses its setuid-root server on the local console because this binpkg release has no elogind"
+            echo "Xorg runs unprivileged with elogind; log in on the local tty before running startx"
             echo "Root filesystem: RAM-only; changes disappear at reboot"
             echo "Kernel config requires built-in DRM/i915, VT, framebuffer, and Zstandard initramfs support"
           } > output/BUILD-MANIFEST.txt
