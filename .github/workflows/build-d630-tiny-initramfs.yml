@@ -85,7 +85,9 @@ jobs:
           mkdir -p "$work/binpkgs"
           cleanup() {
             for mp in run sys proc dev; do
-              sudo mountpoint -q "$root/$mp" 2>/dev/null && sudo umount -R "$root/$mp" 2>/dev/null || true
+              if sudo mountpoint -q "$root/$mp" 2>/dev/null; then
+                sudo umount -R "$root/$mp" 2>/dev/null || true
+              fi
             done
           }
           trap cleanup EXIT

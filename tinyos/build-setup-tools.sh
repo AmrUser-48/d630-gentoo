@@ -100,14 +100,13 @@ terminfo="$GENTOO_ROOT/usr/share/terminfo"
 mkdir -p "$ROOT/usr/share"
 cp -a "$terminfo" "$ROOT/usr/share/"
 
-for config_dir in etc/fonts usr/share/fontconfig; do
-  [[ -d "$GENTOO_ROOT/$config_dir" ]] || {
-    echo "Gentoo fontconfig files are missing: $config_dir" >&2
-    exit 1
-  }
-  mkdir -p "$ROOT/$(dirname "$config_dir")"
-  cp -a "$GENTOO_ROOT/$config_dir" "$ROOT/$(dirname "$config_dir")/"
-done
+config_dir=etc/fonts
+[[ -d "$GENTOO_ROOT/$config_dir" && -s "$GENTOO_ROOT/$config_dir/fonts.conf" ]] || {
+  echo "Gentoo fontconfig configuration is missing: /etc/fonts/fonts.conf" >&2
+  exit 1
+}
+mkdir -p "$ROOT/etc"
+cp -a "$GENTOO_ROOT/etc/fonts" "$ROOT/etc/"
 
 mkdir -p "$ROOT/etc/d630-tiny" "$ROOT/home/gmini"
 install -D -m 0755 "$REBUILD_SCRIPT" "$ROOT/usr/sbin/rebuild-initramfs"
