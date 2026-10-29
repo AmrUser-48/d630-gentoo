@@ -59,6 +59,6 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 - [x] `agetty.tty1` generation now requests autologin for `gentoo`, and `/etc/sudoers.d/10-d630-wheel` grants passwordless sudo to the local live `wheel` group.
 - [x] The minimal SquashFS packer removes man pages, info/docs trees, locale source files and non-English translation catalogs; it no longer runs `mandb`.
 - [x] Post-pack checks now fail if required CLI apps are missing or if Portage state, manuals/docs, headers, package caches or compiler executables remain.
-- [ ] Rebuild the `openbox` profile using a Mesa-containing binpkg release and the matching D630 kernel bundle; inspect the real output logs and package list.
+- [ ] Build the `openbox` profile using Mesa-containing binpkg release run `39507549274` and kernel bundle tag `d630-kernel-6.18.56-run-40922514538`; inspect the real output logs and package list.
 - [ ] Confirm compressed output is at most 300 MiB, required commands are executable, only the intended locale data remains, and no man/manual or Portage payload survives.
 - [ ] Boot the new exact SFS in QEMU, verify tty1 autologin, test `sudo -n true`, `nvim`, `lf`, `fd`, `tldr`, `htop`, and `startx`; diagnose the separate QEMU video-adapter mismatch.
