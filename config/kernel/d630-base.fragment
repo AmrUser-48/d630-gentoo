@@ -350,6 +350,8 @@ CONFIG_USB_NET_RTL8152=n
 CONFIG_BINFMT_MISC=n
 
 # Kernel debug / development overhead
+# Suppress x86 compressed-kernel progress messages (e.g. 'Decompressing Linux...').
+CONFIG_X86_VERBOSE_BOOTUP=n
 CONFIG_DEBUG_KERNEL=n
 CONFIG_DEBUG_INFO=n
 CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=n

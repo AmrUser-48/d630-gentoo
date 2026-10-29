@@ -37,5 +37,9 @@ if grep -Eq '^CONFIG_TIGON3=[ym]$' "$base" "$live"; then
 fi
 grep -Fq 'CONFIG_INITRAMFS_SOURCE=""' "$live"
 grep -Fq 'CONFIG_LOCALVERSION="-d630-gentoo"' "$base"
+grep -Fxq 'CONFIG_X86_VERBOSE_BOOTUP=n' "$base" "$live" || {
+    echo "x86 decompressor progress output must remain disabled." >&2
+    exit 1
+}
 sh -n initramfs/init
 echo "D630 kernel fragments: static validation passed"

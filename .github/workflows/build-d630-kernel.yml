@@ -157,9 +157,16 @@ jobs:
             "$GITHUB_WORKSPACE/config/kernel/d630-base.fragment" \
             "$GITHUB_WORKSPACE/config/kernel/d630-live.fragment" \
             2>&1 | tee "$GITHUB_WORKSPACE/kernel-config-merge.log"
+          # x86 compressed-image status output is controlled by this build-time option,
+          # not by the normal quiet kernel command-line parameter.
+          scripts/config --file .config --disable DEBUG_KERNEL --disable X86_VERBOSE_BOOTUP
           scripts/config --file .config --enable MICROCODE
           scripts/config --file .config --enable FW_LOADER
           make ARCH="$ARCH" olddefconfig
+          if grep -Fxq 'CONFIG_X86_VERBOSE_BOOTUP=y' .config; then
+            echo "ERROR: x86 decompressor progress output is enabled." >&2
+            exit 1
+          fi
           cp .config "$GITHUB_WORKSPACE/d630-$KERNEL_VERSION.config"
 
           required=(
