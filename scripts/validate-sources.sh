@@ -74,8 +74,9 @@ grep -Fq 'app-editors/neovim' config/package-sets/cli.list
 grep -Fq 'sys-process/htop' config/package-sets/cli.list
 grep -Fq 'grep -vx '\''sys-apps/man-db'\''' scripts/build-runtime-squashfs.sh
 grep -Fq 'sys-apps\/man-db$/d' scripts/build-runtime-squashfs.sh
-grep -Fq 'command_args="--autologin gentoo --noclear tty1 linux"' scripts/build-runtime-squashfs.sh
+grep -Fq 'c1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux' scripts/build-runtime-squashfs.sh
 grep -Fq 'NOPASSWD: ALL' scripts/build-runtime-squashfs.sh
+grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" scripts/install-runtime-dotfiles.sh
 grep -Fq '6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298' scripts/install-runtime-dotfiles.sh
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' scripts/build-squashfs.sh
