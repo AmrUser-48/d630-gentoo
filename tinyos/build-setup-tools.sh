@@ -172,10 +172,22 @@ for font in ter-powerline-v16n.psf.gz ter-powerline-v16b.psf.gz; do
   }
   install -D -m 0644 "$POWERLINE_FONTS_ROOT/PSF/$font" "$ROOT/usr/share/consolefonts/$font"
 done
+# Use a minimal, deterministic configuration for this deliberately tiny image.
+# The full Gentoo profile references conf.d links and host font directories which
+# are not shipped, so it can yield an empty match list in the staged root.
+cat > "$ROOT/etc/fonts/fonts.conf" <<'FONTS'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <dir>/usr/share/fonts</dir>
+  <cachedir>/var/cache/fontconfig</cachedir>
+  <rescan><int>30</int></rescan>
+</fontconfig>
+FONTS
 # Prebuild fontconfig's cache inside the staged root. At runtime gmini cannot
 # write the system cache, and without this cache fc-match may return a fallback.
 mkdir -p "$ROOT/var/cache/fontconfig"
-if ! chroot "$ROOT" /usr/bin/fc-cache -f; then
+if ! chroot "$ROOT" /usr/bin/fc-cache -f -v; then
   echo "Could not build fontconfig cache for the staged Powerline fonts." >&2
   exit 1
 fi
