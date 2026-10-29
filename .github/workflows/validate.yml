@@ -23,7 +23,7 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -color
 
   build-openbox:
-    if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'build: trigger improved Openbox runtime SFS' }}
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, 'trigger improved Openbox runtime SFS') }}
     needs: validate
     name: Build improved Openbox runtime SFS
     runs-on: ubuntu-24.04
