@@ -91,6 +91,7 @@ copy_binary setfont /usr/bin/setfont
 copy_binary openvt /usr/bin/openvt
 copy_binary fbterm /usr/bin/fbterm
 copy_binary fc-match /usr/bin/fc-match
+copy_binary fc-cache /usr/bin/fc-cache
 chmod 4755 "$ROOT/usr/bin/doas"
 
 magic_db="$GENTOO_ROOT/usr/share/misc/magic.mgc"
@@ -171,6 +172,20 @@ for font in ter-powerline-v16n.psf.gz ter-powerline-v16b.psf.gz; do
   }
   install -D -m 0644 "$POWERLINE_FONTS_ROOT/PSF/$font" "$ROOT/usr/share/consolefonts/$font"
 done
+# Prebuild fontconfig's cache inside the staged root. At runtime gmini cannot
+# write the system cache, and without this cache fc-match may return a fallback.
+mkdir -p "$ROOT/var/cache/fontconfig"
+if ! chroot "$ROOT" /usr/bin/fc-cache -f; then
+  echo "Could not build fontconfig cache for the staged Powerline fonts." >&2
+  exit 1
+fi
+font_match="$(chroot "$ROOT" /usr/bin/fc-match -f '%{family} %{style}' 'xos4 Terminess Powerline')"
+printf 'Staged Powerline font match: %s\n' "$font_match"
+[[ "$font_match" == *"Terminess Powerline Regular"* ]] || {
+  echo "Staged fontconfig did not select the expected Terminus Powerline font." >&2
+  exit 1
+}
+rm -f "$ROOT/usr/bin/fc-cache"
 [[ -s "$POWERLINE_FONTS_ROOT/LICENSE.txt" ]] || {
   echo "Terminus Powerline font license is missing." >&2
   exit 1
