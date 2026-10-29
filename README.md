@@ -140,38 +140,47 @@ Use the command and output path for the installed distribution; do not run both 
 
 ## Openbox runtime SquashFS: content contract and size reduction
 
-The `openbox` profile must produce a usable live desktop, not a copy of a Gentoo build root. Target size is **at most 300 MiB compressed**. The current builder has known gaps: `scripts/build-runtime-squashfs.sh` adds only `config/package-sets/gui-initram.list` for the `openbox` profile, so it does not install the CLI applications from `config/package-sets/cli.list`; `scripts/build-squashfs.sh` deliberately preserves `/usr/share/man`; and the final trimming does not yet enforce the locale policy below. Fix the package selection and final staging rules rather than relying on `depclean` alone.
+The `openbox` profile is the immutable user runtime, not a Gentoo build root. The compressed image target is **at most 300 MiB**. Build-root state and binary-package caches stay in the separate interactive runner/release; the final SquashFS must not contain Portage, emerge, package metadata, manuals, locale sources, compilers, headers or build caches.
 
-### Add and keep
+The runtime builder now:
+- combines `config/package-sets/gui-initram.list` with `config/package-sets/cli.list`, excluding `sys-apps/man-db`;
+- installs the pinned user configuration from [`AmrUser-48/deb12dots`](https://github.com/AmrUser-48/deb12dots), using commit `6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298`;
+- creates a local `gentoo` account each boot, enables automatic login only on `tty1`, and allows passwordless `sudo` for the local live `wheel` group;
+- removes manuals, development/documentation trees and unused locale data in the final staging copy, then checks that required apps exist and forbidden build payloads are absent.
 
-The `openbox` atom set must include both the required GUI packages and the practical CLI applications. At minimum, require and verify these executables in the final image:
+These are source changes, not proof that a new SFS is already built. Before treating an artifact as ready, inspect the Actions run, its logs and the actual image size.
 
-- CLI file management and diagnostics: `lf`, `mc`, `htop`, `btop`, `fd`, `rg`.
-- Usable shell/editor/session tools: `bash`, `zsh`, `nano`, `nvim`, `tmux`.
-- GUI session: `Xorg`, Mesa's `crocus_dri.so`, Xorg drivers, `startx`, `xterm`, Openbox, a small usable font set, D-Bus and elogind.
-- Boot and hardware support: OpenRC, agetty, user/account utilities needed by first boot, network tools required by the target, and the matching D630 kernel modules and firmware. Keep the required runtime shared libraries for every selected executable.
+### Applications and configuration included
 
-Use `config/package-sets/gui-initram.list` as the GUI foundation and add the chosen runtime CLI atoms from `config/package-sets/cli.list` to the `openbox` profile. Do not make `sys-apps/man-db` a required runtime package if all man pages are removed. Add browser, file-manager, media-player and other larger desktop applications only to a profile that explicitly promises them; do not claim they are present merely because the build root has them.
+The Openbox package set must include and verify these commands in the final SquashFS: `nvim`, `lf`, `fd`, `tldr` (Tealdeer), `htop`, `btop`, `mc`, `rg`, `zsh`, `nano`, `tmux`, `startx`, `xterm`, and `openbox-session`. The graphical base includes Xorg, Mesa Crocus (`crocus_dri.so`), Xorg drivers, a compact font set, D-Bus, elogind, `xdg-utils`, and the X resource/keymap tools used at startup.
 
-### Strip from the runtime staging copy
+User defaults are installed under `/etc/skel`, so the live first-boot account receives them:
+- Bash/Zsh startup and shared aliases, Readline settings, Xresources and Xmodmap from the pinned dotfiles commit.
+- `lf` colors/keymaps and the trimmed, vendored Neovim configuration/plugins.
+- `EDITOR=nvim`, `VISUAL=nvim`, `PAGER=less`, and `OPENER=xdg-open`.
+- `~/.xinitrc` loads Xresources and Xmodmap, then starts Openbox.
 
-Remove these from the final SquashFS, while retaining them in the separate build root and binpkg cache:
+Debian-only aliases from the source dotfiles are removed or adjusted for Gentoo. The configurations are copied into the default user skeleton; the user's files are still volatile and reset/recreated on each boot in the current RAM-overlay live system. Passwordless sudo and the fixed live account are for a locally controlled test/live image only; do not expose it to an untrusted network.
 
-- **Portage and package-manager state:** `emerge`, `emerge-webrsync`, `emaint`, `ebuild`, `portageq`, other Portage helpers, `/etc/portage`, `/usr/lib*/portage`, `/usr/share/portage`, `/var/db/pkg`, `/var/db/repos`, `/var/lib/portage`, `/var/cache/binpkgs`, `/var/cache/distfiles`, `/var/cache/edb`, `/var/tmp/portage`, and Portage build logs. Also remove now-unused `app-portage/*`, `app-admin/eselect`, and `sys-apps/locale-gen` runtime payloads.
-- **Manuals and documentation:** all of `/usr/share/man`, `/usr/share/info`, `/usr/share/doc`, `/usr/share/gtk-doc`, `/usr/share/help`, `/usr/share/gnome/help`, and equivalent package documentation trees. Remove `sys-apps/man-db` from the runtime atom set if no manual pages are shipped. The current packer explicitly says it preserves man pages; change that behavior and validate the output.
-- **Locale and translation waste:** ship only the `en_US.UTF-8` locale required by `config/env.d/02locale`; remove other generated locale data and non-English translation catalogs under `/usr/share/locale`. After trimming, verify that `locale -a` still reports `en_US.utf8` (spelling may be normalized by libc) and that ordinary CLI/GUI programs start with `LANG=en_US.UTF-8`.
-- **Build/development payloads:** GCC/binutils compilers and tools, headers, static archives (`*.a`), libtool files (`*.la`), `pkgconfig` and CMake development metadata, source/debug trees, bytecode caches, build helpers and build-only dependencies such as LLVM/Clang where the runtime does not need them. Retain versioned runtime shared libraries (for example, libstdc++) only where selected programs require them. Do not remove libraries solely by filename; check runtime dependencies and test dynamically loaded drivers/plugins.
-- **Transient data and caches:** contents of `/tmp`, `/run`, `/var/tmp`, package/download caches, build logs and repository checkouts. Keep required configuration, licenses, timezone data, fonts, firmware and runtime device/service files.
+### What is removed from the final runtime
 
-Do not run package cleanup against the saved interactive build root. Perform package pruning and file-level trimming on the disposable runtime root/staging copy only.
+The trimming in `scripts/build-squashfs.sh` applies only to the staging copy, not the saved Gentoo build root or its binpkgs.
 
-### Mandatory validation before publishing an SFS
+- **Package management:** `emerge`, other Portage tools, `/etc/portage`, `/usr/lib*/portage`, `/usr/share/portage`, `/var/db/pkg`, `/var/db/repos`, `/var/lib/portage`, Portage logs, caches and ebuild checkouts.
+- **Manuals/docs:** `/usr/share/man`, `/usr/share/info`, `/usr/share/doc`, `/usr/share/gtk-doc`, `/usr/share/help`, `/usr/share/gnome/help`, `sys-apps/man-db` payload, and man-db index/cache. This live profile intentionally ships no manual pages; `tldr`/Tealdeer provides concise command examples.
+- **Locales:** locale source data and non-English translation catalogs; keep the configured `en_US.UTF-8` runtime locale and the C locale data needed by libc.
+- **Build-only data:** compiler/linker executables, development headers, static archives (`*.a`), libtool metadata (`*.la`), pkg-config/CMake metadata, debug/source trees, Python bytecode caches and unused LLVM/Clang build tools.
+- **Caches/transient data:** package/download caches, ebuild repository checkout, build logs, `/tmp`, `/run` and `/var/tmp/portage`.
 
-1. Save the resolved runtime package list and verify it includes `app-misc/lf`, `sys-process/htop`, and the other selected CLI applications, as well as the GUI stack.
-2. After the final packer has run, verify the actual SquashFS—not only the pre-trim root—with `unsquashfs -ll output/squashfs` and targeted checks.
-3. Fail the build if selected commands are absent (`lf`, `mc`, `htop`, `btop`, `fd`, `rg`, `zsh`, `nvim`, `nano`, `tmux`, `startx`, `xterm`, `openbox-session`) or if clearly forbidden payloads remain (`emerge`/Portage, `/etc/portage`, `/var/db/pkg`, manuals, non-English locale data, compiler executables, headers, static/development metadata, or build caches).
-4. Verify `/sbin/init`, the `/etc/init.d` services, `/home/gentoo/.xinitrc`, Xorg, Mesa Crocus and all required runtime libraries survive trimming. Check the generated SquashFS checksum and compressed size.
-5. Boot-test the built kernel + initramfs + this exact SquashFS in QEMU, then separately test Intel GM965/Crocus, Wi-Fi, Bluetooth, audio and input on the physical D630. Report the actual image size and each test outcome; never infer success from the workflow alone.
+Keep runtime shared libraries required by selected programs, Xorg/Mesa drivers and plugins, firmware, timezone data, licenses, fonts, OpenRC services and hardware configuration. Do not delete libraries solely based on a filename; runtime dependencies and dynamically loaded plugins still need verification.
+
+### Mandatory post-build validation
+
+1. Check the resolved package list for every required command listed above.
+2. Inspect the **actual SquashFS** using `unsquashfs -ll output/squashfs`; do not infer final contents from the pre-trim root.
+3. The packer fails if selected applications are absent or if Portage state, manuals, headers, development caches or compiler executables remain.
+4. Verify `/sbin/init`, OpenRC service definitions, `/etc/skel/.xinitrc`, `/etc/skel/.config/nvim`, `/etc/skel/.config/lf`, Xorg and Mesa Crocus survive trimming.
+5. Record the compressed image size and checksum. It must be at most 300 MiB. Boot-test this exact SquashFS with the intended kernel/initramfs in QEMU, then test the physical D630 separately. QEMU's virtual video adapter cannot validate the laptop's Intel GM965 acceleration.
 
 ## Interactive Gentoo build runner
 
