@@ -126,11 +126,11 @@ jobs:
           fi
           sudo install -d -m 0755 "$GENTOO_ROOT"
           avail_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
-          [[ "$avail_kib" =~ ^[0-9]+$ ]] && (( avail_kib >= 3145728 )) || {
+          if [[ ! "$avail_kib" =~ ^[0-9]+$ ]] || (( avail_kib < 3145728 )); then
             echo "Less than 3 GiB free for restoring the saved state." >&2
             df -h / >&2
             exit 1
-          }
+          fi
           df -h / | tee "$report/host-disk-before-extract.txt"
           printf 'Selected state: %s\n' "$state_tag" | tee "$report/selected-state.txt" | tee -a "$GITHUB_STEP_SUMMARY"
           cp "$metadata/manifest.txt" "$report/manifest.txt"
