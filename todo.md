@@ -44,3 +44,10 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 - [ ] For a reliable QEMU graphics test, build a separate test kernel with `CONFIG_DRM_BOCHS=y` and use QEMU `-vga std` (then verify `/dev/dri/card0` exists). Keep the physical D630 kernel profile unchanged unless there is a separate hardware reason to enable extra virtual-GPU drivers.
 - [ ] Alternative to test before a kernel rebuild: add Gentoo package `x11-drivers/xf86-video-vesa` to a test SFS and verify whether it can drive QEMU's standard VGA under this direct-kernel boot. Do not assume this works until Xorg log confirms it.
 - [ ] Once QEMU has a supported video device, retest `startx` and Openbox. This is a QEMU adapter/driver compatibility issue until proven otherwise; do not label it a general D630 Intel-GPU failure.
+
+## Console getty — enable local autologin
+
+- [ ] Change the generated OpenRC service `/etc/init.d/agetty.tty1` so **tty1 automatically logs in as `gentoo`** for this volatile live image. Current service args are `--noclear tty1 linux`; add agetty's `--autologin gentoo` option and verify it is passed correctly by OpenRC.
+- [ ] Keep autologin limited to the local graphical console `tty1`. Do not enable it on serial `ttyS0`, SSH, or other login services.
+- [ ] Verify the first-boot service creates the `gentoo` account before `agetty.tty1` launches, and that the resulting PAM/elogind login creates a valid local session/seat for Xorg.
+- [ ] Acceptance: boot the current SFS in QEMU with `console=tty0`, see an automatic `gentoo` login on tty1 with no username/password prompt, run `startx`, and confirm Xorg opens the VT and Openbox starts once the QEMU video-driver issue above is resolved.
