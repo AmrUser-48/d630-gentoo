@@ -1,0 +1,363 @@
+name: Publish updated Gentoo binpkgs and build Openbox SFS
+run-name: "Core 2 binpkgs + Openbox SFS • run ${{ github.run_number }}"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-updated-binpkgs-and-build-openbox.yml"
+  workflow_dispatch:
+    inputs:
+      state_tag:
+        description: "Optional runner-state-* release tag; blank selects the newest saved state"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: d630-openbox-binpkgs-refresh
+  cancel-in-progress: false
+
+jobs:
+  publish-binpkgs:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS') }}
+    name: Restore saved Gentoo state and publish its current binpkgs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      binpkg_run_ids: ${{ steps.publish.outputs.binpkg_run_ids }}
+    env:
+      GENTOO_ROOT: /opt/gentoo
+      GH_TOKEN: ${{ github.token }}
+      STATE_TAG_INPUT: ${{ inputs.state_tag || '' }}
+      STATE_ENCRYPTION_PASSPHRASE: ${{ secrets.STATE_ENCRYPTION_PASSPHRASE }}
+
+    steps:
+      - name: Check out binpkg exporter
+        uses: actions/checkout@v4
+
+      - name: Cancel obsolete SFS build using the October 20 binpkgs
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(gh run view 40950797127 --repo "$GITHUB_REPOSITORY" --json status --jq '.status' 2>/dev/null || true)"
+          if [[ "$status" == queued || "$status" == in_progress ]]; then
+            gh run cancel 40950797127 --repo "$GITHUB_REPOSITORY" ||
+              echo "::warning::Could not cancel the obsolete SFS run; continuing with the updated build."
+          else
+            echo "The previous SFS run is already $status; no cancellation needed."
+          fi
+
+      - name: Install state restore and binpkg archive tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl coreutils gpg jq tar zstd python3
+          sudo apt-get clean
+          df -h / | tee "$RUNNER_TEMP/host-disk-before-restore.txt"
+
+      - name: Restore the newest saved Gentoo root
+        id: restore
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          report="$RUNNER_TEMP/gentoo-state"
+          metadata="$report/metadata"
+          chunks="$report/chunks"
+          fifo="$report/rootfs-stream.fifo"
+          mkdir -p "$metadata" "$chunks"
+
+          state_tag="$STATE_TAG_INPUT"
+          if [[ -z "$state_tag" ]]; then
+            state_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+              --json tagName,publishedAt \
+              --jq '[.[] | select(.tagName | startswith("runner-state-"))] | sort_by(.publishedAt) | last | .tagName // empty')"
+          fi
+          [[ "$state_tag" =~ ^runner-state-[A-Za-z0-9._-]+$ ]] || {
+            echo "No valid runner-state-* release was found." >&2
+            exit 1
+          }
+          gh release download "$state_tag" --repo "$GITHUB_REPOSITORY" \
+            --pattern manifest.txt --pattern SHARD-SHA256SUMS --dir "$metadata"
+          [[ -s "$metadata/manifest.txt" && -s "$metadata/SHARD-SHA256SUMS" ]] || {
+            echo "Saved state is missing its manifest or checksums." >&2
+            exit 1
+          }
+
+          if grep -Fxq 'Archive format: gpg-aes256-encrypted-zstd-tar' "$metadata/manifest.txt"; then
+            state_encrypted=true
+            part_prefix="gentoo-rootfs.tar.zst.gpg.part-"
+            [[ -n "${STATE_ENCRYPTION_PASSPHRASE:-}" ]] || {
+              echo "Missing Actions secret STATE_ENCRYPTION_PASSPHRASE." >&2
+              exit 1
+            }
+          else
+            state_encrypted=false
+            part_prefix="gentoo-rootfs.tar.zst.part-"
+          fi
+
+          if [[ "$state_encrypted" == true ]]; then
+            mapfile -t parts < <(gh release view "$state_tag" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.gpg.part-")) | .name' | sort)
+          else
+            mapfile -t parts < <(gh release view "$state_tag" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[] | select(.state == "uploaded") | select(.name | startswith("gentoo-rootfs.tar.zst.part-")) | .name' | sort)
+          fi
+          (( ${#parts[@]} > 0 )) || {
+            echo "Release $state_tag has no state chunks matching $part_prefix." >&2
+            exit 1
+          }
+          diff -u \
+            <(printf '%s\n' "${parts[@]}") \
+            <(awk 'NF >= 2 {name=$2; sub(/^\*/, "", name); print name}' "$metadata/SHARD-SHA256SUMS" | sort) || {
+              echo "State release chunk list does not match its checksum manifest." >&2
+              exit 1
+            }
+
+          if [[ -e "$GENTOO_ROOT" ]] && find "$GENTOO_ROOT" -mindepth 1 -print -quit | grep -q .; then
+            echo "$GENTOO_ROOT exists and is not empty; refusing to overwrite it." >&2
+            exit 1
+          fi
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+          avail_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+          [[ "$avail_kib" =~ ^[0-9]+$ ]] && (( avail_kib >= 3145728 )) || {
+            echo "Less than 3 GiB free for restoring the saved state." >&2
+            df -h / >&2
+            exit 1
+          }
+          df -h / | tee "$report/host-disk-before-extract.txt"
+          printf 'Selected state: %s\n' "$state_tag" | tee "$report/selected-state.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          cp "$metadata/manifest.txt" "$report/manifest.txt"
+
+          mkfifo "$fifo"
+          extract_pid=""
+          cleanup_restore() {
+            exec 3>&- 2>/dev/null || true
+            if [[ -n "${extract_pid:-}" ]]; then kill "$extract_pid" 2>/dev/null || true; fi
+            rm -f "$fifo"
+          }
+          trap cleanup_restore EXIT
+          if [[ "$state_encrypted" == true ]]; then
+            (
+              set -euo pipefail
+              gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --decrypt \
+                < "$fifo" 3< <(printf '%s\n' "$STATE_ENCRYPTION_PASSPHRASE") |
+                zstd --decompress --stdout |
+                sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                  --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+            ) > "$report/extract.log" 2>&1 &
+          else
+            (
+              set -euo pipefail
+              zstd --decompress --stdout < "$fifo" |
+                sudo tar --extract --file=- --directory="$GENTOO_ROOT" \
+                  --numeric-owner --same-permissions --acls --xattrs --xattrs-include='*' --sparse
+            ) > "$report/extract.log" 2>&1 &
+          fi
+          extract_pid=$!
+          exec 3>"$fifo"
+          for part in "${parts[@]}"; do
+            echo "Downloading and verifying $part"
+            gh release download "$state_tag" --repo "$GITHUB_REPOSITORY" --pattern "$part" --dir "$chunks"
+            expected="$(awk -v name="$part" '$2 == name {print $1}' "$metadata/SHARD-SHA256SUMS")"
+            [[ "$expected" =~ ^[[:xdigit:]]{64}$ ]] || {
+              echo "No valid SHA-256 for $part." >&2; exit 1;
+            }
+            (cd "$chunks" && printf '%s  %s\n' "$expected" "$part" | sha256sum --check -)
+            cat "$chunks/$part" >&3
+            rm -f "$chunks/$part"
+          done
+          exec 3>&-
+          if ! wait "$extract_pid"; then
+            echo "Root filesystem extraction failed; last log lines:" >&2
+            tail -n 100 "$report/extract.log" >&2 || true
+            exit 1
+          fi
+          extract_pid=""
+          trap - EXIT
+          rm -f "$fifo"
+          sudo test -s "$GENTOO_ROOT/etc/gentoo-release"
+          sudo test -x "$GENTOO_ROOT/usr/bin/emerge" || sudo test -x "$GENTOO_ROOT/usr/bin/emerge-webrsync"
+          echo "STATE_TAG=$state_tag" >> "$GITHUB_ENV"
+          echo "Restored and validated Gentoo root from $state_tag."
+          df -h / | tee "$report/host-disk-after-restore.txt"
+
+      - name: Package current PKGDIR and publish the updated binpkg release
+        id: publish
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pkgdir="$GENTOO_ROOT/var/cache/binpkgs"
+          release_dir="$RUNNER_TEMP/binpkgs-release"
+          mkdir -p "$release_dir"
+          [[ -d "$pkgdir" ]] || {
+            echo "Restored Gentoo state has no PKGDIR at $pkgdir." >&2
+            exit 1
+          }
+          count="$(find "$pkgdir" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) | wc -l)"
+          (( count > 0 )) || {
+            echo "No Gentoo binary packages were present in the restored PKGDIR." >&2
+            exit 1
+          }
+          echo "Restored PKGDIR contains $count binary package files."
+          find "$pkgdir" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) \
+            -printf '%T@ %TY-%Tm-%Td %TH:%TM %p\n' | sort -nr | head -n 30 \
+            | tee "$RUNNER_TEMP/latest-binpkgs.txt"
+
+          bash scripts/package-binpkgs-release.sh "$pkgdir" "$release_dir" 1500000000
+          {
+            echo "Target: amd64 / glibc / OpenRC Gentoo Stage 3"
+            echo "CPU target: Intel Core 2 / Merom"
+            echo "CFLAGS: -O2 -pipe -march=core2 -mtune=core2"
+            echo "Source saved-state tag: $STATE_TAG"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Publisher run ID: $GITHUB_RUN_ID"
+            echo "Binary package files in restored PKGDIR: $count"
+            echo "Release tag: binpkgs-$GITHUB_RUN_ID"
+            echo "This release exports the current saved runner PKGDIR, including any package updates saved there."
+            echo
+            echo "Most recently modified package files:"
+            cat "$RUNNER_TEMP/latest-binpkgs.txt"
+          } > "$release_dir/BUILD-MANIFEST.txt"
+          (
+            cd "$release_dir"
+            sha256sum PACKAGE-LIST.txt BUILD-MANIFEST.txt binpkgs-part-*.tar.zst > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+          tag="binpkgs-$GITHUB_RUN_ID"
+          gh release create "$tag" "$release_dir"/PACKAGE-LIST.txt "$release_dir"/BUILD-MANIFEST.txt \
+            "$release_dir"/SHA256SUMS "$release_dir"/binpkgs-part-*.tar.zst \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "D630 Core 2 binary packages — refreshed state run $GITHUB_RUN_ID" \
+            --notes-file "$release_dir/BUILD-MANIFEST.txt" \
+            --target "$GITHUB_SHA" --prerelease
+          echo "binpkg_run_ids=39507549274,$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "Published $tag from the restored PKGDIR. The Openbox build will import the older Mesa set first, then this newer cache so updated package files take precedence." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload binpkg refresh diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: binpkg-refresh-report-run-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/gentoo-state/manifest.txt
+            ${{ runner.temp }}/gentoo-state/selected-state.txt
+            ${{ runner.temp }}/gentoo-state/host-disk-before-restore.txt
+            ${{ runner.temp }}/gentoo-state/host-disk-after-restore.txt
+            ${{ runner.temp }}/gentoo-state/extract.log
+            ${{ runner.temp }}/latest-binpkgs.txt
+            ${{ runner.temp }}/binpkgs-release/BUILD-MANIFEST.txt
+            ${{ runner.temp }}/binpkgs-release/PACKAGE-LIST.txt
+            ${{ runner.temp }}/binpkgs-release/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
+  build-openbox:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS') }}
+    name: Build and verify Openbox SFS from refreshed packages
+    needs: publish-binpkgs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      RUNTIME_PROFILE: openbox
+      BINPKG_RUN_IDS: ${{ needs.publish-binpkgs.outputs.binpkg_run_ids }}
+      SOURCE_FALLBACK: "true"
+      KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-40922514538
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out D630 Gentoo configuration
+        uses: actions/checkout@v4
+
+      - name: Install host tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git python3 tar xz-utils zstd rsync squashfs-tools \
+            e2fsprogs util-linux gzip
+          sudo apt-get clean
+          df -h / | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build runtime root and trimmed SquashFS
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
+            bash scripts/build-runtime-squashfs.sh
+
+      - name: Test the resulting SquashFS contents
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sfs="$GITHUB_WORKSPACE/output/squashfs"
+          [[ -s "$sfs" ]] || { echo "Expected SquashFS not found: $sfs" >&2; exit 1; }
+          listing="$RUNNER_TEMP/squashfs-list.txt"
+          unsquashfs -ll "$sfs" > "$listing"
+          fail=0
+          for path in usr/share/man usr/share/info usr/share/doc usr/share/gtk-doc usr/share/help usr/share/gnome/help usr/share/i18n var/cache/man; do
+            if grep -Eq "squashfs-root/$path(/|$)" "$listing"; then
+              echo "FAIL: /$path is still present"; fail=1
+            else
+              echo "PASS: /$path removed"
+            fi
+          done
+          for path in usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg usr/bin/zsh usr/bin/nano usr/bin/tmux usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do
+            if grep -Eq "squashfs-root/$path([[:space:]]|$)" "$listing"; then
+              echo "PASS: /$path present"
+            else
+              echo "FAIL: /$path missing"; fail=1
+            fi
+          done
+          if grep -Eq 'squashfs-root/usr/share/licenses(/|$)' "$listing"; then
+            echo "PASS: licenses preserved"
+          else
+            echo "FAIL: license files missing"; fail=1
+          fi
+          exit "$fail"
+
+      - name: Upload verified SFS and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d630-openbox-squashfs-refreshed-run-${{ github.run_number }}
+          path: |
+            output/squashfs
+            output/kernel
+            output/initramfs
+            output/KERNELRELEASE.txt
+            output/KERNEL-BUILD-MANIFEST.txt
+            output/SOURCE-BUILD-MANIFEST.txt
+            output/LOCAL-BINPKG-IMPORT.txt
+            output/mesa-binpkg.log
+            output/PREPARED-ASSET-CHECK.log
+            output/SHA256SUMS
+            output/SQUASHFS-SHA256.txt
+            output/RUNTIME-MANIFEST.txt
+            output/RELEASE-NOTES.md
+            output/PACKAGES.txt
+            output/INSTALLED-PACKAGES.txt
+            output/EMERGE-INFO.txt
+            output/BUILD-INPUTS.txt
+            output/STAGE3-MANIFEST.txt
+            output/PORTAGE-TARGET.txt
+            output/SQUASHFS-INFO.txt
+            output/INIT-PROBE.txt
+            output/KERNEL-MODULES.txt
+            output/portage-bootstrap.log
+            output/emerge-runtime.log
+            output/depclean.log
+            output/locale.log
+            ${{ runner.temp }}/squashfs-list.txt
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
