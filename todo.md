@@ -35,3 +35,12 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 - [ ] Matching kernel modules and firmware required by the D630 are available in the runtime root (or are explicitly built into the kernel / supplied by the initramfs).
 - [ ] Unsupported sysctl configuration is removed or guarded; remaining warnings are documented and understood.
 - [ ] Physical D630 testing separately confirms Intel graphics, Wi-Fi, Bluetooth, audio, and input hardware.
+
+## Newly identified — QEMU VNC video adapter is unsupported by the D630 kernel config
+
+- [ ] Xorg now fails to find/open a usable video device during QEMU VNC testing. This is likely separate from the earlier serial-console `/dev/tty0` failure.
+- [ ] The current `config/kernel/d630-base.fragment` explicitly disables `CONFIG_DRM_BOCHS`, `CONFIG_DRM_VIRTIO_GPU`, `CONFIG_DRM_QXL`, and `CONFIG_DRM_VMWGFX`; `CONFIG_DRM_SIMPLEDRM=y` does not guarantee a DRM card with QEMU direct-kernel boot. QEMU's `-vga std` adapter uses the Bochs VBE interface, so the current D630-focused kernel may expose no usable `/dev/dri/card*` device to Xorg.
+- [ ] Confirm in the guest: `ls -l /dev/dri /dev/fb* 2>&1; grep -E '\\(EE\\)|No devices|modeset|drm|vesa|intel' /home/gentoo/.local/share/xorg/Xorg.0.log`.
+- [ ] For a reliable QEMU graphics test, build a separate test kernel with `CONFIG_DRM_BOCHS=y` and use QEMU `-vga std` (then verify `/dev/dri/card0` exists). Keep the physical D630 kernel profile unchanged unless there is a separate hardware reason to enable extra virtual-GPU drivers.
+- [ ] Alternative to test before a kernel rebuild: add Gentoo package `x11-drivers/xf86-video-vesa` to a test SFS and verify whether it can drive QEMU's standard VGA under this direct-kernel boot. Do not assume this works until Xorg log confirms it.
+- [ ] Once QEMU has a supported video device, retest `startx` and Openbox. This is a QEMU adapter/driver compatibility issue until proven otherwise; do not label it a general D630 Intel-GPU failure.
