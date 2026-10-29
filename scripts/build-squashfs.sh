@@ -212,11 +212,11 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
   # generated from config/locale.gen, which selects en_US.UTF-8 only.
   if [[ -d "$stage/usr/share/locale" ]]; then
     find "$stage/usr/share/locale" -mindepth 1 -maxdepth 1 -type d \
-      ! -name en - ! -name en_US - ! -name C -exec rm -rf {} +
+      ! -name en ! -name en_US ! -name C -exec rm -rf {} +
   fi
   if [[ -d "$stage/usr/lib/locale" ]]; then
     find "$stage/usr/lib/locale" -mindepth 1 -maxdepth 1 -type d \
-      ! -name C.utf8 - ! -name C.UTF-8 - ! -name en_US.utf8 - ! -name en_US.UTF-8 \
+      ! -name C.utf8 ! -name C.UTF-8 ! -name en_US.utf8 ! -name en_US.UTF-8 \
       -exec rm -rf {} +
   fi
 
