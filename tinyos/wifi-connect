@@ -152,14 +152,24 @@ else
         exit 1
     fi
 
-    if ! printf '%s\n' "$password" | wpa_passphrase "$ssid" > /run/wpa_supplicant.conf; then
-        unset password
+    # wpa_passphrase reads from a terminal when its passphrase argument is omitted.
+    # Generate the quoted supplicant config directly so a pipe does not cause tcgetattr
+    # to fail. Escape characters significant inside quoted wpa_supplicant strings.
+    ssid_config=$(printf '%s' "$ssid" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+    password_config=$(printf '%s' "$password" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+    if ! {
+        printf 'ctrl_interface=DIR=/run/wpa_supplicant GROUP=0\n'
+        printf 'update_config=0\n\nnetwork={\n'
+        printf '    ssid="%s"\n' "$ssid_config"
+        printf '    psk="%s"\n' "$password_config"
+        printf '}\n'
+    } > /etc/wpa_supplicant.conf; then
+        unset password password_config ssid_config
         echo "Could not create Wi-Fi configuration." >&2
         exit 1
     fi
-    sed '/^[[:space:]]*#psk=/d' /run/wpa_supplicant.conf > /etc/wpa_supplicant.conf
-    rm -f /run/wpa_supplicant.conf
-    unset password
+    chmod 0600 /etc/wpa_supplicant.conf
+    unset password password_config ssid_config
 fi
 
 wpa_supplicant -B -f /run/wpa_supplicant.log -P /run/wpa_supplicant.pid \
