@@ -343,6 +343,7 @@ chroot "$ROOT" /bin/bash -lc 'env-update'
 
 log "Configure console login, first-boot account creation, and OpenRC"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
+chroot "$ROOT" /bin/bash -lc 'getent group wheel >/dev/null 2>&1 || groupadd wheel'
 install -m 0755 "$GITHUB_WORKSPACE/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
 printf '%s\n' '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
 chmod 0755 "$ROOT/etc/sudoers.d"
