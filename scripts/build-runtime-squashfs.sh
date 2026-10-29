@@ -328,7 +328,8 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
     /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/tldr /usr/bin/htop \
-    /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux; do
+    /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux \
+    /usr/bin/aplay /usr/bin/arecord /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
   mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
