@@ -47,7 +47,18 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 
 ## Console getty — enable local autologin
 
-- [ ] Change the generated OpenRC service `/etc/init.d/agetty.tty1` so **tty1 automatically logs in as `gentoo`** for this volatile live image. Current service args are `--noclear tty1 linux`; add agetty's `--autologin gentoo` option and verify it is passed correctly by OpenRC.
+- [x] Builder now overwrites the generated OpenRC service `/etc/init.d/agetty.tty1` with `--autologin gentoo --noclear tty1 linux`; validate the built image to confirm this exact service reaches the SFS.
 - [ ] Keep autologin limited to the local graphical console `tty1`. Do not enable it on serial `ttyS0`, SSH, or other login services.
 - [ ] Verify the first-boot service creates the `gentoo` account before `agetty.tty1` launches, and that the resulting PAM/elogind login creates a valid local session/seat for Xorg.
 - [ ] Acceptance: boot the current SFS in QEMU with `console=tty0`, see an automatic `gentoo` login on tty1 with no username/password prompt, run `startx`, and confirm Xorg opens the VT and Openbox starts once the QEMU video-driver issue above is resolved.
+## Runtime SFS implementation updated — build and runtime proof still pending
+
+- [x] The `openbox` profile combines `config/package-sets/gui-initram.list` with `config/package-sets/cli.list`, omitting `sys-apps/man-db`.
+- [x] Added `app-misc/tealdeer` (GURU, `~amd64`) plus the required `less`/`file` package atoms and X resource/keymap/open-file helpers.
+- [x] Added pinned `deb12dots` user defaults into `/etc/skel`: Bash/Zsh, shared aliases, Readline, `lf`, Neovim and X resources. Debian-specific aliases are filtered out; `EDITOR`/`VISUAL` use Neovim and `PAGER` uses less.
+- [x] `agetty.tty1` generation now requests autologin for `gentoo`, and `/etc/sudoers.d/10-d630-wheel` grants passwordless sudo to the local live `wheel` group.
+- [x] The minimal SquashFS packer removes man pages, info/docs trees, locale source files and non-English translation catalogs; it no longer runs `mandb`.
+- [x] Post-pack checks now fail if required CLI apps are missing or if Portage state, manuals/docs, headers, package caches or compiler executables remain.
+- [ ] Rebuild the `openbox` profile using a Mesa-containing binpkg release and the matching D630 kernel bundle; inspect the real output logs and package list.
+- [ ] Confirm compressed output is at most 300 MiB, required commands are executable, only the intended locale data remains, and no man/manual or Portage payload survives.
+- [ ] Boot the new exact SFS in QEMU, verify tty1 autologin, test `sudo -n true`, `nvim`, `lf`, `fd`, `tldr`, `htop`, and `startx`; diagnose the separate QEMU video-adapter mismatch.
