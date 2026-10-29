@@ -26,6 +26,7 @@ test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
 test -s config/portage/package.use/20-repositories
 test -s config/portage/package.accept_keywords/20-guru
+test -s config/runtime/d630-firstboot
 grep -Fq 'app-eselect/eselect-repository git' config/portage/package.use/20-repositories
 grep -Fq 'app-misc/lf ~amd64' config/portage/package.accept_keywords/20-guru
 
@@ -36,7 +37,7 @@ grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d6
 grep -Fq 'llvm-core/llvm LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-core/clang LLVM_TARGETS: -* X86 SPIRV' config/portage/package.use/10-d630-hardware
 grep -Fq 'llvm-runtimes/libclc VIDEO_CARDS: -*' config/portage/package.use/10-d630-hardware
-grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel i915' config/portage/package.use/10-d630-hardware
+grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 grep -Fq 'x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics' config/portage/package.use/10-d630-hardware
 test -s config/xorg/99-synaptics.conf
 grep -Fq 'x11-base/xorg-server -minimal' config/portage/package.use/10-d630-hardware
@@ -66,7 +67,29 @@ grep -Fq 'workflow_call:' .github/workflows/build-d630-kernel.yml
 bash -n scripts/build-squashfs-inplace.sh
 bash -n scripts/build-state-squashfs.sh
 test -s scripts/build-runtime-squashfs.sh
-grep -Fq 'if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' scripts/build-runtime-squashfs.sh
+grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' scripts/build-runtime-squashfs.sh
+grep -Fq 'Install Mesa from an imported binary package only' scripts/build-runtime-squashfs.sh
+grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' scripts/build-runtime-squashfs.sh
+grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa"'\''' scripts/build-runtime-squashfs.sh
+grep -Fq -- '--getbinpkg --usepkgonly --onlydeps' scripts/build-runtime-squashfs.sh
+grep -Fq -- '--getbinpkg=n --usepkgonly' scripts/build-runtime-squashfs.sh
+grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' scripts/build-runtime-squashfs.sh
+grep -Fq 'command -v usermod && command -v openssl && command -v visudo' scripts/build-runtime-squashfs.sh
+grep -Fq 'useradd -M -U -u 1000 -s /bin/bash gentoo' config/runtime/d630-firstboot
+grep -Fq 'awk -F: '\''$1 != "gentoo" { print $1 }'\'' /etc/group | paste -sd, -' config/runtime/d630-firstboot
+grep -Fq 's0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100' scripts/build-runtime-squashfs.sh
+grep -Fq "rc-update del netmount default" scripts/build-runtime-squashfs.sh
+grep -Fq 'install -m 0755 "$GITHUB_WORKSPACE/config/runtime/d630-firstboot"' scripts/build-runtime-squashfs.sh
+grep -Fq 'find "$stage" -xdev -uid 1000 -exec chown -h 0 {} +' scripts/build-squashfs.sh
+grep -Fq 'chown 0:0 "$stage/var"' scripts/build-squashfs.sh
+grep -Fq 'chroot "$ROOT" chmod 4755 /usr/bin/sudo' scripts/build-runtime-squashfs.sh
+grep -Fq 'chmod 0755 "$ROOT/etc/sudoers.d"' scripts/build-runtime-squashfs.sh
+grep -Fq 'chown -R gentoo:gentoo /home/gentoo' config/runtime/d630-firstboot
+grep -Fq 'openssl passwd -6 gentoo' config/runtime/d630-firstboot
+grep -Fq 'find "$ROOT" -xdev -uid 1000 -exec chown -h 0 {} +' scripts/build-state-squashfs.sh
+grep -Fq 'umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=' scripts/build-runtime-squashfs.sh
+grep -Fq '\${FEATURES} -userpriv' scripts/build-runtime-squashfs.sh
+grep -Fq 'the installed Mesa binpkg has USE=llvm' scripts/build-runtime-squashfs.sh
 ! grep -Fq 'if [[ "$RUNTIME_PROFILE" != console ]]; then' scripts/build-runtime-squashfs.sh
 test -s scripts/build-runtime-squashfs-local.sh
 test -s .github/workflows/build-d630-runtime-squashfs.yml
@@ -129,6 +152,17 @@ PY
 bash -n scripts/build-squashfs.sh
 bash -n scripts/build-runtime-squashfs.sh
 bash -n scripts/build-runtime-squashfs-local.sh
+grep -Fq 'du -shx "$src" "$output"' scripts/build-squashfs.sh
+grep -Fq 'usr/bin/init($| ->)' scripts/build-runtime-squashfs.sh
+grep -Fq "MINIMAL_RUNTIME=true bash" scripts/build-runtime-squashfs.sh
+grep -Fq -- "--exclude='/var/cache/***'" scripts/build-squashfs.sh
+grep -Fq 'Removing Portage, language runtimes, development tools, and compiler binaries.' scripts/build-squashfs.sh
+grep -Fq 'remove_package_payload sys-devel/gcc true' scripts/build-squashfs.sh
+grep -Fq '"$stage/var/db/pkg"' scripts/build-squashfs.sh
+grep -Fq 'rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,python*,perl*}' scripts/build-squashfs.sh
+grep -Fq 'ln -s ../usr/lib/netifrc "$stage/lib/netifrc"' scripts/build-squashfs.sh
+grep -Fq 'LLVM/Clang package records are present in the input root' scripts/build-squashfs.sh
+grep -Fq 'dev-(build|lang|python|util)' scripts/build-runtime-squashfs.sh
 grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
 grep -Fq 'OUTPUT_DIR' scripts/build-runtime-squashfs.sh
 grep -Fq -- "--getbinpkg --usepkgonly" scripts/build-runtime-squashfs.sh

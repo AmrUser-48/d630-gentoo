@@ -1,0 +1,1 @@
+-rwxr-xr-- root/root             49064 2025-11-22 16:38 squashfs-root/usr/bin/init

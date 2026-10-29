@@ -150,40 +150,18 @@ for atom in $TARGETS; do
         die "depclean removed a required runtime target: $atom"
     fi
 done
-chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v rc-update && command -v rc-status'
+chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v rc-update && command -v rc-status && command -v openssl && command -v usermod'
 
 log "Configure first boot, OpenRC services, console login, and Openbox session"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
-cat > "$ROOT/etc/init.d/d630-firstboot" <<'EOF'
-#!/sbin/openrc-run
-description="Interactive first-boot user creation"
-start() {
-    [ -e /var/lib/d630/firstboot.done ] && return 0
-    exec 3<>/dev/console || return 1
-    while :; do
-        printf '\nCreate a local username: ' >&3
-        IFS= read -r username <&3 || return 1
-        case "$username" in ""|root|*[!a-zA-Z0-9_-]*|[!a-zA-Z_]*)
-            printf 'Invalid username.\n' >&3; continue ;;
-        esac
-        [ "$(expr length "$username")" -le 32 ] || { printf 'Username too long.\n' >&3; continue; }
-        break
-    done
-    for group in wheel audio video plugdev usb netdev; do groupadd -f "$group" || return 1; done
-    useradd -m -s /bin/bash -G wheel,audio,video,plugdev,usb,netdev "$username" || return 1
-    printf '\nSet a password for %s when prompted.\n' "$username" >&3
-    passwd "$username" <&3 >&3 2>&3 || { userdel -r "$username" >/dev/null 2>&1 || true; return 1; }
-    touch /var/lib/d630/firstboot.done || return 1
-    printf 'Account created; use sudo for administration.\n' >&3
-    exec 3>&-
-}
-EOF
-chmod 0755 "$ROOT/etc/init.d/d630-firstboot"
+install -m 0755 "$REPO/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
 printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
+chmod 0755 "$ROOT/etc/sudoers.d"
 chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
 grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers.d' "$ROOT/etc/sudoers" ||
     echo '#includedir /etc/sudoers.d' >> "$ROOT/etc/sudoers"
 chroot "$ROOT" /bin/bash -lc 'visudo -c'
+chroot "$ROOT" chmod 4755 /usr/bin/sudo
 
 printf '%s\n' d630-gentoo > "$ROOT/etc/hostname"
 cat > "$ROOT/etc/hosts" <<'EOF'
@@ -210,6 +188,12 @@ EOF
 fi
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default'
+if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
+    chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
+fi
+if ! grep -Eq '^s0:12345:respawn:.*ttyS0' "$ROOT/etc/inittab"; then
+    printf '\ns0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100\n' >> "$ROOT/etc/inittab"
+fi
 for service in dbus elogind NetworkManager bluetooth; do
     if [[ -x "$ROOT/etc/init.d/$service" ]]; then
         chroot "$ROOT" /bin/bash -lc "rc-update add '$service' default"
@@ -226,11 +210,24 @@ rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/ed
     "$ROOT/var/log/gentoo-build-set.log" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru" \
     "$ROOT/usr/src" "$ROOT/root/.cache"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
-printf 'Source root: %s\nProfile: OpenRC desktop + fbterm/mc\nTarget: Core 2 Duo, -march=core2 -mtune=core2\nRuntime root: separate copy; build root/binpkgs preserved\nWritable upper: volatile RAM OverlayFS; changes vanish on reboot\n' \
+printf 'Source root: %s\nProfile: OpenRC desktop + fbterm/mc\nTarget: Core 2 Duo, -march=core2 -mtune=core2\nRuntime root: separate copy; build root/binpkgs preserved\nWritable upper: volatile RAM OverlayFS; changes vanish on reboot\nLive login: gentoo / gentoo; account and all-group membership are initialized at every boot.\n' \
     "$BUILD_ROOT" > "$OUT/RUNTIME-MANIFEST.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
 
 log "Build Zstandard SquashFS from runtime-only root"
+if awk -F: '$3 == 1000 { found = 1 } END { exit !found }' "$ROOT/etc/passwd"; then
+    die "UID 1000 is assigned in the runtime root"
+fi
+if awk -F: '$3 == 1000 { found = 1 } END { exit !found }' "$ROOT/etc/group"; then
+    die "GID 1000 is assigned in the runtime root"
+fi
+find "$ROOT" -xdev -uid 1000 -exec chown -h 0 {} +
+find "$ROOT" -xdev -gid 1000 -exec chgrp -h 0 {} +
+chown 0:0 "$ROOT/var"
+chmod 0755 "$ROOT/var"
+if find "$ROOT" -xdev \( -uid 1000 -o -gid 1000 \) -print -quit | grep -q .; then
+    die "runtime root still contains host UID/GID 1000 ownership"
+fi
 bash "$REPO/scripts/build-squashfs-inplace.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"

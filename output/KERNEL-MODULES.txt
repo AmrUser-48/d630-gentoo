@@ -1,0 +1,2 @@
+Release: d630-kernel-6.18.56-run-40813428910
+Kernel release: 6.18.56-d630-gentoo

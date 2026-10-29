@@ -6,7 +6,7 @@ log() { echo; echo "[d630-runtime-rootfs] $*"; }
 [[ "$EUID" -eq 0 ]] || die "run as root"
 GH_API_AUTH_ARGS=()
 if [[ -n "${GH_TOKEN:-}" ]]; then GH_API_AUTH_ARGS=(-H "Authorization: Bearer $GH_TOKEN"); fi
-[[ "$RUNTIME_PROFILE" =~ ^(tiny-console|console|desktop|daily-driver|gui-initram)$ ]] || die "invalid runtime profile"
+[[ "$RUNTIME_PROFILE" =~ ^(tiny-console|console|openbox|desktop|daily-driver|gui-initram)$ ]] || die "invalid runtime profile"
 [[ -z "$BINPKG_RUN_IDS" || "$BINPKG_RUN_IDS" =~ ^[0-9,[:space:]]+$ ]] || die "binpkg_run_ids must be numeric IDs separated by commas or spaces"
 [[ "$SOURCE_FALLBACK" == true || "$SOURCE_FALLBACK" == false ]] || die "SOURCE_FALLBACK must be true or false"
 [[ -z "$KERNEL_BUNDLE_TAG" || "$KERNEL_BUNDLE_TAG" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid kernel bundle tag"
@@ -32,6 +32,9 @@ fi
 if [[ -n "$LOCAL_BINPKG_ARCHIVE" ]]; then
   [[ -s "$LOCAL_BINPKG_ARCHIVE" ]] || die "local binpkg archive not found: $LOCAL_BINPKG_ARCHIVE"
   zstd -t "$LOCAL_BINPKG_ARCHIVE" >/dev/null || die "local binpkg archive is not valid Zstandard data"
+fi
+if [[ "$RUNTIME_PROFILE" == openbox && -z "$BINPKG_RUN_IDS" && -z "$LOCAL_RELEASE_ASSETS_DIR" && -z "$LOCAL_BINPKG_ARCHIVE" ]]; then
+  die "the openbox SquashFS profile requires an imported binary-package release containing Mesa"
 fi
 
 IDS="$(printf '%s' "$BINPKG_RUN_IDS" | tr ',' ' ')"
@@ -68,13 +71,17 @@ printf '%s  %s\n' "$SHA" "$WORK/stage3/$ARCHIVE" | sha256sum --check -
 mkdir -p "$ROOT"
 tar -xpf "$WORK/stage3/$ARCHIVE" -C "$ROOT" --numeric-owner --xattrs --xattrs-include='*' --same-permissions
 printf 'Archive: %s\nSHA256: %s\n' "$ARCHIVE" "$SHA" > "$OUT/STAGE3-MANIFEST.txt"
+PORTAGE_GID="$(awk -F: '$1 == "portage" { print $3; exit }' "$ROOT/etc/group")"
+[[ "$PORTAGE_GID" =~ ^[0-9]+$ ]] || die "Stage 3 has no portage group"
 
 log "Install Core 2 Portage configuration"
 mkdir -p "$ROOT/etc/portage/package-sets" "$ROOT/etc/portage/profile/package.use.force" \
   "$ROOT/etc/portage/binrepos.conf" "$ROOT/etc/portage/repos.conf" \
   "$ROOT/etc/bash/bashrc.d" "$ROOT/etc/env.d" "$ROOT/etc/X11/xorg.conf.d" \
   "$ROOT/usr/local/sbin" "$ROOT/var/cache/binpkgs" "$ROOT/var/log/portage" \
-  "$ROOT/dev" "$ROOT/proc" "$ROOT/sys" "$ROOT/run"
+  "$ROOT/var/tmp/portage" "$ROOT/dev" "$ROOT/proc" "$ROOT/sys" "$ROOT/run"
+chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"
+chmod 2775 "$ROOT/var/tmp/portage"
 if [[ -f "$ROOT/etc/portage/package.use" ]]; then mv "$ROOT/etc/portage/package.use" "$ROOT/etc/portage/package.use.stage3"; fi
 mkdir -p "$ROOT/etc/portage/package.use"
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/make.conf" "$ROOT/etc/portage/make.conf"
@@ -234,6 +241,7 @@ net-wireless/bluez
 EOF
   case "$RUNTIME_PROFILE" in
     console) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
+    openbox) cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt" ;;
     desktop) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" "$GITHUB_WORKSPACE/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
     daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
   esac
@@ -244,8 +252,42 @@ if grep -Evq '^[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(:[A-Za-z0-9+_.-]+)?$' "$WORK/at
 cp "$WORK/atoms.txt" "$OUT/PACKAGES.txt"
 ATOMS="$(paste -sd ' ' "$WORK/atoms.txt")"
 
-if [[ "$RUNTIME_PROFILE" == gui-initram && "$SOURCE_FALLBACK" == false ]]; then
-  log "Require the GUI package atoms in the pinned binary-package release"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  mesa_binpkg="$(find "$ROOT/var/cache/binpkgs/media-libs/mesa" -maxdepth 1 -type f \
+    \( -name 'mesa-*.gpkg.tar' -o -name 'mesa-*.tbz2' \) -print -quit 2>/dev/null || true)"
+  [[ -n "$mesa_binpkg" ]] || die "imported binary packages do not contain Mesa"
+  mesa_filename="$(basename "$mesa_binpkg")"
+  case "$mesa_filename" in
+    *.gpkg.tar) mesa_version="${mesa_filename#mesa-}"; mesa_version="${mesa_version%-[0-9]*.gpkg.tar}"; mesa_version="${mesa_version%.gpkg.tar}" ;;
+    *.tbz2) mesa_version="${mesa_filename#mesa-}"; mesa_version="${mesa_version%.tbz2}" ;;
+  esac
+  [[ -n "$mesa_version" ]] || die "could not determine the Mesa version from $mesa_filename"
+  mesa_atom="=media-libs/mesa-$mesa_version"
+  log "Install Mesa runtime dependencies from binary packages"
+  chroot "$ROOT" /bin/bash -lc \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly --onlydeps '$mesa_atom'" \
+    |& tee "$OUT/mesa-binpkg.log"
+  log "Install Mesa from an imported binary package only"
+  chroot "$ROOT" /bin/bash -lc \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly '$mesa_atom'" \
+    |& tee -a "$OUT/mesa-binpkg.log"
+  mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
+  [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Mesa binary package did not install package metadata"
+  if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
+    die "the installed Mesa binpkg has USE=llvm; refusing an LLVM-enabled Mesa runtime"
+  fi
+  find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null | grep -q . ||
+    die "installed Mesa binary package is missing the Crocus driver"
+fi
+
+RUNTIME_ATOMS="$ATOMS"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  RUNTIME_ATOMS="$(awk '$0 != "media-libs/mesa"' "$WORK/atoms.txt" | paste -sd ' ' -)"
+  log "Mesa is already installed from its verified binpkg; installing the remaining runtime atoms"
+fi
+
+if [[ "$RUNTIME_PROFILE" == gui-initram || ( "$RUNTIME_PROFILE" == openbox && "$SOURCE_FALLBACK" == false ) ]]; then
+  log "Require the GUI package atoms in the imported binary-package release"
   while IFS= read -r atom || [[ -n "$atom" ]]; do
     atom="${atom%%#*}"
     atom="${atom//[[:space:]]/}"
@@ -261,14 +303,14 @@ fi
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg $ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 else
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
-chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v useradd && command -v groupadd && command -v passwd && command -v visudo'
+chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v useradd && command -v groupadd && command -v usermod && command -v openssl && command -v visudo'
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --ask=n --verbose --depclean --with-bdeps=n' |& tee "$OUT/depclean.log"
-if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
-  for atom in llvm-core/llvm llvm-core/clang llvm-runtimes/libclc dev-util/mesa_clc; do
+if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
+  for atom in llvm-core/llvm llvm-core/clang llvm-runtimes/compiler-rt llvm-runtimes/clang-runtime llvm-runtimes/libclc dev-util/mesa_clc dev-util/spirv-llvm-translator; do
     category="${atom%%/*}"
     package="${atom#*/}"
     if find "$ROOT/var/db/pkg/$category" -mindepth 1 -maxdepth 1 -type d -name "$package-*" -print -quit 2>/dev/null | grep -q .; then
@@ -276,38 +318,29 @@ if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
     fi
   done
 fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  chroot "$ROOT" chmod 0755 /usr/bin/startx
+  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session; do
+    chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
+  done
+  mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
+  [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Openbox runtime has no installed Mesa package metadata"
+  if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
+    die "the installed Mesa binpkg has USE=llvm; refusing an LLVM-enabled Mesa runtime"
+  fi
+  find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null | grep -q . ||
+    die "Openbox runtime is missing Mesa's Crocus driver"
+fi
 
 log "Configure console login, first-boot account creation, and OpenRC"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
-cat > "$ROOT/etc/init.d/d630-firstboot" <<'EOF'
-#!/sbin/openrc-run
-description="Interactive first-boot user creation"
-start() {
-    [ -e /var/lib/d630/firstboot.done ] && return 0
-    exec 3<>/dev/console || return 1
-    while :; do
-        printf '\nCreate a local username: ' >&3
-        IFS= read -r username <&3 || return 1
-        case "$username" in ""|root|*[!a-zA-Z0-9_-]*|[!a-zA-Z_]*)
-            printf 'Invalid username.\n' >&3; continue ;;
-        esac
-        [ "$(expr length "$username")" -le 32 ] || { printf 'Username too long.\n' >&3; continue; }
-        break
-    done
-    for group in wheel audio video plugdev usb netdev; do groupadd -f "$group" || return 1; done
-    useradd -m -s /bin/bash -G wheel,audio,video,plugdev,usb,netdev "$username" || return 1
-    printf '\nSet a password for %s when prompted.\n' "$username" >&3
-    passwd "$username" <&3 >&3 2>&3 || { userdel -r "$username" >/dev/null 2>&1 || true; return 1; }
-    touch /var/lib/d630/firstboot.done || return 1
-    printf 'Account created; use sudo for administration.\n' >&3
-    exec 3>&-
-}
-EOF
-chmod 0755 "$ROOT/etc/init.d/d630-firstboot"
+install -m 0755 "$GITHUB_WORKSPACE/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
 printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
+chmod 0755 "$ROOT/etc/sudoers.d"
 chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
 grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers.d' "$ROOT/etc/sudoers" || echo '#includedir /etc/sudoers.d' >> "$ROOT/etc/sudoers"
 chroot "$ROOT" /bin/bash -lc 'visudo -c'
+chroot "$ROOT" chmod 4755 /usr/bin/sudo
 printf '%s\n' d630-gentoo > "$ROOT/etc/hostname"
 cat > "$ROOT/etc/hosts" <<'EOF'
 127.0.0.1 localhost
@@ -331,7 +364,13 @@ EOF
 fi
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default' || echo "WARNING: could not enable agetty.tty1"
-if [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
+  chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
+fi
+if ! grep -Eq '^s0:12345:respawn:.*ttyS0' "$ROOT/etc/inittab"; then
+  printf '\ns0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100\n' >> "$ROOT/etc/inittab"
+fi
+if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
   [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
   chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
 fi
@@ -407,13 +446,13 @@ fi
 
 log "Validate runtime root and build SquashFS"
 [[ -x "$ROOT/sbin/init" ]] || die "runtime root has no executable /sbin/init"
-if [[ "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then
-  [[ -x "$ROOT/usr/bin/Xorg" || -x "$ROOT/usr/libexec/Xorg" ]] || die "graphical profile missing Xorg"
-  [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "graphical profile missing openbox-session"
+if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then
+  chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/Xorg || test -x /usr/libexec/Xorg' || die "graphical profile missing Xorg"
+  chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/openbox-session' || die "graphical profile missing openbox-session"
 fi
 if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session; do
-    [[ -x "$ROOT$executable" ]] || die "GUI runtime missing required executable $executable"
+    chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "GUI runtime missing required executable $executable"
   done
   xorg_server="$ROOT/usr/bin/Xorg"
   [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
@@ -429,9 +468,16 @@ if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  filtered_packages="$OUT/INSTALLED-PACKAGES.txt.tmp"
+  grep -Ev '^(app-admin/(eselect|perl-cleaner)-|app-eselect/|app-portage/|dev-(build|lang|python|util)/|dev-libs/gobject-introspection-common-|sys-apps/(locale-gen|portage)-|sys-devel/(binutils|binutils-config|gcc|gcc-config|gettext|gnuconfig|patch)-)' \
+    "$OUT/INSTALLED-PACKAGES.txt" > "$filtered_packages"
+  mv -f "$filtered_packages" "$OUT/INSTALLED-PACKAGES.txt"
+fi
 rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru"
 mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
-chmod 1777 "$ROOT/var/tmp/portage"
+chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"
+chmod 2775 "$ROOT/var/tmp/portage"
 
 cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
 Project: AmrUser-48/d630-gentoo
@@ -441,7 +487,8 @@ Flags: -O2 -pipe -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
-First boot: create local account and password at console.
+Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
+$(if [[ "$RUNTIME_PROFILE" == openbox ]]; then echo "Minimal runtime: no Portage, package database, Python/Perl, development tools, or compiler binaries; versioned GCC runtime libraries retained."; fi)
 $(cat "$OUT/KERNEL-MODULES.txt")
 EOF
 cat > "$OUT/RELEASE-NOTES.md" <<EOF
@@ -449,7 +496,7 @@ D630 Gentoo runtime SquashFS — profile $RUNTIME_PROFILE
 
 Place the release asset **squashfs** at **/d630-gentoo/squashfs**. Keep the kernel and initramfs from the interactive Gentoo runner at **/d630-gentoo/kernel** and **/d630-gentoo/initramfs**.
 
-This first boot image uses a volatile RAM OverlayFS. Changes and user accounts are lost on reboot until persistence is added. The console first-boot service asks you to create a local account. No default password or root autologin is included.
+This live image uses a volatile RAM OverlayFS. Changes are lost on reboot. Every boot creates or refreshes the local **gentoo** account, assigns it to all system groups, and resets its password to **gentoo**. The account can use `sudo`; log in as `gentoo` with password `gentoo`. This fixed test password is intended for local live-media testing, not network-exposed use.
 
 The kernel and initramfs are separate deliverables. Supply their release tag to kernel_bundle_tag to add matching modules and firmware.
 EOF
@@ -504,11 +551,16 @@ INIT
   sum_files=(gui-initram RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt GUI-INITRAMFS-MANIFEST.txt)
 else
   log "Build Zstandard SquashFS from runtime-only root"
-  bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+    MINIMAL_RUNTIME=true bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  else
+    bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  fi
   unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
-  unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
+  unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
-  sum_files=(squashfs RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+  (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
+  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
 fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
   [[ ! -f "$OUT/$optional" ]] || sum_files+=("$optional")
@@ -516,4 +568,5 @@ done
 (cd "$OUT" && sha256sum "${sum_files[@]}" > SHA256SUMS)
 [[ ! -s "$OUT/squashfs" ]] || du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
 cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
+[[ ! -s "$OUT/SQUASHFS-SHA256.txt" ]] || cat "$OUT/SQUASHFS-SHA256.txt" | tee -a "$GITHUB_STEP_SUMMARY"
 log "Runtime image completed"

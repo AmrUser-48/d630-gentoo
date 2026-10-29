@@ -9,9 +9,8 @@ dev-util/mesa_clc LLVM_SLOT: -* 22
 dev-util/mesa_clc VIDEO_CARDS: -*
 llvm-runtimes/libclc VIDEO_CARDS: -*
 
-# Xorg: Intel graphics via the built-in modesetting DDX, plus legacy Intel DDX as an alternate.
-# On xorg-drivers, "intel" selects xorg-server/modesetting and "i915" selects xf86-video-intel.
-x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
+# Xorg: use the Xorg server's built-in modesetting driver on Intel graphics.
+x11-base/xorg-drivers VIDEO_CARDS: -* intel
 x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics
 x11-base/xorg-server -minimal elogind -suid
 x11-drivers/xf86-video-intel dri

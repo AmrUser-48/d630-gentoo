@@ -2,7 +2,7 @@
 
 A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with an optional live ISO for testing, installation and recovery. The goal is a fast, responsive, legacy-BIOS-compatible desktop you can use every day for web browsing, file management, development, media, Wi-Fi, Android tools and ordinary computing; disk repair and rescue tools are included as secondary capabilities.
 
-**Current state:** the repository defines a standalone three-file boot contract, GRUB2 entry, and an Actions workflow that builds the stable D630 kernel, matching module archive, early Intel microcode + BusyBox initramfs, and selected firmware bundle. The Gentoo SquashFS root and live ISO remain separate unfinished stages.
+**Current state:** the local `output/` build directory contains the D630 kernel, external initramfs, and a 198.43 MiB Openbox runtime SquashFS. The SquashFS is intentionally not tracked by Git because it exceeds GitHub's 100 MB file limit. The direct-folder boot contract and GRUB2 entry are documented below. QEMU serial boot and login were verified; graphical Openbox startup and booting on the physical D630 still need testing. There is no installer or persistent installed system yet.
 
 ## AI assistant operating instructions
 
@@ -13,7 +13,7 @@ A small, lightweight Gentoo daily-driver system for the Dell Latitude D630, with
 - Primary hardware is the Dell Latitude D630 with Intel Core 2 Duo T7250 (Merom), Intel GM965/GMA X3100 graphics, Intel 3945ABG Wi-Fi, Intel HDA audio, legacy BIOS/GRUB, and no EFI or U-Boot requirement. Keep the userland optimized for the target: `-O2 -pipe -march=core2 -mtune=core2`; never use the GitHub runner's CPU features or `-march=native`.
 - Treat the checked-in configuration and the **actual current runner, release, artifact, and workflow state** as evidence. Inspect existing kernel bundles, generated `.config` files, initramfs archives, saved-state releases, workflow runs, and logs before rebuilding anything. Do not assume that a past status summary still describes the current repository.
 - The saved Gentoo build root and its binary packages are valuable work. Preserve the source/build root and `/var/cache/binpkgs`. Build and trim a separate disposable runtime root; depclean or prune only that copy. Do not restart a large package rebuild or overwrite a non-empty restore destination unless the task explicitly requires it.
-- The target boot storage is constrained. Keep the runtime SquashFS as small as practical (historical target: around 400 MiB or less for a roughly 500 MiB available partition, unless the user changes this requirement). Always report the actual compressed size and whether it fits; never call an oversized image “tiny.”
+- The target boot storage is constrained. Keep the runtime SquashFS at or below 300 MiB. Always report the actual compressed size and whether it fits; never call an oversized image “tiny.”
 - The preferred direct-folder boot contract is `/d630-gentoo/kernel`, `/d630-gentoo/initramfs`, and `/d630-gentoo/squashfs`. The initramfs must have a working executable `/init`, valid **relative, non-dangling BusyBox applet symlinks** (especially `/bin/sh` and `/bin/static-sh` to `busybox`), the firmware and microcode required by this target, and the tools used before root switch.
 
 ### Avoid unnecessary rebuilds
@@ -60,7 +60,73 @@ This can be a Windows NTFS partition or another filesystem supported by GRUB. Th
 
 The initial three-file mode uses a temporary writable OverlayFS layer in RAM. **Changes made during the session are lost at reboot.** A persistent upper layer needs a separate suitable writable filesystem/image; NTFS itself is not used as the OverlayFS upper directory.
 
-The old ISO loopback configuration remains in the repository as a reference, but the current build targets direct-folder boot. The kernel workflow publishes the kernel, matching /lib/modules archive, external initramfs (including early Intel microcode and Intel 3945ABG firmware), and a separate firmware tarball. The SquashFS root is a separate next-stage artifact and is not produced by that workflow yet.
+The generated `output/` artifacts are ready for direct-folder boot; the SquashFS must be built or obtained separately because it is not stored in Git. The runtime has OpenRC, Openbox, Xterm, and Mesa; it omits Portage, LLVM/Clang, Python/Perl, and compiler binaries. Its live account is `gentoo` with password `gentoo`; this fixed password is for local testing only. The older ISO loopback configuration remains a reference, not a supported installer.
+
+## Test the live system in QEMU
+
+These commands boot the kernel and initramfs directly (without GRUB) and attach a small FAT disk image containing the three boot files. First ensure `output/kernel`, `output/initramfs`, and `output/squashfs` are present; the SquashFS is not downloaded by `git clone`. Run from the repository root on a Linux host with QEMU x86, `dosfstools`, and `mtools` installed. On Debian/Ubuntu, install these with `sudo apt install qemu-system-x86 dosfstools mtools`; use the equivalent packages on other distributions. Choose a new image path that does not already exist.
+
+First verify the delivered artifacts and create the FAT image:
+
+```sh
+(cd output && sha256sum --check SHA256SUMS && sha256sum --check SQUASHFS-SHA256.txt)
+img="$PWD/d630-qemu-test.img"
+mkfs.vfat -F 32 -n D630TEST -C "$img" 2097152
+mmd -i "$img" ::/d630-gentoo
+mcopy -i "$img" output/kernel output/initramfs output/squashfs ::/d630-gentoo/
+```
+
+Start QEMU with a serial console:
+
+```sh
+qemu-system-x86_64 \
+  -machine pc -cpu core2duo -m 2048 -smp 2 \
+  -kernel output/kernel \
+  -initrd output/initramfs \
+  -append 'console=ttyS0,115200 quiet d630.squashfs=/d630-gentoo/squashfs' \
+  -drive "file=$img,format=raw,if=ide,index=0" \
+  -display none -serial stdio -monitor none -no-reboot
+```
+
+Wait for the login prompt and log in as `gentoo` / `gentoo`. This tests kernel/initramfs discovery, the SquashFS and volatile OverlayFS boot, and serial login; it does not test GRUB or graphical Openbox startup. The guest has no network adapter in this example. Stop QEMU with `Ctrl-C`.
+
+## Quickstart: copy the live files to a machine partition
+
+This puts the live boot files on an **existing** partition; it does not format or repartition a disk and is not a permanent Gentoo installation. Back up important data first. Ensure the three files exist in `output/` (the SquashFS is not in Git), and use a partition readable by GRUB and supported by the initramfs (NTFS3, FAT/VFAT, exFAT, ext4, or Btrfs). Keep the directory and filenames exactly as shown:
+
+```text
+/d630-gentoo/kernel
+/d630-gentoo/initramfs
+/d630-gentoo/squashfs
+/d630-gentoo/SHA256SUMS
+/d630-gentoo/SQUASHFS-SHA256.txt
+```
+
+Replace `/dev/sdX1` below with the **correct existing partition**. Verify the device before mounting; do not run formatting commands on it.
+
+```sh
+(cd output && sha256sum --check SHA256SUMS && sha256sum --check SQUASHFS-SHA256.txt)
+sudo mkdir -p /mnt/d630-files
+sudo mount /dev/sdX1 /mnt/d630-files
+sudo install -D -m 0644 output/kernel /mnt/d630-files/d630-gentoo/kernel
+sudo install -D -m 0644 output/initramfs /mnt/d630-files/d630-gentoo/initramfs
+sudo install -D -m 0644 output/squashfs /mnt/d630-files/d630-gentoo/squashfs
+sudo install -D -m 0644 output/SHA256SUMS /mnt/d630-files/d630-gentoo/SHA256SUMS
+sudo install -D -m 0644 output/SQUASHFS-SHA256.txt /mnt/d630-files/d630-gentoo/SQUASHFS-SHA256.txt
+(cd /mnt/d630-files/d630-gentoo && sha256sum --check SHA256SUMS && sha256sum --check SQUASHFS-SHA256.txt)
+sync
+sudo umount /mnt/d630-files
+```
+
+On a Linux installation that already boots with legacy-BIOS GRUB, add the contents of [grub2/d630-gentoo.cfg](grub2/d630-gentoo.cfg) to `/etc/grub.d/40_custom` (for example, edit it with `sudoedit /etc/grub.d/40_custom`), then regenerate GRUB's configuration. Common commands are:
+
+```sh
+sudo grub-mkconfig -o /boot/grub/grub.cfg
+# Some distributions instead use:
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+```
+
+Use the command and output path for the installed distribution; do not run both blindly. Reboot, select **D630 Gentoo (find root filesystem automatically)** in GRUB, and log in as `gentoo` / `gentoo`. The account is recreated on every boot. This live system uses a RAM-only writable layer, so installed changes and user files are lost at reboot. The password is intentionally weak for local testing; do not expose this live system to untrusted networks.
 
 ## Project goals
 
@@ -128,8 +194,8 @@ The intended D630 settings are in `config/portage/package.use/10-d630-hardware`:
 # Mesa for Intel GM965 / GMA X3100 (Gen 4): Crocus.
 media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel
 
-# Xorg modesetting plus the optional legacy Intel DDX.
-x11-base/xorg-drivers VIDEO_CARDS: -* intel i915
+# Xorg's built-in Intel modesetting driver.
+x11-base/xorg-drivers VIDEO_CARDS: -* intel
 
 # Input support; Synaptics is preferred for the D630 touchpad by Xorg config.
 x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics
@@ -142,7 +208,7 @@ sys-boot/grub GRUB_PLATFORMS: pc
 Important distinctions:
 
 - For the GM965/GMA X3100, `intel` is the Mesa video-card option for the Intel Gen4 hardware driver (Crocus).
-- `i915` under `x11-base/xorg-drivers` selects the legacy `xf86-video-intel` Xorg driver as an alternative to the Xorg server's built-in modesetting driver. It is **not** the kernel `i915` DRM driver and is not the same as Mesa's `video_cards_i915` Gallium driver.
+- The legacy `xf86-video-intel` DDX is not selected; Xorg's built-in modesetting driver uses the kernel's `i915` DRM driver.
 - Do not enable Mesa's `video_cards_i915` just because the kernel module is named `i915`; for this hardware the target is `VIDEO_CARDS: -* intel`.
 - Avoid global AMD, Radeon, NVIDIA, Asahi, Panfrost, VirGL and other unrelated GPU options. They are not part of the D630 target. In a verbose emerge plan, a card shown with a leading minus is disabled; a card shown in parentheses is profile-forced and needs separate investigation.
 
@@ -293,15 +359,15 @@ emerge --ask --verbose --usepkgonly app-misc/mc sys-apps/ripgrep
 
 ### Compact runtime SquashFS
 
-**Automated build:** open **Actions → Build D630 Gentoo runtime SquashFS → Run workflow**. This workflow downloads and verifies a fresh Gentoo amd64 glibc/OpenRC Stage 3, applies the repository's Core 2 Portage settings, imports requested durable `binpkgs-<run-id>` releases, installs a runtime package set, and emits a compressed SquashFS named exactly `squashfs`. Select `console` for the first build, `desktop` for Xorg/Openbox, or `daily-driver` for the broader application set. Enter one or more numeric package-run IDs that actually published binary shards. With `source_fallback=false` (default), missing/incompatible binaries stop the build instead of compiling; set it to `true` only when source builds are acceptable. The workflow does not build the kernel or initramfs.
+**Automated build:** open **Actions → Build D630 Gentoo runtime SquashFS → Run workflow**. This workflow downloads and verifies a fresh Gentoo amd64 glibc/OpenRC Stage 3, applies the repository's Core 2 Portage settings, imports requested durable `binpkgs-<run-id>` releases, installs a runtime package set, and emits a compressed SquashFS named exactly `squashfs`. Select `openbox` for a focused OpenRC/Xorg/Mesa/Openbox/Xterm image, `console` for a console image, `desktop` for the broader Xorg/Openbox set, or `daily-driver` for the broader application set. For `openbox`, provide the run ID for the binary release containing Mesa (the existing `39507549274` release includes Mesa, Xorg, xinit, xterm, and Openbox). Mesa is installed separately using `--usepkgonly`, then checked for `USE=llvm` and the Crocus driver before other packages are processed; enabling source fallback can build missing non-Mesa packages but cannot compile Mesa. The known release does not include elogind, so use `source_fallback=true` or provide a newer package release that does. The focused `openbox` image removes cached binhost packages, Portage, Python/Perl, development tools, and compiler binaries from its staging copy, retaining versioned GCC runtime shared libraries. It refuses roots containing LLVM/Clang packages. The workflow does not build the kernel or initramfs.
 
 **Exporting a boot bundle from the interactive Gentoo runner:** inside the Gentoo chroot, place files in `/root/d630-boot-bundle/`. Required files are `kernel` and `initramfs`. If building modules, also provide `KERNELRELEASE.txt` containing the exact output of `make -s kernelrelease` and `modules-<exact-kernelrelease>.tar.zst`. Optional files are `d630-firmware.tar.zst`, `d630-*.config`, `FIRMWARE-SOURCES.txt` and `KERNEL-BUILD-MANIFEST.txt`. New interactive runner jobs publish these assets alongside their `binpkgs-<run-id>` release and check that the module archive's directory matches `KERNELRELEASE.txt`. Use the same release tag (for example, `binpkgs-<run-id>`) in the runtime workflow's `kernel_bundle_tag` input. For an already-running session that uses the older collector, place the assets directly in Gentoo's `/var/cache/binpkgs/`; once that job completes, run **Actions → Publish existing Gentoo binpkgs artifact** with the actual numeric Actions run ID to add the assets to its persistent release. This works because the older collector already archives that directory. Do not use the display run number (51); use the actual run ID shown in the URL.
 
-The first SquashFS boot flow uses a volatile RAM OverlayFS, so account and system changes are lost at reboot. A persistent overlay / installed-system target remains unfinished. Do not mistake source validation for a successful image build or a successful boot on the physical D630.
+The first SquashFS boot flow uses a volatile RAM OverlayFS, so account and system changes are lost at reboot. Each boot creates or refreshes the `gentoo` account, sets its password to `gentoo`, and adds it to all system groups; `gentoo` can use `sudo`. Log in with `gentoo` / `gentoo`. A password change only affects the current session and resets on reboot. A persistent overlay / installed-system target remains unfinished. Do not mistake source validation for a successful image build or a successful boot on the physical D630.
 
-The repository's `scripts/build-squashfs.sh ROOTFS OUTPUT.squashfs` makes a staging copy and removes `/usr/share/doc`, `/usr/share/info`, GTK/desktop help trees, Portage build/download caches, the checked-out ebuild repository, headers, pkg-config/CMake development metadata, static archives and libtool files. It preserves `/usr/share/man`, `/usr/share/licenses`, and `/var/db/pkg`; if `man-db` is installed, it attempts to rebuild the index used by `whatis`. The package sets include `sys-apps/man-db`, and global USE keeps optional man-page generation enabled, so the intended offline interface is `man ls` and `whatis ls`. A TLDR client is optional, not a replacement for offline manual pages.
+The repository's `scripts/build-squashfs.sh ROOTFS OUTPUT.squashfs` makes a staging copy and removes `/usr/share/doc`, `/usr/share/info`, GTK/desktop help trees, Portage build/download caches, the checked-out ebuild repository, headers, pkg-config/CMake development metadata, static archives and libtool files. The standard mode preserves `/usr/share/man`, `/usr/share/licenses`, and `/var/db/pkg`; if `man-db` is installed, it attempts to rebuild the index used by `whatis`. The focused Openbox profile opts into `MINIMAL_RUNTIME=true`: it removes Portage and its package database, Python/Perl, development tools, GCC/binutils compilers, and development data while retaining versioned GCC runtime shared libraries. It refuses to pack a root containing LLVM or Clang packages. A TLDR client is optional, not a replacement for offline manual pages.
 
-The packer uses Zstandard compression at a 1 MiB block size and level 15. The target kernel must have SquashFS and its Zstandard decompressor built in (e.g. `CONFIG_SQUASHFS=y` and `CONFIG_SQUASHFS_ZSTD=y`). The script does not rewrite the source root and will warn if LLVM/Clang package records are still present. It deliberately does not delete LLVM files blindly; keep them out by constructing the final runtime root from runtime dependencies only.
+The packer uses Zstandard compression at a 1 MiB block size and level 15. The target kernel must have SquashFS and its Zstandard decompressor built in (e.g. `CONFIG_SQUASHFS=y` and `CONFIG_SQUASHFS_ZSTD=y`). The script does not rewrite the source root. In `MINIMAL_RUNTIME=true` mode it refuses input roots with LLVM/Clang package records rather than silently deleting libraries that a runtime might need.
 
 Example, after creating the clean runtime root at `/opt/d630-runtime-root`:
 
@@ -476,4 +542,4 @@ Treat this README as the project's source of truth. Read it and inspect the curr
 
 ## Current limitations
 
-The repository contains a source/configuration scaffold, an interactive Gentoo bootstrap runner, and a kernel-bundle workflow. The kernel workflow compiles and publishes the D630 kernel, matching modules, early microcode initramfs, and selected firmware. The repository does not yet resolve and build the full Gentoo daily-use root, assemble a live ISO, prepare a persistent install target, or complete boot tests on the D630.
+The repository includes the Gentoo build scaffold, runtime build scripts, boot configuration, and checked-in kernel/initramfs/SquashFS test artifacts. The current compact live root is not the full daily-use system described in the project goals. A live ISO, persistent installer/installation target, graphical QEMU verification, and physical D630 boot verification remain future work.

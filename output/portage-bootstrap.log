@@ -1,8 +1,8 @@
 !!! Section 'gentoo' in repos.conf has location attribute set to nonexistent directory: '/var/db/repos/gentoo'
 !!! Invalid Repository Location (not a dir): '/var/db/repos/gentoo'
-2026-10-28 21:16:10 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261027.tar.xz.md5sum [57/57] -> "/var/tmp/emerge-webrsync.JyP1ZH/gentoo-20261027.tar.xz.md5sum" [1]
-2026-10-28 21:16:10 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261027.tar.xz.gpgsig [1000/1000] -> "/var/tmp/emerge-webrsync.JyP1ZH/gentoo-20261027.tar.xz.gpgsig" [1]
-2026-10-28 21:16:11 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261027.tar.xz [50774552/50774552] -> "/var/tmp/emerge-webrsync.JyP1ZH/gentoo-20261027.tar.xz" [1]
+2026-10-29 14:51:40 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261028.tar.xz.md5sum [57/57] -> "/var/tmp/emerge-webrsync.8rC7k3/gentoo-20261028.tar.xz.md5sum" [1]
+2026-10-29 14:51:40 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261028.tar.xz.gpgsig [1000/1000] -> "/var/tmp/emerge-webrsync.8rC7k3/gentoo-20261028.tar.xz.gpgsig" [1]
+2026-10-29 14:51:40 URL:http://distfiles.gentoo.org/snapshots/gentoo-20261028.tar.xz [50759284/50759284] -> "/var/tmp/emerge-webrsync.8rC7k3/gentoo-20261028.tar.xz" [1]
 
 Performing Global Updates
 (Could take a couple of minutes if you have a lot of binary packages.)

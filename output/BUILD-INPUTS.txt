@@ -1,6 +1,6 @@
-Profile: gui-initram
+Profile: openbox
 Binpkg releases: 39507549274
 Prepared assets directory: 
 Local package archive: 
 Source fallback: true
-Kernel bundle tag: d630-kernel-6.18.56-run-39509781896
+Kernel bundle tag: d630-kernel-6.18.56-run-40813428910

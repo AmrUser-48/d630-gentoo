@@ -11,6 +11,7 @@ on:
         options:
           - tiny-console
           - console
+          - openbox
           - desktop
           - daily-driver
         default: tiny-console
@@ -20,12 +21,12 @@ on:
         type: string
         default: ""
       binpkg_run_ids:
-        description: "Optional legacy binpkgs release run IDs, separated by commas or spaces (use prepared_assets_run_id for the recovered artifact)"
+        description: "Binpkg release run IDs, separated by commas or spaces; for openbox, use the release containing Mesa (39507549274 has Mesa/Xorg/xterm/Openbox)"
         required: false
         type: string
         default: ""
       source_fallback:
-        description: Allow Portage to compile missing/incompatible packages (may take hours)
+        description: "Allow source builds for missing packages; Openbox always installs Mesa from its required binpkg first"
         required: true
         type: boolean
         default: false
@@ -72,6 +73,19 @@ jobs:
             exit 2
           }
 
+      - name: Require Mesa binpkg input for Openbox SquashFS
+        if: inputs.runtime_profile == 'openbox'
+        shell: bash
+        env:
+          PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
+          BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids }}
+        run: |
+          set -Eeuo pipefail
+          [[ -n "$PREPARED_ASSETS_RUN_ID" || -n "$BINPKG_RUN_IDS" ]] || {
+            echo "::error::The Openbox SquashFS profile requires an imported binpkg release containing Mesa."
+            exit 1
+          }
+
       - name: Download recovered Gentoo assets artifact
         if: inputs.prepared_assets_run_id != ''
         uses: actions/download-artifact@v4
@@ -115,8 +129,10 @@ jobs:
             output/KERNEL-BUILD-MANIFEST.txt
             output/SOURCE-BUILD-MANIFEST.txt
             output/LOCAL-BINPKG-IMPORT.txt
+            output/mesa-binpkg.log
             output/PREPARED-ASSET-CHECK.log
             output/SHA256SUMS
+            output/SQUASHFS-SHA256.txt
             output/RUNTIME-MANIFEST.txt
             output/RELEASE-NOTES.md
             output/PACKAGES.txt

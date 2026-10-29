@@ -1,0 +1,28 @@
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LC_CTYPE = (unset),
+	LC_NUMERIC = (unset),
+	LC_COLLATE = (unset),
+	LC_TIME = (unset),
+	LC_MESSAGES = (unset),
+	LC_MONETARY = (unset),
+	LC_ADDRESS = (unset),
+	LC_IDENTIFICATION = (unset),
+	LC_MEASUREMENT = (unset),
+	LC_PAPER = (unset),
+	LC_TELEPHONE = (unset),
+	LC_NAME = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Found 1 locale declaration in '/etc/locale.gen'.
+Compiling 2 locales with 2 workers ...
+[1/2] Compiling locale: C.UTF-8
+[2/2] Compiling locale: en_US.UTF-8
+Waiting for active workers to finish their jobs ...
+The location of the archive shall be '/usr/lib/locale/locale-archive'.
+Adding 2 locales to the locale archive ...
+Successfully installed an archive containing 2 locales, of 2.93 MiB in size.
+>>> Regenerating /etc/ld.so.cache...

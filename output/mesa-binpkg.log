@@ -1,0 +1,1323 @@
+[gentoo] Local copy of remote index is within TTL and will be used.
+
+ * IMPORTANT: 19 news items need reading for repository 'gentoo'.
+ * Use eselect news read to view new items.
+
+
+These are the packages that would be merged, in order:
+
+Calculating dependencies ... done!
+Dependency resolution took 0.42 s (backtrack: 0/20).
+
+[binary  N g   ] x11-misc/compose-tables-1.8.14-1::gentoo  120 KiB
+[binary  N g   ] x11-base/xorg-proto-2025.1-1::gentoo  USE="-test" 280 KiB
+[binary  N     ] sys-apps/hwdata-0.401-1::gentoo  0 KiB
+[binary  N g   ] x11-libs/libXau-1.0.12-9::gentoo  USE="-doc" ABI_X86="32 (64) (-x32)" 60 KiB
+[binary  N g   ] x11-libs/libXdmcp-1.1.5-11::gentoo  USE="-doc" ABI_X86="32 (64) (-x32)" 70 KiB
+[binary  N     ] dev-util/spirv-tools-1.4.357.0-1::gentoo  USE="-test" ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N     ] x11-libs/libxshmfence-1.3.3-1::gentoo  ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N g   ] x11-libs/libxcb-1.17.0-14:0/1.12::gentoo  USE="(selinux) xkb -doc -test" ABI_X86="(64) -32 (-x32)" 470 KiB
+[binary  N     ] x11-libs/libpciaccess-0.19-1::gentoo  USE="zlib -static-libs" ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N g   ] x11-libs/libX11-1.8.14-1::gentoo  USE="-doc -test" ABI_X86="(64) -32 (-x32)" 830 KiB
+[binary  N     ] x11-libs/libdrm-2.4.134-3::gentoo  USE="udev -doc -test -tools -valgrind" ABI_X86="(64) -32 (-x32)" VIDEO_CARDS="intel -amdgpu (-exynos) (-freedreno) -nouveau (-omap) -radeon (-tegra) (-vc4) (-vivante) -vmware" 0 KiB
+[binary  N     ] x11-libs/xcb-util-keysyms-0.4.1-1::gentoo  ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N     ] x11-libs/libXext-1.3.7-1::gentoo  USE="-doc" ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N     ] x11-libs/libXfixes-6.0.2-1::gentoo  USE="-doc" ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N     ] media-libs/libglvnd-1.7.0-1::gentoo  USE="X -test" ABI_X86="(64) -32 (-x32)" 0 KiB
+[binary  N     ] x11-libs/libXxf86vm-1.1.7-1::gentoo  USE="-doc" ABI_X86="(64) -32 (-x32)" 0 KiB
+
+Total: 16 packages (16 new, 16 binaries), Size of downloads: 1830 KiB
+
+
+>>> Emerging binary (1 of 16) x11-misc/compose-tables-1.8.14::gentoo
+ * Fetching in the background:
+ * /var/cache/binhost/gentoo/x11-misc/compose-tables/compose-tables-1.8.14-1.gpkg.tar.partial
+ * To view fetch progress, run in another terminal:
+ * tail -f /var/log/emerge-fetch.log
+ * compose-tables-1.8.14-1.gpkg.tar MD5 SHA1 size ;-) ...                [ ok ]
+>>> Extracting info
+>>> Extracting x11-misc/compose-tables-1.8.14
+
+>>> Installing (1 of 16) x11-misc/compose-tables-1.8.14::gentoo
+ [32;01m*[39;49;00m checking 189 files for package collisions
+>>> Merging x11-misc/compose-tables-1.8.14 to /
+--- /usr/
+--- /usr/share/
+>>> /usr/share/X11/
+>>> /usr/share/X11/locale/
+>>> /usr/share/X11/locale/iso8859-11/
+>>> /usr/share/X11/locale/iso8859-11/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-11/Compose
+>>> /usr/share/X11/locale/iso8859-11/XI18N_OBJS
+>>> /usr/share/X11/locale/cs_CZ.UTF-8/
+>>> /usr/share/X11/locale/cs_CZ.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/cs_CZ.UTF-8/Compose
+>>> /usr/share/X11/locale/cs_CZ.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/pt_PT.UTF-8/
+>>> /usr/share/X11/locale/pt_PT.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/pt_PT.UTF-8/Compose
+>>> /usr/share/X11/locale/pt_PT.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_CN.gbk/
+>>> /usr/share/X11/locale/zh_CN.gbk/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_CN.gbk/Compose
+>>> /usr/share/X11/locale/zh_CN.gbk/XI18N_OBJS
+>>> /usr/share/X11/locale/ja.JIS/
+>>> /usr/share/X11/locale/ja.JIS/XLC_LOCALE
+>>> /usr/share/X11/locale/ja.JIS/Compose
+>>> /usr/share/X11/locale/ja.JIS/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-8/
+>>> /usr/share/X11/locale/iso8859-8/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-8/Compose
+>>> /usr/share/X11/locale/iso8859-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-1/
+>>> /usr/share/X11/locale/iso8859-1/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-1/Compose
+>>> /usr/share/X11/locale/iso8859-1/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-3/
+>>> /usr/share/X11/locale/iso8859-3/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-3/Compose
+>>> /usr/share/X11/locale/iso8859-3/XI18N_OBJS
+>>> /usr/share/X11/locale/armscii-8/
+>>> /usr/share/X11/locale/armscii-8/XLC_LOCALE
+>>> /usr/share/X11/locale/armscii-8/Compose
+>>> /usr/share/X11/locale/armscii-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iscii-dev/
+>>> /usr/share/X11/locale/iscii-dev/XLC_LOCALE
+>>> /usr/share/X11/locale/iscii-dev/Compose
+>>> /usr/share/X11/locale/iscii-dev/XI18N_OBJS
+>>> /usr/share/X11/locale/ja_JP.UTF-8/
+>>> /usr/share/X11/locale/ja_JP.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/ja_JP.UTF-8/Compose
+>>> /usr/share/X11/locale/ja_JP.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/georgian-ps/
+>>> /usr/share/X11/locale/georgian-ps/XLC_LOCALE
+>>> /usr/share/X11/locale/georgian-ps/Compose
+>>> /usr/share/X11/locale/georgian-ps/XI18N_OBJS
+>>> /usr/share/X11/locale/ru_RU.UTF-8/
+>>> /usr/share/X11/locale/ru_RU.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/ru_RU.UTF-8/Compose
+>>> /usr/share/X11/locale/ru_RU.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-14/
+>>> /usr/share/X11/locale/iso8859-14/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-14/Compose
+>>> /usr/share/X11/locale/iso8859-14/XI18N_OBJS
+>>> /usr/share/X11/locale/km_KH.UTF-8/
+>>> /usr/share/X11/locale/km_KH.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/km_KH.UTF-8/Compose
+>>> /usr/share/X11/locale/km_KH.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/vi_VN.tcvn/
+>>> /usr/share/X11/locale/vi_VN.tcvn/XLC_LOCALE
+>>> /usr/share/X11/locale/vi_VN.tcvn/Compose
+>>> /usr/share/X11/locale/vi_VN.tcvn/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_HK.big5hkscs/
+>>> /usr/share/X11/locale/zh_HK.big5hkscs/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_HK.big5hkscs/Compose
+>>> /usr/share/X11/locale/zh_HK.big5hkscs/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-9e/
+>>> /usr/share/X11/locale/iso8859-9e/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-9e/Compose
+>>> /usr/share/X11/locale/iso8859-9e/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_HK.big5/
+>>> /usr/share/X11/locale/zh_HK.big5/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_HK.big5/Compose
+>>> /usr/share/X11/locale/zh_HK.big5/XI18N_OBJS
+>>> /usr/share/X11/locale/microsoft-cp1251/
+>>> /usr/share/X11/locale/microsoft-cp1251/XLC_LOCALE
+>>> /usr/share/X11/locale/microsoft-cp1251/Compose
+>>> /usr/share/X11/locale/microsoft-cp1251/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-10/
+>>> /usr/share/X11/locale/iso8859-10/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-10/Compose
+>>> /usr/share/X11/locale/iso8859-10/XI18N_OBJS
+>>> /usr/share/X11/locale/pt_BR.UTF-8/
+>>> /usr/share/X11/locale/pt_BR.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/pt_BR.UTF-8/Compose
+>>> /usr/share/X11/locale/pt_BR.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-6/
+>>> /usr/share/X11/locale/iso8859-6/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-6/Compose
+>>> /usr/share/X11/locale/iso8859-6/XI18N_OBJS
+>>> /usr/share/X11/locale/compose.dir
+>>> /usr/share/X11/locale/locale.alias
+>>> /usr/share/X11/locale/vi_VN.viscii/
+>>> /usr/share/X11/locale/vi_VN.viscii/XLC_LOCALE
+>>> /usr/share/X11/locale/vi_VN.viscii/Compose
+>>> /usr/share/X11/locale/vi_VN.viscii/XI18N_OBJS
+>>> /usr/share/X11/locale/tatar-cyr/
+>>> /usr/share/X11/locale/tatar-cyr/XLC_LOCALE
+>>> /usr/share/X11/locale/tatar-cyr/Compose
+>>> /usr/share/X11/locale/tatar-cyr/XI18N_OBJS
+>>> /usr/share/X11/locale/ibm-cp1133/
+>>> /usr/share/X11/locale/ibm-cp1133/XLC_LOCALE
+>>> /usr/share/X11/locale/ibm-cp1133/Compose
+>>> /usr/share/X11/locale/ibm-cp1133/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-7/
+>>> /usr/share/X11/locale/iso8859-7/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-7/Compose
+>>> /usr/share/X11/locale/iso8859-7/XI18N_OBJS
+>>> /usr/share/X11/locale/ja.SJIS/
+>>> /usr/share/X11/locale/ja.SJIS/XLC_LOCALE
+>>> /usr/share/X11/locale/ja.SJIS/Compose
+>>> /usr/share/X11/locale/ja.SJIS/XI18N_OBJS
+>>> /usr/share/X11/locale/en_US.UTF-8/
+>>> /usr/share/X11/locale/en_US.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/en_US.UTF-8/Compose
+>>> /usr/share/X11/locale/en_US.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/th_TH.UTF-8/
+>>> /usr/share/X11/locale/th_TH.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/th_TH.UTF-8/Compose
+>>> /usr/share/X11/locale/th_TH.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-5/
+>>> /usr/share/X11/locale/iso8859-5/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-5/Compose
+>>> /usr/share/X11/locale/iso8859-5/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_TW/
+>>> /usr/share/X11/locale/zh_TW/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_TW/Compose
+>>> /usr/share/X11/locale/zh_TW/XI18N_OBJS
+>>> /usr/share/X11/locale/ko/
+>>> /usr/share/X11/locale/ko/XLC_LOCALE
+>>> /usr/share/X11/locale/ko/Compose
+>>> /usr/share/X11/locale/ko/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-2/
+>>> /usr/share/X11/locale/iso8859-2/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-2/Compose
+>>> /usr/share/X11/locale/iso8859-2/XI18N_OBJS
+>>> /usr/share/X11/locale/isiri-3342/
+>>> /usr/share/X11/locale/isiri-3342/XLC_LOCALE
+>>> /usr/share/X11/locale/isiri-3342/Compose
+>>> /usr/share/X11/locale/isiri-3342/XI18N_OBJS
+>>> /usr/share/X11/locale/koi8-c/
+>>> /usr/share/X11/locale/koi8-c/XLC_LOCALE
+>>> /usr/share/X11/locale/koi8-c/Compose
+>>> /usr/share/X11/locale/koi8-c/XI18N_OBJS
+>>> /usr/share/X11/locale/locale.dir
+>>> /usr/share/X11/locale/koi8-u/
+>>> /usr/share/X11/locale/koi8-u/XLC_LOCALE
+>>> /usr/share/X11/locale/koi8-u/Compose
+>>> /usr/share/X11/locale/koi8-u/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_CN/
+>>> /usr/share/X11/locale/zh_CN/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_CN/Compose
+>>> /usr/share/X11/locale/zh_CN/XI18N_OBJS
+>>> /usr/share/X11/locale/ko_KR.UTF-8/
+>>> /usr/share/X11/locale/ko_KR.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/ko_KR.UTF-8/Compose
+>>> /usr/share/X11/locale/ko_KR.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_CN.gb18030/
+>>> /usr/share/X11/locale/zh_CN.gb18030/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_CN.gb18030/Compose
+>>> /usr/share/X11/locale/zh_CN.gb18030/XI18N_OBJS
+>>> /usr/share/X11/locale/nokhchi-1/
+>>> /usr/share/X11/locale/nokhchi-1/XLC_LOCALE
+>>> /usr/share/X11/locale/nokhchi-1/Compose
+>>> /usr/share/X11/locale/nokhchi-1/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_CN.UTF-8/
+>>> /usr/share/X11/locale/zh_CN.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_CN.UTF-8/Compose
+>>> /usr/share/X11/locale/zh_CN.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/georgian-academy/
+>>> /usr/share/X11/locale/georgian-academy/XLC_LOCALE
+>>> /usr/share/X11/locale/georgian-academy/Compose
+>>> /usr/share/X11/locale/georgian-academy/XI18N_OBJS
+>>> /usr/share/X11/locale/fi_FI.UTF-8/
+>>> /usr/share/X11/locale/fi_FI.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/fi_FI.UTF-8/Compose
+>>> /usr/share/X11/locale/fi_FI.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-15/
+>>> /usr/share/X11/locale/iso8859-15/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-15/Compose
+>>> /usr/share/X11/locale/iso8859-15/XI18N_OBJS
+>>> /usr/share/X11/locale/sr_RS.UTF-8/
+>>> /usr/share/X11/locale/sr_RS.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/sr_RS.UTF-8/Compose
+>>> /usr/share/X11/locale/sr_RS.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/microsoft-cp1255/
+>>> /usr/share/X11/locale/microsoft-cp1255/XLC_LOCALE
+>>> /usr/share/X11/locale/microsoft-cp1255/Compose
+>>> /usr/share/X11/locale/microsoft-cp1255/XI18N_OBJS
+>>> /usr/share/X11/locale/tscii-0/
+>>> /usr/share/X11/locale/tscii-0/XLC_LOCALE
+>>> /usr/share/X11/locale/tscii-0/Compose
+>>> /usr/share/X11/locale/tscii-0/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_TW.UTF-8/
+>>> /usr/share/X11/locale/zh_TW.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_TW.UTF-8/Compose
+>>> /usr/share/X11/locale/zh_TW.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/am_ET.UTF-8/
+>>> /usr/share/X11/locale/am_ET.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/am_ET.UTF-8/Compose
+>>> /usr/share/X11/locale/am_ET.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/el_GR.UTF-8/
+>>> /usr/share/X11/locale/el_GR.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/el_GR.UTF-8/Compose
+>>> /usr/share/X11/locale/el_GR.UTF-8/XI18N_OBJS
+>>> /usr/share/X11/locale/C/
+>>> /usr/share/X11/locale/C/XLC_LOCALE
+>>> /usr/share/X11/locale/C/Compose
+>>> /usr/share/X11/locale/C/XI18N_OBJS
+>>> /usr/share/X11/locale/microsoft-cp1256/
+>>> /usr/share/X11/locale/microsoft-cp1256/XLC_LOCALE
+>>> /usr/share/X11/locale/microsoft-cp1256/Compose
+>>> /usr/share/X11/locale/microsoft-cp1256/XI18N_OBJS
+>>> /usr/share/X11/locale/mulelao-1/
+>>> /usr/share/X11/locale/mulelao-1/XLC_LOCALE
+>>> /usr/share/X11/locale/mulelao-1/Compose
+>>> /usr/share/X11/locale/mulelao-1/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-9/
+>>> /usr/share/X11/locale/iso8859-9/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-9/Compose
+>>> /usr/share/X11/locale/iso8859-9/XI18N_OBJS
+>>> /usr/share/X11/locale/koi8-r/
+>>> /usr/share/X11/locale/koi8-r/XLC_LOCALE
+>>> /usr/share/X11/locale/koi8-r/Compose
+>>> /usr/share/X11/locale/koi8-r/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_TW.big5/
+>>> /usr/share/X11/locale/zh_TW.big5/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_TW.big5/Compose
+>>> /usr/share/X11/locale/zh_TW.big5/XI18N_OBJS
+>>> /usr/share/X11/locale/th_TH/
+>>> /usr/share/X11/locale/th_TH/XLC_LOCALE
+>>> /usr/share/X11/locale/th_TH/Compose
+>>> /usr/share/X11/locale/th_TH/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-13/
+>>> /usr/share/X11/locale/iso8859-13/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-13/Compose
+>>> /usr/share/X11/locale/iso8859-13/XI18N_OBJS
+>>> /usr/share/X11/locale/iso8859-4/
+>>> /usr/share/X11/locale/iso8859-4/XLC_LOCALE
+>>> /usr/share/X11/locale/iso8859-4/Compose
+>>> /usr/share/X11/locale/iso8859-4/XI18N_OBJS
+>>> /usr/share/X11/locale/ja/
+>>> /usr/share/X11/locale/ja/XLC_LOCALE
+>>> /usr/share/X11/locale/ja/Compose
+>>> /usr/share/X11/locale/ja/XI18N_OBJS
+>>> /usr/share/X11/locale/zh_HK.UTF-8/
+>>> /usr/share/X11/locale/zh_HK.UTF-8/XLC_LOCALE
+>>> /usr/share/X11/locale/zh_HK.UTF-8/Compose
+>>> /usr/share/X11/locale/zh_HK.UTF-8/XI18N_OBJS
+>>> x11-misc/compose-tables-1.8.14 merged.
+
+>>> Completed (1 of 16) x11-misc/compose-tables-1.8.14::gentoo
+
+>>> Emerging binary (2 of 16) x11-base/xorg-proto-2025.1::gentoo
+ * xorg-proto-2025.1-1.gpkg.tar MD5 SHA1 size ;-) ...                    [ ok ]
+>>> Extracting info
+>>> Extracting x11-base/xorg-proto-2025.1
+
+>>> Installing (2 of 16) x11-base/xorg-proto-2025.1::gentoo
+ [32;01m*[39;49;00m checking 171 files for package collisions
+>>> Merging x11-base/xorg-proto-2025.1 to /
+--- /usr/
+--- /usr/include/
+>>> /usr/include/X11/
+>>> /usr/include/X11/Xwinsock.h
+>>> /usr/include/X11/Xdefs.h
+>>> /usr/include/X11/Xwindows.h
+>>> /usr/include/X11/Xos.h
+>>> /usr/include/X11/keysymdef.h
+>>> /usr/include/X11/Xfuncs.h
+>>> /usr/include/X11/XWDFile.h
+>>> /usr/include/X11/HPkeysym.h
+>>> /usr/include/X11/Xos_r.h
+>>> /usr/include/X11/XF86keysym.h
+>>> /usr/include/X11/ap_keysym.h
+>>> /usr/include/X11/Sunkeysym.h
+>>> /usr/include/X11/Xalloca.h
+>>> /usr/include/X11/Xpoll.h
+>>> /usr/include/X11/Xatom.h
+>>> /usr/include/X11/Xmd.h
+>>> /usr/include/X11/extensions/
+>>> /usr/include/X11/extensions/XvMCproto.h
+>>> /usr/include/X11/extensions/recordconst.h
+>>> /usr/include/X11/extensions/syncproto.h
+>>> /usr/include/X11/extensions/shapeconst.h
+>>> /usr/include/X11/extensions/xf86dga1str.h
+>>> /usr/include/X11/extensions/syncstr.h
+>>> /usr/include/X11/extensions/dri2proto.h
+>>> /usr/include/X11/extensions/compositeproto.h
+>>> /usr/include/X11/extensions/XResproto.h
+>>> /usr/include/X11/extensions/applewmproto.h
+>>> /usr/include/X11/extensions/xf86vmproto.h
+>>> /usr/include/X11/extensions/render.h
+>>> /usr/include/X11/extensions/securproto.h
+>>> /usr/include/X11/extensions/dri2tokens.h
+>>> /usr/include/X11/extensions/damageproto.h
+>>> /usr/include/X11/extensions/xf86dga.h
+>>> /usr/include/X11/extensions/randr.h
+>>> /usr/include/X11/extensions/xtestconst.h
+>>> /usr/include/X11/extensions/secur.h
+>>> /usr/include/X11/extensions/Xv.h
+>>> /usr/include/X11/extensions/panoramiXproto.h
+>>> /usr/include/X11/extensions/xtestext1const.h
+>>> /usr/include/X11/extensions/randrproto.h
+>>> /usr/include/X11/extensions/recordproto.h
+>>> /usr/include/X11/extensions/xf86dga1const.h
+>>> /usr/include/X11/extensions/shmstr.h
+>>> /usr/include/X11/extensions/dpmsconst.h
+>>> /usr/include/X11/extensions/xf86bigfproto.h
+>>> /usr/include/X11/extensions/damagewire.h
+>>> /usr/include/X11/extensions/agproto.h
+>>> /usr/include/X11/extensions/dbeproto.h
+>>> /usr/include/X11/extensions/composite.h
+>>> /usr/include/X11/extensions/ge.h
+>>> /usr/include/X11/extensions/shm.h
+>>> /usr/include/X11/extensions/xf86bigfstr.h
+>>> /usr/include/X11/extensions/applewmconst.h
+>>> /usr/include/X11/extensions/lbxproto.h
+>>> /usr/include/X11/extensions/EVIproto.h
+>>> /usr/include/X11/extensions/xf86dgastr.h
+>>> /usr/include/X11/extensions/dmxproto.h
+>>> /usr/include/X11/extensions/dri3proto.h
+>>> /usr/include/X11/extensions/xf86dga1proto.h
+>>> /usr/include/X11/extensions/XvMC.h
+>>> /usr/include/X11/extensions/mitmiscconst.h
+>>> /usr/include/X11/extensions/bigreqstr.h
+>>> /usr/include/X11/extensions/xf86vmstr.h
+>>> /usr/include/X11/extensions/geproto.h
+>>> /usr/include/X11/extensions/multibufproto.h
+>>> /usr/include/X11/extensions/lbx.h
+>>> /usr/include/X11/extensions/XI2proto.h
+>>> /usr/include/X11/extensions/mitmiscproto.h
+>>> /usr/include/X11/extensions/cupproto.h
+>>> /usr/include/X11/extensions/xf86vm.h
+>>> /usr/include/X11/extensions/shmproto.h
+>>> /usr/include/X11/extensions/EVI.h
+>>> /usr/include/X11/extensions/bigreqsproto.h
+>>> /usr/include/X11/extensions/multibufconst.h
+>>> /usr/include/X11/extensions/Xvproto.h
+>>> /usr/include/X11/extensions/xf86dgaproto.h
+>>> /usr/include/X11/extensions/XI2.h
+>>> /usr/include/X11/extensions/xfixesproto.h
+>>> /usr/include/X11/extensions/XIproto.h
+>>> /usr/include/X11/extensions/xtestext1proto.h
+>>> /usr/include/X11/extensions/XKBstr.h
+>>> /usr/include/X11/extensions/XKBsrv.h
+>>> /usr/include/X11/extensions/xwaylandproto.h
+>>> /usr/include/X11/extensions/dmx.h
+>>> /usr/include/X11/extensions/recordstr.h
+>>> /usr/include/X11/extensions/syncconst.h
+>>> /usr/include/X11/extensions/renderproto.h
+>>> /usr/include/X11/extensions/XI.h
+>>> /usr/include/X11/extensions/dbe.h
+>>> /usr/include/X11/extensions/xf86bigfont.h
+>>> /usr/include/X11/extensions/xcmiscproto.h
+>>> /usr/include/X11/extensions/shapeproto.h
+>>> /usr/include/X11/extensions/xtestproto.h
+>>> /usr/include/X11/extensions/xf86dgaconst.h
+>>> /usr/include/X11/extensions/presentproto.h
+>>> /usr/include/X11/extensions/dpmsproto.h
+>>> /usr/include/X11/extensions/saverproto.h
+>>> /usr/include/X11/extensions/xfixeswire.h
+>>> /usr/include/X11/extensions/shapestr.h
+>>> /usr/include/X11/extensions/presenttokens.h
+>>> /usr/include/X11/extensions/XKBproto.h
+>>> /usr/include/X11/extensions/cup.h
+>>> /usr/include/X11/extensions/saver.h
+>>> /usr/include/X11/extensions/ag.h
+>>> /usr/include/X11/extensions/XKB.h
+>>> /usr/include/X11/extensions/xcmiscstr.h
+>>> /usr/include/X11/keysym.h
+>>> /usr/include/X11/Xproto.h
+>>> /usr/include/X11/Xw32defs.h
+>>> /usr/include/X11/dri/
+>>> /usr/include/X11/dri/xf86driproto.h
+>>> /usr/include/X11/dri/xf86dri.h
+>>> /usr/include/X11/dri/xf86dristr.h
+>>> /usr/include/X11/DECkeysym.h
+>>> /usr/include/X11/fonts/
+>>> /usr/include/X11/fonts/fontproto.h
+>>> /usr/include/X11/fonts/font.h
+>>> /usr/include/X11/fonts/fontstruct.h
+>>> /usr/include/X11/fonts/FSproto.h
+>>> /usr/include/X11/fonts/FS.h
+>>> /usr/include/X11/fonts/fsmasks.h
+>>> /usr/include/X11/Xosdefs.h
+>>> /usr/include/X11/Xarch.h
+>>> /usr/include/X11/X.h
+>>> /usr/include/X11/Xthreads.h
+>>> /usr/include/X11/Xprotostr.h
+>>> /usr/include/X11/Xfuncproto.h
+>>> /usr/include/GL/
+>>> /usr/include/GL/glxint.h
+>>> /usr/include/GL/glxtokens.h
+>>> /usr/include/GL/internal/
+>>> /usr/include/GL/internal/glcore.h
+>>> /usr/include/GL/glxmd.h
+>>> /usr/include/GL/glxproto.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/xorg-proto-2025.1/
+>>> /usr/share/doc/xorg-proto-2025.1/README.md.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/AUTHORS.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/damageproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/xv-protocol-v2.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/dri2proto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/randrproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/xwaylandproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/presentproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/fixesproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/resproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/renderproto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/dri3proto.txt.bz2
+>>> /usr/share/doc/xorg-proto-2025.1/xorgproto/compositeproto.txt.bz2
+--- /usr/share/pkgconfig/
+>>> /usr/share/pkgconfig/inputproto.pc
+>>> /usr/share/pkgconfig/renderproto.pc
+>>> /usr/share/pkgconfig/resourceproto.pc
+>>> /usr/share/pkgconfig/fixesproto.pc
+>>> /usr/share/pkgconfig/kbproto.pc
+>>> /usr/share/pkgconfig/xwaylandproto.pc
+>>> /usr/share/pkgconfig/xextproto.pc
+>>> /usr/share/pkgconfig/compositeproto.pc
+>>> /usr/share/pkgconfig/dpmsproto.pc
+>>> /usr/share/pkgconfig/applewmproto.pc
+>>> /usr/share/pkgconfig/videoproto.pc
+>>> /usr/share/pkgconfig/xineramaproto.pc
+>>> /usr/share/pkgconfig/dmxproto.pc
+>>> /usr/share/pkgconfig/xf86driproto.pc
+>>> /usr/share/pkgconfig/dri2proto.pc
+>>> /usr/share/pkgconfig/bigreqsproto.pc
+>>> /usr/share/pkgconfig/dri3proto.pc
+>>> /usr/share/pkgconfig/damageproto.pc
+>>> /usr/share/pkgconfig/presentproto.pc
+>>> /usr/share/pkgconfig/xcmiscproto.pc
+>>> /usr/share/pkgconfig/xf86vidmodeproto.pc
+>>> /usr/share/pkgconfig/scrnsaverproto.pc
+>>> /usr/share/pkgconfig/xf86dgaproto.pc
+>>> /usr/share/pkgconfig/recordproto.pc
+>>> /usr/share/pkgconfig/xproto.pc
+>>> /usr/share/pkgconfig/randrproto.pc
+>>> /usr/share/pkgconfig/xf86bigfontproto.pc
+>>> /usr/share/pkgconfig/fontsproto.pc
+>>> /usr/share/pkgconfig/glproto.pc
+>>> x11-base/xorg-proto-2025.1 merged.
+
+>>> Completed (2 of 16) x11-base/xorg-proto-2025.1::gentoo
+
+>>> Emerging binary (3 of 16) sys-apps/hwdata-0.401::gentoo
+ * hwdata-0.401-1.gpkg.tar MD5 SHA1 size ;-) ...                         [ ok ]
+>>> Extracting info
+>>> Extracting sys-apps/hwdata-0.401
+
+>>> Installing (3 of 16) sys-apps/hwdata-0.401::gentoo
+ [32;01m*[39;49;00m checking 8 files for package collisions
+>>> Merging sys-apps/hwdata-0.401 to /
+--- /lib/
+--- /lib/modprobe.d/
+>>> /lib/modprobe.d/dist-blacklist.conf
+--- /usr/
+--- /usr/share/
+>>> /usr/share/hwdata/
+>>> /usr/share/hwdata/pnp.ids
+>>> /usr/share/hwdata/pci.ids
+>>> /usr/share/hwdata/oui.txt
+>>> /usr/share/hwdata/usb.ids
+>>> /usr/share/hwdata/iab.txt
+--- /usr/share/doc/
+>>> /usr/share/doc/hwdata-0.401/
+>>> /usr/share/doc/hwdata-0.401/README
+--- /usr/share/pkgconfig/
+>>> /usr/share/pkgconfig/hwdata.pc
+>>> sys-apps/hwdata-0.401 merged.
+
+>>> Completed (3 of 16) sys-apps/hwdata-0.401::gentoo
+
+>>> Emerging binary (4 of 16) x11-libs/libXau-1.0.12::gentoo
+ * libXau-1.0.12-9.gpkg.tar MD5 SHA1 size ;-) ...                        [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libXau-1.0.12
+
+>>> Installing (4 of 16) x11-libs/libXau-1.0.12::gentoo
+ [32;01m*[39;49;00m checking 12 files for package collisions
+>>> Merging x11-libs/libXau-1.0.12 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libXau.so.6.0.0
+>>> /usr/lib64/libXau.so -> libXau.so.6.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xau.pc
+--- /usr/lib/
+>>> /usr/lib/libXau.so.6.0.0
+>>> /usr/lib/libXau.so -> libXau.so.6.0.0
+--- /usr/lib/pkgconfig/
+>>> /usr/lib/pkgconfig/xau.pc
+--- /usr/include/
+--- /usr/include/X11/
+>>> /usr/include/X11/Xauth.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libXau-1.0.12/
+>>> /usr/share/doc/libXau-1.0.12/AUTHORS
+>>> /usr/share/doc/libXau-1.0.12/README.bz2
+>>> /usr/share/doc/libXau-1.0.12/ChangeLog.bz2
+--- /usr/src/
+>>> /usr/lib/libXau.so.6 -> libXau.so.6.0.0
+>>> /usr/lib64/libXau.so.6 -> libXau.so.6.0.0
+>>> x11-libs/libXau-1.0.12 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (4 of 16) x11-libs/libXau-1.0.12::gentoo
+
+>>> Emerging binary (5 of 16) x11-libs/libXdmcp-1.1.5::gentoo
+ * libXdmcp-1.1.5-11.gpkg.tar MD5 SHA1 size ;-) ...                      [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libXdmcp-1.1.5
+
+>>> Installing (5 of 16) x11-libs/libXdmcp-1.1.5::gentoo
+ [32;01m*[39;49;00m checking 12 files for package collisions
+>>> Merging x11-libs/libXdmcp-1.1.5 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libXdmcp.so.6.0.0
+>>> /usr/lib64/libXdmcp.so -> libXdmcp.so.6.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xdmcp.pc
+--- /usr/lib/
+>>> /usr/lib/libXdmcp.so.6.0.0
+>>> /usr/lib/libXdmcp.so -> libXdmcp.so.6.0.0
+--- /usr/lib/pkgconfig/
+>>> /usr/lib/pkgconfig/xdmcp.pc
+--- /usr/include/
+--- /usr/include/X11/
+>>> /usr/include/X11/Xdmcp.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libXdmcp-1.1.5/
+>>> /usr/share/doc/libXdmcp-1.1.5/README.md.bz2
+>>> /usr/share/doc/libXdmcp-1.1.5/AUTHORS.bz2
+>>> /usr/share/doc/libXdmcp-1.1.5/ChangeLog.bz2
+--- /usr/src/
+>>> /usr/lib/libXdmcp.so.6 -> libXdmcp.so.6.0.0
+>>> /usr/lib64/libXdmcp.so.6 -> libXdmcp.so.6.0.0
+>>> x11-libs/libXdmcp-1.1.5 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (5 of 16) x11-libs/libXdmcp-1.1.5::gentoo
+
+>>> Emerging binary (6 of 16) dev-util/spirv-tools-1.4.357.0::gentoo
+ * spirv-tools-1.4.357.0-1.gpkg.tar MD5 SHA1 size ;-) ...                [ ok ]
+>>> Extracting info
+>>> Extracting dev-util/spirv-tools-1.4.357.0
+
+>>> Installing (6 of 16) dev-util/spirv-tools-1.4.357.0::gentoo
+ [32;01m*[39;49;00m checking 47 files for package collisions
+>>> Merging dev-util/spirv-tools-1.4.357.0 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libSPIRV-Tools-lint.so
+>>> /usr/lib64/libSPIRV-Tools-opt.so
+>>> /usr/lib64/libSPIRV-Tools-reduce.so
+--- /usr/lib64/cmake/
+>>> /usr/lib64/cmake/SPIRV-Tools-link/
+>>> /usr/lib64/cmake/SPIRV-Tools-link/SPIRV-Tools-linkTargets.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-link/SPIRV-Tools-linkTargets-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-link/SPIRV-Tools-linkConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-diff/
+>>> /usr/lib64/cmake/SPIRV-Tools-diff/SPIRV-Tools-diffConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-diff/SPIRV-Tools-diffTargets-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-diff/SPIRV-Tools-diffTargets.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-tools/
+>>> /usr/lib64/cmake/SPIRV-Tools-tools/SPIRV-Tools-toolsConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-tools/SPIRV-Tools-toolsTargets.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-tools/SPIRV-Tools-toolsTargets-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools/
+>>> /usr/lib64/cmake/SPIRV-Tools/SPIRV-ToolsTarget-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools/SPIRV-ToolsTarget.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools/SPIRV-ToolsConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-opt/
+>>> /usr/lib64/cmake/SPIRV-Tools-opt/SPIRV-Tools-optTargets.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-opt/SPIRV-Tools-optTargets-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-opt/SPIRV-Tools-optConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-lint/
+>>> /usr/lib64/cmake/SPIRV-Tools-lint/SPIRV-Tools-lintTargets.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-lint/SPIRV-Tools-lintConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-lint/SPIRV-Tools-lintTargets-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-reduce/
+>>> /usr/lib64/cmake/SPIRV-Tools-reduce/SPIRV-Tools-reduceTarget-relwithdebinfo.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-reduce/SPIRV-Tools-reduceConfig.cmake
+>>> /usr/lib64/cmake/SPIRV-Tools-reduce/SPIRV-Tools-reduceTarget.cmake
+>>> /usr/lib64/libSPIRV-Tools-shared.so
+>>> /usr/lib64/libSPIRV-Tools-diff.so
+>>> /usr/lib64/libSPIRV-Tools.so
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/SPIRV-Tools-shared.pc
+>>> /usr/lib64/pkgconfig/SPIRV-Tools.pc
+>>> /usr/lib64/libSPIRV-Tools-link.so
+--- /usr/bin/
+>>> /usr/bin/spirv-objdump
+>>> /usr/bin/spirv-opt
+>>> /usr/bin/spirv-link
+>>> /usr/bin/spirv-val
+>>> /usr/bin/spirv-diff
+>>> /usr/bin/spirv-lint
+>>> /usr/bin/spirv-dis
+>>> /usr/bin/spirv-reduce
+>>> /usr/bin/spirv-as
+>>> /usr/bin/spirv-cfg
+>>> /usr/bin/spirv-lesspipe.sh
+--- /usr/include/
+>>> /usr/include/spirv-tools/
+>>> /usr/include/spirv-tools/linker.hpp
+>>> /usr/include/spirv-tools/libspirv.h
+>>> /usr/include/spirv-tools/libspirv.hpp
+>>> /usr/include/spirv-tools/optimizer.hpp
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/spirv-tools-1.4.357.0/
+>>> /usr/share/doc/spirv-tools-1.4.357.0/README.md.bz2
+>>> /usr/share/doc/spirv-tools-1.4.357.0/CHANGES.bz2
+>>> dev-util/spirv-tools-1.4.357.0 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (6 of 16) dev-util/spirv-tools-1.4.357.0::gentoo
+
+>>> Emerging binary (7 of 16) x11-libs/libxshmfence-1.3.3::gentoo
+ * libxshmfence-1.3.3-1.gpkg.tar MD5 SHA1 size ;-) ...                   [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libxshmfence-1.3.3
+
+>>> Installing (7 of 16) x11-libs/libxshmfence-1.3.3::gentoo
+ [32;01m*[39;49;00m checking 7 files for package collisions
+>>> Merging x11-libs/libxshmfence-1.3.3 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libxshmfence.so.1.0.0
+>>> /usr/lib64/libxshmfence.so -> libxshmfence.so.1.0.0
+>>> /usr/lib64/libxshmfence.so.1 -> libxshmfence.so.1.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xshmfence.pc
+--- /usr/include/
+--- /usr/include/X11/
+>>> /usr/include/X11/xshmfence.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libxshmfence-1.3.3/
+>>> /usr/share/doc/libxshmfence-1.3.3/README.md.bz2
+>>> /usr/share/doc/libxshmfence-1.3.3/ChangeLog.bz2
+>>> x11-libs/libxshmfence-1.3.3 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (7 of 16) x11-libs/libxshmfence-1.3.3::gentoo
+
+>>> Emerging binary (8 of 16) x11-libs/libxcb-1.17.0::gentoo
+ * libxcb-1.17.0-14.gpkg.tar MD5 SHA1 size ;-) ...                       [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libxcb-1.17.0
+
+>>> Installing (8 of 16) x11-libs/libxcb-1.17.0::gentoo
+ [32;01m*[39;49;00m checking 142 files for package collisions
+>>> Merging x11-libs/libxcb-1.17.0 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libxcb-sync.so.1.0.0
+>>> /usr/lib64/libxcb-res.so.0.0.0
+>>> /usr/lib64/libxcb-record.so.0.0.0
+>>> /usr/lib64/libxcb-xinput.so.0.1.0
+>>> /usr/lib64/libxcb-xv.so.0.0.0
+>>> /usr/lib64/libxcb-glx.so.0.0.0
+>>> /usr/lib64/libxcb-record.so -> libxcb-record.so.0.0.0
+>>> /usr/lib64/libxcb-glx.so -> libxcb-glx.so.0.0.0
+>>> /usr/lib64/libxcb-dri3.so.0.1.0
+>>> /usr/lib64/libxcb-composite.so.0.0.0
+>>> /usr/lib64/libxcb-record.so.0 -> libxcb-record.so.0.0.0
+>>> /usr/lib64/libxcb-xinput.so -> libxcb-xinput.so.0.1.0
+>>> /usr/lib64/libxcb-xv.so -> libxcb-xv.so.0.0.0
+>>> /usr/lib64/libxcb-render.so.0.0.0
+>>> /usr/lib64/libxcb-res.so -> libxcb-res.so.0.0.0
+>>> /usr/lib64/libxcb-glx.so.0 -> libxcb-glx.so.0.0.0
+>>> /usr/lib64/libxcb-dri3.so.0 -> libxcb-dri3.so.0.1.0
+>>> /usr/lib64/libxcb-sync.so.1 -> libxcb-sync.so.1.0.0
+>>> /usr/lib64/libxcb-randr.so.0.1.0
+>>> /usr/lib64/libxcb-xtest.so.0.0.0
+>>> /usr/lib64/libxcb-shape.so.0.0.0
+>>> /usr/lib64/libxcb-randr.so.0 -> libxcb-randr.so.0.1.0
+>>> /usr/lib64/libxcb-shm.so.0.0.0
+>>> /usr/lib64/libxcb-dpms.so.0.0.0
+>>> /usr/lib64/libxcb-xselinux.so.0.0.0
+>>> /usr/lib64/libxcb-xkb.so.1.0.0
+>>> /usr/lib64/libxcb-dri3.so -> libxcb-dri3.so.0.1.0
+>>> /usr/lib64/libxcb-xfixes.so.0.0.0
+>>> /usr/lib64/libxcb-xf86dri.so.0.0.0
+>>> /usr/lib64/libxcb-dpms.so -> libxcb-dpms.so.0.0.0
+>>> /usr/lib64/libxcb-shape.so -> libxcb-shape.so.0.0.0
+>>> /usr/lib64/libxcb-xf86dri.so -> libxcb-xf86dri.so.0.0.0
+>>> /usr/lib64/libxcb-randr.so -> libxcb-randr.so.0.1.0
+>>> /usr/lib64/libxcb-dri2.so.0.0.0
+>>> /usr/lib64/libxcb-xinput.so.0 -> libxcb-xinput.so.0.1.0
+>>> /usr/lib64/libxcb.so.1.1.0
+>>> /usr/lib64/libxcb-damage.so.0.0.0
+>>> /usr/lib64/libxcb-dbe.so.0.0.0
+>>> /usr/lib64/libxcb-present.so.0.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xcb-present.pc
+>>> /usr/lib64/pkgconfig/xcb-xinerama.pc
+>>> /usr/lib64/pkgconfig/xcb-xkb.pc
+>>> /usr/lib64/pkgconfig/xcb-xv.pc
+>>> /usr/lib64/pkgconfig/xcb-dri3.pc
+>>> /usr/lib64/pkgconfig/xcb-res.pc
+>>> /usr/lib64/pkgconfig/xcb-damage.pc
+>>> /usr/lib64/pkgconfig/xcb-record.pc
+>>> /usr/lib64/pkgconfig/xcb-xinput.pc
+>>> /usr/lib64/pkgconfig/xcb-xfixes.pc
+>>> /usr/lib64/pkgconfig/xcb-xselinux.pc
+>>> /usr/lib64/pkgconfig/xcb.pc
+>>> /usr/lib64/pkgconfig/xcb-xvmc.pc
+>>> /usr/lib64/pkgconfig/xcb-dpms.pc
+>>> /usr/lib64/pkgconfig/xcb-glx.pc
+>>> /usr/lib64/pkgconfig/xcb-dbe.pc
+>>> /usr/lib64/pkgconfig/xcb-screensaver.pc
+>>> /usr/lib64/pkgconfig/xcb-randr.pc
+>>> /usr/lib64/pkgconfig/xcb-sync.pc
+>>> /usr/lib64/pkgconfig/xcb-composite.pc
+>>> /usr/lib64/pkgconfig/xcb-xtest.pc
+>>> /usr/lib64/pkgconfig/xcb-shape.pc
+>>> /usr/lib64/pkgconfig/xcb-shm.pc
+>>> /usr/lib64/pkgconfig/xcb-xf86dri.pc
+>>> /usr/lib64/pkgconfig/xcb-dri2.pc
+>>> /usr/lib64/pkgconfig/xcb-render.pc
+>>> /usr/lib64/libxcb-composite.so -> libxcb-composite.so.0.0.0
+>>> /usr/lib64/libxcb-xv.so.0 -> libxcb-xv.so.0.0.0
+>>> /usr/lib64/libxcb-screensaver.so.0.0.0
+>>> /usr/lib64/libxcb-sync.so -> libxcb-sync.so.1.0.0
+>>> /usr/lib64/libxcb-res.so.0 -> libxcb-res.so.0.0.0
+>>> /usr/lib64/libxcb-xvmc.so.0.0.0
+>>> /usr/lib64/libxcb-xinerama.so.0.0.0
+--- /usr/lib/
+--- /usr/include/
+>>> /usr/include/xcb/
+>>> /usr/include/xcb/xevie.h
+>>> /usr/include/xcb/res.h
+>>> /usr/include/xcb/xvmc.h
+>>> /usr/include/xcb/glx.h
+>>> /usr/include/xcb/render.h
+>>> /usr/include/xcb/xselinux.h
+>>> /usr/include/xcb/randr.h
+>>> /usr/include/xcb/xtest.h
+>>> /usr/include/xcb/dpms.h
+>>> /usr/include/xcb/xf86dri.h
+>>> /usr/include/xcb/composite.h
+>>> /usr/include/xcb/ge.h
+>>> /usr/include/xcb/shm.h
+>>> /usr/include/xcb/xfixes.h
+>>> /usr/include/xcb/damage.h
+>>> /usr/include/xcb/xkb.h
+>>> /usr/include/xcb/record.h
+>>> /usr/include/xcb/xinerama.h
+>>> /usr/include/xcb/sync.h
+>>> /usr/include/xcb/xc_misc.h
+>>> /usr/include/xcb/present.h
+>>> /usr/include/xcb/xproto.h
+>>> /usr/include/xcb/xcb.h
+>>> /usr/include/xcb/dbe.h
+>>> /usr/include/xcb/xprint.h
+>>> /usr/include/xcb/xinput.h
+>>> /usr/include/xcb/dri3.h
+>>> /usr/include/xcb/xcbext.h
+>>> /usr/include/xcb/shape.h
+>>> /usr/include/xcb/bigreq.h
+>>> /usr/include/xcb/screensaver.h
+>>> /usr/include/xcb/xv.h
+>>> /usr/include/xcb/dri2.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libxcb-1.17.0/
+>>> /usr/share/doc/libxcb-1.17.0/README.md.bz2
+>>> /usr/share/doc/libxcb-1.17.0/html/
+>>> /usr/share/doc/libxcb-1.17.0/html/tutorial/
+>>> /usr/share/doc/libxcb-1.17.0/html/tutorial/xcb.css
+>>> /usr/share/doc/libxcb-1.17.0/html/tutorial/index.html
+>>> /usr/share/doc/libxcb-1.17.0/NEWS.bz2
+>>> /usr/share/doc/libxcb-1.17.0/ChangeLog.bz2
+--- /usr/src/
+>>> /usr/lib64/libxcb-xinerama.so -> libxcb-xinerama.so.0.0.0
+>>> /usr/lib64/libxcb-xinerama.so.0 -> libxcb-xinerama.so.0.0.0
+>>> /usr/lib64/libxcb-xfixes.so.0 -> libxcb-xfixes.so.0.0.0
+>>> /usr/lib64/libxcb.so -> libxcb.so.1.1.0
+>>> /usr/lib64/libxcb-screensaver.so -> libxcb-screensaver.so.0.0.0
+>>> /usr/lib64/libxcb-screensaver.so.0 -> libxcb-screensaver.so.0.0.0
+>>> /usr/lib64/libxcb-xselinux.so -> libxcb-xselinux.so.0.0.0
+>>> /usr/lib64/libxcb-xselinux.so.0 -> libxcb-xselinux.so.0.0.0
+>>> /usr/lib64/libxcb-xvmc.so -> libxcb-xvmc.so.0.0.0
+>>> /usr/lib64/libxcb-xtest.so.0 -> libxcb-xtest.so.0.0.0
+>>> /usr/lib64/libxcb-shm.so.0 -> libxcb-shm.so.0.0.0
+>>> /usr/lib64/libxcb-shape.so.0 -> libxcb-shape.so.0.0.0
+>>> /usr/lib64/libxcb-present.so -> libxcb-present.so.0.0.0
+>>> /usr/lib64/libxcb.so.1 -> libxcb.so.1.1.0
+>>> /usr/lib64/libxcb-damage.so -> libxcb-damage.so.0.0.0
+>>> /usr/lib64/libxcb-shm.so -> libxcb-shm.so.0.0.0
+>>> /usr/lib64/libxcb-xkb.so.1 -> libxcb-xkb.so.1.0.0
+>>> /usr/lib64/libxcb-xvmc.so.0 -> libxcb-xvmc.so.0.0.0
+>>> /usr/lib64/libxcb-dbe.so.0 -> libxcb-dbe.so.0.0.0
+>>> /usr/lib64/libxcb-xtest.so -> libxcb-xtest.so.0.0.0
+>>> /usr/lib64/libxcb-present.so.0 -> libxcb-present.so.0.0.0
+>>> /usr/lib64/libxcb-xkb.so -> libxcb-xkb.so.1.0.0
+>>> /usr/lib64/libxcb-damage.so.0 -> libxcb-damage.so.0.0.0
+>>> /usr/lib64/libxcb-dri2.so -> libxcb-dri2.so.0.0.0
+>>> /usr/lib64/libxcb-composite.so.0 -> libxcb-composite.so.0.0.0
+>>> /usr/lib64/libxcb-dpms.so.0 -> libxcb-dpms.so.0.0.0
+>>> /usr/lib64/libxcb-dri2.so.0 -> libxcb-dri2.so.0.0.0
+>>> /usr/lib64/libxcb-dbe.so -> libxcb-dbe.so.0.0.0
+>>> /usr/lib64/libxcb-render.so.0 -> libxcb-render.so.0.0.0
+>>> /usr/lib64/libxcb-render.so -> libxcb-render.so.0.0.0
+>>> /usr/lib64/libxcb-xf86dri.so.0 -> libxcb-xf86dri.so.0.0.0
+>>> /usr/lib64/libxcb-xfixes.so -> libxcb-xfixes.so.0.0.0
+>>> x11-libs/libxcb-1.17.0 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (8 of 16) x11-libs/libxcb-1.17.0::gentoo
+
+>>> Emerging binary (9 of 16) x11-libs/libpciaccess-0.19::gentoo
+ * libpciaccess-0.19-1.gpkg.tar MD5 SHA1 size ;-) ...                    [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libpciaccess-0.19
+
+>>> Installing (9 of 16) x11-libs/libpciaccess-0.19::gentoo
+ [32;01m*[39;49;00m checking 8 files for package collisions
+>>> Merging x11-libs/libpciaccess-0.19 to /
+--- /usr/
+--- /usr/lib64/
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/pciaccess.pc
+>>> /usr/lib64/libpciaccess.so.0.11.1
+--- /usr/include/
+>>> /usr/include/pciaccess.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libpciaccess-0.19/
+>>> /usr/share/doc/libpciaccess-0.19/README.md.bz2
+>>> /usr/share/doc/libpciaccess-0.19/AUTHORS
+>>> /usr/share/doc/libpciaccess-0.19/README.cygwin.bz2
+>>> /usr/lib64/libpciaccess.so.0 -> libpciaccess.so.0.11.1
+>>> /usr/lib64/libpciaccess.so -> libpciaccess.so.0
+>>> x11-libs/libpciaccess-0.19 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (9 of 16) x11-libs/libpciaccess-0.19::gentoo
+
+>>> Emerging binary (10 of 16) x11-libs/libX11-1.8.14::gentoo
+ * libX11-1.8.14-1.gpkg.tar MD5 SHA1 size ;-) ...                        [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libX11-1.8.14
+
+>>> Installing (10 of 16) x11-libs/libX11-1.8.14::gentoo
+ [32;01m*[39;49;00m checking 28 files for package collisions
+>>> Merging x11-libs/libX11-1.8.14 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libX11-xcb.so.1.0.0
+>>> /usr/lib64/libX11.so.6.4.0
+>>> /usr/lib64/libX11.so.6 -> libX11.so.6.4.0
+>>> /usr/lib64/libX11-xcb.so.1 -> libX11-xcb.so.1.0.0
+>>> /usr/lib64/libX11.so -> libX11.so.6.4.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/x11-xcb.pc
+>>> /usr/lib64/pkgconfig/x11.pc
+--- /usr/lib/
+--- /usr/include/
+--- /usr/include/X11/
+>>> /usr/include/X11/Xcms.h
+>>> /usr/include/X11/XKBlib.h
+>>> /usr/include/X11/Xlibint.h
+>>> /usr/include/X11/ImUtil.h
+>>> /usr/include/X11/Xlocale.h
+--- /usr/include/X11/extensions/
+>>> /usr/include/X11/extensions/XKBgeom.h
+>>> /usr/include/X11/Xlib.h
+>>> /usr/include/X11/Xlib-xcb.h
+>>> /usr/include/X11/Xresource.h
+>>> /usr/include/X11/cursorfont.h
+>>> /usr/include/X11/Xregion.h
+>>> /usr/include/X11/Xutil.h
+>>> /usr/include/X11/XlibConf.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libX11-1.8.14/
+>>> /usr/share/doc/libX11-1.8.14/README.md.bz2
+>>> /usr/share/doc/libX11-1.8.14/AUTHORS.bz2
+>>> /usr/share/doc/libX11-1.8.14/ChangeLog.bz2
+--- /usr/share/X11/
+>>> /usr/share/X11/XErrorDB
+>>> /usr/share/X11/Xcms.txt
+--- /usr/share/man/
+--- /usr/share/man/man5/
+>>> /usr/share/man/man5/XCompose.5
+>>> /usr/share/man/man5/Compose.5.bz2
+--- /usr/src/
+>>> /usr/lib64/libX11-xcb.so -> libX11-xcb.so.1.0.0
+>>> x11-libs/libX11-1.8.14 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (10 of 16) x11-libs/libX11-1.8.14::gentoo
+
+>>> Emerging binary (11 of 16) x11-libs/libdrm-2.4.134::gentoo
+ * libdrm-2.4.134-3.gpkg.tar MD5 SHA1 size ;-) ...                       [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libdrm-2.4.134
+
+>>> Installing (11 of 16) x11-libs/libdrm-2.4.134::gentoo
+ [32;01m*[39;49;00m checking 34 files for package collisions
+>>> Merging x11-libs/libdrm-2.4.134 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libdrm_intel.so.1.134.0
+>>> /usr/lib64/libdrm.so.2.134.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/libdrm.pc
+>>> /usr/lib64/pkgconfig/libdrm_intel.pc
+>>> /usr/lib64/libdrm_intel.so.1 -> libdrm_intel.so.1.134.0
+>>> /usr/lib64/libdrm.so.2 -> libdrm.so.2.134.0
+--- /usr/include/
+>>> /usr/include/libsync.h
+>>> /usr/include/xf86drmMode.h
+>>> /usr/include/xf86drm.h
+>>> /usr/include/libdrm/
+>>> /usr/include/libdrm/vc4_drm.h
+>>> /usr/include/libdrm/via_drm.h
+>>> /usr/include/libdrm/virtgpu_drm.h
+>>> /usr/include/libdrm/i915_drm.h
+>>> /usr/include/libdrm/amdgpu_drm.h
+>>> /usr/include/libdrm/nouveau_drm.h
+>>> /usr/include/libdrm/savage_drm.h
+>>> /usr/include/libdrm/drm_fourcc.h
+>>> /usr/include/libdrm/qxl_drm.h
+>>> /usr/include/libdrm/drm.h
+>>> /usr/include/libdrm/intel_bufmgr.h
+>>> /usr/include/libdrm/r128_drm.h
+>>> /usr/include/libdrm/tegra_drm.h
+>>> /usr/include/libdrm/intel_debug.h
+>>> /usr/include/libdrm/intel_aub.h
+>>> /usr/include/libdrm/drm_sarea.h
+>>> /usr/include/libdrm/msm_drm.h
+>>> /usr/include/libdrm/sis_drm.h
+>>> /usr/include/libdrm/radeon_drm.h
+>>> /usr/include/libdrm/mga_drm.h
+>>> /usr/include/libdrm/drm_mode.h
+>>> /usr/include/libdrm/mach64_drm.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libdrm-2.4.134/
+>>> /usr/share/doc/libdrm-2.4.134/README.rst.bz2
+>>> /usr/lib64/libdrm_intel.so -> libdrm_intel.so.1
+>>> /usr/lib64/libdrm.so -> libdrm.so.2
+>>> x11-libs/libdrm-2.4.134 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (11 of 16) x11-libs/libdrm-2.4.134::gentoo
+
+>>> Emerging binary (12 of 16) x11-libs/xcb-util-keysyms-0.4.1::gentoo
+ * xcb-util-keysyms-0.4.1-1.gpkg.tar MD5 SHA1 size ;-) ...               [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/xcb-util-keysyms-0.4.1
+
+>>> Installing (12 of 16) x11-libs/xcb-util-keysyms-0.4.1::gentoo
+ [32;01m*[39;49;00m checking 8 files for package collisions
+>>> Merging x11-libs/xcb-util-keysyms-0.4.1 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libxcb-keysyms.so.1.0.0
+>>> /usr/lib64/libxcb-keysyms.so.1 -> libxcb-keysyms.so.1.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xcb-keysyms.pc
+>>> /usr/lib64/libxcb-keysyms.so -> libxcb-keysyms.so.1.0.0
+--- /usr/include/
+--- /usr/include/xcb/
+>>> /usr/include/xcb/xcb_keysyms.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/xcb-util-keysyms-0.4.1/
+>>> /usr/share/doc/xcb-util-keysyms-0.4.1/README.md.bz2
+>>> /usr/share/doc/xcb-util-keysyms-0.4.1/NEWS.bz2
+>>> /usr/share/doc/xcb-util-keysyms-0.4.1/ChangeLog.bz2
+>>> x11-libs/xcb-util-keysyms-0.4.1 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (12 of 16) x11-libs/xcb-util-keysyms-0.4.1::gentoo
+
+>>> Emerging binary (13 of 16) x11-libs/libXext-1.3.7::gentoo
+ * libXext-1.3.7-1.gpkg.tar MD5 SHA1 size ;-) ...                        [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libXext-1.3.7
+
+>>> Installing (13 of 16) x11-libs/libXext-1.3.7::gentoo
+ [32;01m*[39;49;00m checking 23 files for package collisions
+>>> Merging x11-libs/libXext-1.3.7 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libXext.so.6.4.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xext.pc
+>>> /usr/lib64/libXext.so -> libXext.so.6.4.0
+--- /usr/include/
+--- /usr/include/X11/
+--- /usr/include/X11/extensions/
+>>> /usr/include/X11/extensions/Xag.h
+>>> /usr/include/X11/extensions/dpms.h
+>>> /usr/include/X11/extensions/MITMisc.h
+>>> /usr/include/X11/extensions/XShm.h
+>>> /usr/include/X11/extensions/security.h
+>>> /usr/include/X11/extensions/multibuf.h
+>>> /usr/include/X11/extensions/sync.h
+>>> /usr/include/X11/extensions/XEVI.h
+>>> /usr/include/X11/extensions/XLbx.h
+>>> /usr/include/X11/extensions/Xge.h
+>>> /usr/include/X11/extensions/extutil.h
+>>> /usr/include/X11/extensions/shape.h
+>>> /usr/include/X11/extensions/xtestext1.h
+>>> /usr/include/X11/extensions/Xext.h
+>>> /usr/include/X11/extensions/Xcup.h
+>>> /usr/include/X11/extensions/Xdbe.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libXext-1.3.7/
+>>> /usr/share/doc/libXext-1.3.7/README.md.bz2
+>>> /usr/share/doc/libXext-1.3.7/AUTHORS.bz2
+>>> /usr/share/doc/libXext-1.3.7/ChangeLog.bz2
+>>> /usr/lib64/libXext.so.6 -> libXext.so.6.4.0
+>>> x11-libs/libXext-1.3.7 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (13 of 16) x11-libs/libXext-1.3.7::gentoo
+
+>>> Emerging binary (14 of 16) x11-libs/libXfixes-6.0.2::gentoo
+ * libXfixes-6.0.2-1.gpkg.tar MD5 SHA1 size ;-) ...                      [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libXfixes-6.0.2
+
+>>> Installing (14 of 16) x11-libs/libXfixes-6.0.2::gentoo
+ [32;01m*[39;49;00m checking 8 files for package collisions
+>>> Merging x11-libs/libXfixes-6.0.2 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libXfixes.so.3.1.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xfixes.pc
+--- /usr/include/
+--- /usr/include/X11/
+--- /usr/include/X11/extensions/
+>>> /usr/include/X11/extensions/Xfixes.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libXfixes-6.0.2/
+>>> /usr/share/doc/libXfixes-6.0.2/README.md.bz2
+>>> /usr/share/doc/libXfixes-6.0.2/AUTHORS
+>>> /usr/share/doc/libXfixes-6.0.2/ChangeLog.bz2
+>>> /usr/lib64/libXfixes.so.3 -> libXfixes.so.3.1.0
+>>> /usr/lib64/libXfixes.so -> libXfixes.so.3
+>>> x11-libs/libXfixes-6.0.2 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (14 of 16) x11-libs/libXfixes-6.0.2::gentoo
+
+>>> Emerging binary (15 of 16) media-libs/libglvnd-1.7.0::gentoo
+ * libglvnd-1.7.0-1.gpkg.tar MD5 SHA1 size ;-) ...                       [ ok ]
+>>> Extracting info
+>>> Extracting media-libs/libglvnd-1.7.0
+
+>>> Installing (15 of 16) media-libs/libglvnd-1.7.0::gentoo
+ [32;01m*[39;49;00m checking 53 files for package collisions
+>>> Merging media-libs/libglvnd-1.7.0 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libOpenGL.so.0.0.0
+>>> /usr/lib64/libGL.so.1.7.0
+>>> /usr/lib64/libGLX.so.0.0.0
+>>> /usr/lib64/libGLdispatch.so.0.0.0
+>>> /usr/lib64/libGL.so.1 -> libGL.so.1.7.0
+>>> /usr/lib64/libGLX.so.0 -> libGLX.so.0.0.0
+>>> /usr/lib64/libGLX.so -> libGLX.so.0
+>>> /usr/lib64/libGLESv1_CM.so.1.2.0
+>>> /usr/lib64/libEGL.so.1.1.0
+>>> /usr/lib64/libGLESv2.so.2.1.0
+>>> /usr/lib64/libGLdispatch.so.0 -> libGLdispatch.so.0.0.0
+>>> /usr/lib64/libEGL.so.1 -> libEGL.so.1.1.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/egl.pc
+>>> /usr/lib64/pkgconfig/libglvnd.pc
+>>> /usr/lib64/pkgconfig/opengl.pc
+>>> /usr/lib64/pkgconfig/gl.pc
+>>> /usr/lib64/pkgconfig/glesv1_cm.pc
+>>> /usr/lib64/pkgconfig/glesv2.pc
+>>> /usr/lib64/pkgconfig/glx.pc
+>>> /usr/lib64/libOpenGL.so.0 -> libOpenGL.so.0.0.0
+--- /usr/include/
+>>> /usr/include/KHR/
+>>> /usr/include/KHR/khrplatform.h
+>>> /usr/include/GLES3/
+>>> /usr/include/GLES3/gl31.h
+>>> /usr/include/GLES3/gl3platform.h
+>>> /usr/include/GLES3/gl32.h
+>>> /usr/include/GLES3/gl3.h
+>>> /usr/include/GLES3/gl3ext.h
+>>> /usr/include/EGL/
+>>> /usr/include/EGL/eglext.h
+>>> /usr/include/EGL/egl.h
+>>> /usr/include/EGL/eglplatform.h
+>>> /usr/include/glvnd/
+>>> /usr/include/glvnd/GLdispatchABI.h
+>>> /usr/include/glvnd/libglxabi.h
+>>> /usr/include/glvnd/libeglabi.h
+>>> /usr/include/GLES2/
+>>> /usr/include/GLES2/gl2platform.h
+>>> /usr/include/GLES2/gl2ext.h
+>>> /usr/include/GLES2/gl2.h
+>>> /usr/include/GLES/
+>>> /usr/include/GLES/glext.h
+>>> /usr/include/GLES/glplatform.h
+>>> /usr/include/GLES/egl.h
+>>> /usr/include/GLES/gl.h
+--- /usr/include/GL/
+>>> /usr/include/GL/glcorearb.h
+>>> /usr/include/GL/glx.h
+>>> /usr/include/GL/glxext.h
+>>> /usr/include/GL/glext.h
+>>> /usr/include/GL/gl.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libglvnd-1.7.0/
+>>> /usr/share/doc/libglvnd-1.7.0/README.md.bz2
+>>> /usr/lib64/libGLdispatch.so -> libGLdispatch.so.0
+>>> /usr/lib64/libGLESv2.so.2 -> libGLESv2.so.2.1.0
+>>> /usr/lib64/libGLESv1_CM.so.1 -> libGLESv1_CM.so.1.2.0
+>>> /usr/lib64/libGL.so -> libGL.so.1
+>>> /usr/lib64/libOpenGL.so -> libOpenGL.so.0
+>>> /usr/lib64/libEGL.so -> libEGL.so.1
+>>> /usr/lib64/libGLESv2.so -> libGLESv2.so.2
+>>> /usr/lib64/libGLESv1_CM.so -> libGLESv1_CM.so.1
+>>> media-libs/libglvnd-1.7.0 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (15 of 16) media-libs/libglvnd-1.7.0::gentoo
+
+>>> Emerging binary (16 of 16) x11-libs/libXxf86vm-1.1.7::gentoo
+ * libXxf86vm-1.1.7-1.gpkg.tar MD5 SHA1 size ;-) ...                     [ ok ]
+>>> Extracting info
+>>> Extracting x11-libs/libXxf86vm-1.1.7
+
+>>> Installing (16 of 16) x11-libs/libXxf86vm-1.1.7::gentoo
+ [32;01m*[39;49;00m checking 7 files for package collisions
+>>> Merging x11-libs/libXxf86vm-1.1.7 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libXxf86vm.so.1.0.0
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/xxf86vm.pc
+--- /usr/include/
+--- /usr/include/X11/
+--- /usr/include/X11/extensions/
+>>> /usr/include/X11/extensions/xf86vmode.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/libXxf86vm-1.1.7/
+>>> /usr/share/doc/libXxf86vm-1.1.7/README.md.bz2
+>>> /usr/share/doc/libXxf86vm-1.1.7/ChangeLog.bz2
+>>> /usr/lib64/libXxf86vm.so.1 -> libXxf86vm.so.1.0.0
+>>> /usr/lib64/libXxf86vm.so -> libXxf86vm.so.1
+>>> x11-libs/libXxf86vm-1.1.7 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Completed (16 of 16) x11-libs/libXxf86vm-1.1.7::gentoo
+
+ * GNU info directory index is up-to-date.
+
+ * IMPORTANT: 19 news items need reading for repository 'gentoo'.
+ * Use eselect news read to view new items.
+
+setlocale: unsupported locale setting
+setlocale: unsupported locale setting
+
+ * IMPORTANT: 19 news items need reading for repository 'gentoo'.
+ * Use eselect news read to view new items.
+
+
+These are the packages that would be merged, in order:
+
+Calculating dependencies ... done!
+Dependency resolution took 0.28 s (backtrack: 0/20).
+
+[binary  N     ] media-libs/mesa-26.1.8-4::gentoo  USE="X (opengl) proprietary-codecs zstd -debug -llvm -lm-sensors -opencl -sysprof -test -unwind -vaapi -valgrind -vulkan -wayland" ABI_X86="(64) -32 (-x32)" CPU_FLAGS_X86="sse2" LLVM_SLOT="22 -18 -19 -20 -21" VIDEO_CARDS="intel -asahi -d3d12 (-freedreno) -i915 (-imagination) -lavapipe (-lima) -nouveau -nvk (-panfrost) -r300 -r600 -radeon -radeonsi (-v3d) (-vc4) -virgl (-vivante) -vmware -zink" 0 KiB
+
+Total: 1 package (1 new, 1 binary), Size of downloads: 0 KiB
+
+
+>>> Running pre-merge checks for media-libs/mesa-26.1.8
+ * mesa-26.1.8-4.gpkg.tar MD5 SHA1 size ;-) ...                          [ ok ]
+
+>>> Emerging binary (1 of 1) media-libs/mesa-26.1.8::gentoo
+ * mesa-26.1.8-4.gpkg.tar MD5 SHA1 size ;-) ...                          [ ok ]
+>>> Extracting info
+ [33;01m*[0m Unable to calculate Linux Kernel version for build, attempting to use running version
+ [33;01m*[0m Unable to check for the following kernel config options due
+ [33;01m*[0m to absence of any configured kernel sources or compiled
+ [33;01m*[0m config:
+ [33;01m*[0m  - KCMP
+ [33;01m*[0m You're on your own to make sure they are set if needed.
+>>> Extracting media-libs/mesa-26.1.8
+
+>>> Installing (1 of 1) media-libs/mesa-26.1.8::gentoo
+ [32;01m*[39;49;00m checking 26 files for package collisions
+>>> Merging media-libs/mesa-26.1.8 to /
+--- /usr/
+--- /usr/lib64/
+>>> /usr/lib64/libgbm.so.1.0.0
+>>> /usr/lib64/libGLX_mesa.so.0.0.0
+>>> /usr/lib64/gbm/
+>>> /usr/lib64/gbm/dri_gbm.so
+>>> /usr/lib64/libGLX_mesa.so.0 -> libGLX_mesa.so.0.0.0
+>>> /usr/lib64/libGLX_mesa.so -> libGLX_mesa.so.0
+>>> /usr/lib64/libgallium-26.1.8.so
+>>> /usr/lib64/libgbm.so.1 -> libgbm.so.1.0.0
+>>> /usr/lib64/dri/
+>>> /usr/lib64/dri/libdril_dri.so
+>>> /usr/lib64/dri/iris_dri.so -> libdril_dri.so
+>>> /usr/lib64/dri/swrast_dri.so -> libdril_dri.so
+>>> /usr/lib64/dri/crocus_dri.so -> libdril_dri.so
+>>> /usr/lib64/dri/kms_swrast_dri.so -> libdril_dri.so
+--- /usr/lib64/pkgconfig/
+>>> /usr/lib64/pkgconfig/gbm.pc
+>>> /usr/lib64/pkgconfig/dri.pc
+>>> /usr/lib64/libEGL_mesa.so.0.0.0
+--- /usr/include/
+>>> /usr/include/gbm_backend_abi.h
+>>> /usr/include/gbm.h
+--- /usr/include/EGL/
+>>> /usr/include/EGL/eglext_angle.h
+>>> /usr/include/EGL/eglmesaext.h
+--- /usr/include/GL/
+--- /usr/include/GL/internal/
+>>> /usr/include/GL/internal/dri_interface.h
+--- /usr/share/
+--- /usr/share/doc/
+>>> /usr/share/doc/mesa-26.1.8/
+>>> /usr/share/doc/mesa-26.1.8/README.rst.bz2
+>>> /usr/share/drirc.d/
+>>> /usr/share/drirc.d/00-mesa-defaults.conf
+>>> /usr/share/glvnd/
+>>> /usr/share/glvnd/egl_vendor.d/
+>>> /usr/share/glvnd/egl_vendor.d/50_mesa.json
+>>> /usr/lib64/libEGL_mesa.so.0 -> libEGL_mesa.so.0.0.0
+>>> /usr/lib64/libgbm.so -> libgbm.so.1
+>>> /usr/lib64/libEGL_mesa.so -> libEGL_mesa.so.0
+>>> media-libs/mesa-26.1.8 merged.
+>>> Regenerating /etc/ld.so.cache...
+
+>>> Recording media-libs/mesa in "world" favorites file...
+
+>>> Completed (1 of 1) media-libs/mesa-26.1.8::gentoo
+
+ * Messages for package media-libs/mesa-26.1.8:
+ * Log file: /var/log/portage/media-libs:mesa-26.1.8:20261029-145314.log
+
+ * Unable to calculate Linux Kernel version for build, attempting to use running version
+ * Unable to check for the following kernel config options due
+ * to absence of any configured kernel sources or compiled
+ * config:
+ *  - KCMP
+ * You're on your own to make sure they are set if needed.
+
+ * GNU info directory index is up-to-date.
+
+ * IMPORTANT: 19 news items need reading for repository 'gentoo'.
+ * Use eselect news read to view new items.
+

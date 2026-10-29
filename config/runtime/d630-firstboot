@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+description="Initialize the Gentoo live user"
+start() {
+    groups=
+    groupadd -f netdev || return 1
+    if ! id -u gentoo >/dev/null 2>&1; then
+        useradd -M -U -u 1000 -s /bin/bash gentoo || return 1
+    fi
+    [ "$(id -u gentoo)" = 1000 ] || return 1
+    groups="$(awk -F: '$1 != "gentoo" { print $1 }' /etc/group | paste -sd, -)" || return 1
+    [ -n "$groups" ] || return 1
+    usermod -aG "$groups" gentoo || return 1
+    password_hash="$(openssl passwd -6 gentoo)" || return 1
+    usermod -p "$password_hash" gentoo || return 1
+    mkdir -p /home/gentoo || return 1
+    if [ ! -e /home/gentoo/.bashrc ]; then
+        cp -a /etc/skel/. /home/gentoo/ || return 1
+    fi
+    chown -R gentoo:gentoo /home/gentoo || return 1
+    chmod 0700 /home/gentoo || return 1
+}
