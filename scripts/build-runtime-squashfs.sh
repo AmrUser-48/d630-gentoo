@@ -126,7 +126,7 @@ if ! chroot "$ROOT" /bin/bash -lc 'emerge-webrsync --quiet' |& tee "$OUT/portage
 fi
 chroot "$ROOT" /bin/bash -lc 'getuto' |& tee -a "$OUT/portage-bootstrap.log"
 
-if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
+if [[ "$RUNTIME_PROFILE" == tiny-console || "$RUNTIME_PROFILE" == console || "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver ]]; then
   log "Fetch GURU ebuilds required by the lf package"
   mkdir -p "$ROOT/var/db/repos"
   cat > "$ROOT/etc/portage/repos.conf/guru.conf" <<'EOF'
@@ -241,7 +241,10 @@ net-wireless/bluez
 EOF
   case "$RUNTIME_PROFILE" in
     console) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
-    openbox) cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt" ;;
+    openbox)
+      cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
+      grep -vx 'sys-apps/man-db' "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt"
+      ;;
     desktop) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" "$GITHUB_WORKSPACE/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
     daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
   esac
@@ -320,7 +323,9 @@ if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; the
 fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   chroot "$ROOT" chmod 0755 /usr/bin/startx
-  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session; do
+  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
+    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/tldr /usr/bin/htop \
+    /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
   mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
@@ -332,10 +337,14 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     die "Openbox runtime is missing Mesa's Crocus driver"
 fi
 
+log "Install pinned deb12dots user configuration"
+bash "$GITHUB_WORKSPACE/scripts/install-runtime-dotfiles.sh" "$ROOT" "$WORK/dotfiles"
+chroot "$ROOT" /bin/bash -lc 'env-update'
+
 log "Configure console login, first-boot account creation, and OpenRC"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
 install -m 0755 "$GITHUB_WORKSPACE/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
-printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
+printf '%s\n' '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
 chmod 0755 "$ROOT/etc/sudoers.d"
 chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
 grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers.d' "$ROOT/etc/sudoers" || echo '#includedir /etc/sudoers.d' >> "$ROOT/etc/sudoers"
@@ -350,18 +359,31 @@ EOF
 cat > "$ROOT/etc/fstab" <<'EOF'
 # The initramfs mounts the read-only SquashFS and volatile OverlayFS.
 EOF
-if [[ "$RUNTIME_PROFILE" != console ]]; then printf '%s\n' 'exec openbox-session' > "$ROOT/etc/skel/.xinitrc"; chmod 0644 "$ROOT/etc/skel/.xinitrc"; fi
-if [[ ! -x "$ROOT/etc/init.d/agetty.tty1" ]]; then
-  cat > "$ROOT/etc/init.d/agetty.tty1" <<'EOF'
+if [[ "$RUNTIME_PROFILE" != console ]]; then
+  cat > "$ROOT/etc/skel/.xinitrc" <<'EOF'
+#!/bin/sh
+cd "$HOME" || exit 1
+if command -v xrdb >/dev/null 2>&1 && [ -r "$HOME/.Xresources" ]; then
+  xrdb -merge "$HOME/.Xresources"
+fi
+if command -v xmodmap >/dev/null 2>&1 && [ -r "$HOME/.Xmodmap" ]; then
+  xmodmap "$HOME/.Xmodmap"
+fi
+exec openbox-session
+EOF
+  chmod 0644 "$ROOT/etc/skel/.xinitrc"
+fi
+# Always replace the Stage 3 getty definition: merely creating the service
+# conditionally can leave its password-prompting default in the final image.
+cat > "$ROOT/etc/init.d/agetty.tty1" <<'EOF'
 #!/sbin/openrc-run
-description="D630 local tty1 login"
+description="D630 local tty1 automatic login"
 command="/sbin/agetty"
-command_args="--noclear tty1 linux"
+command_args="--autologin gentoo --noclear tty1 linux"
 command_background="yes"
 pidfile="/run/agetty.tty1.pid"
 EOF
-  chmod 0755 "$ROOT/etc/init.d/agetty.tty1"
-fi
+chmod 0755 "$ROOT/etc/init.d/agetty.tty1"
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 chroot "$ROOT" /bin/bash -lc 'rc-update add agetty.tty1 default' || echo "WARNING: could not enable agetty.tty1"
 if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
