@@ -28,6 +28,7 @@ output="$(realpath -m "$2")"
 mkdir -p "$(dirname "$output")"
 stage="$(mktemp -d "${TMPDIR:-/var/tmp}/d630-squashfs.XXXXXXXX")"
 tmp_output=""
+tmp_filelist=""
 cleanup() {
   for mountpoint in run sys proc dev; do
     if mountpoint -q "$stage/$mountpoint" 2>/dev/null; then
@@ -35,6 +36,7 @@ cleanup() {
     fi
   done
   [[ -z "$tmp_output" ]] || rm -f "$tmp_output"
+  [[ -z "$tmp_filelist" ]] || rm -f "$tmp_filelist"
   rm -rf "$stage"
 }
 trap cleanup EXIT
@@ -194,13 +196,45 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
   done
 fi
 
+if [[ "$MINIMAL_RUNTIME" == true ]]; then
+  echo "Removing manuals, documentation trees, locale sources, and unused translations."
+  rm -rf \
+    "$stage/usr/share/man" \
+    "$stage/usr/share/info" \
+    "$stage/usr/share/doc" \
+    "$stage/usr/share/gtk-doc" \
+    "$stage/usr/share/help" \
+    "$stage/usr/share/gnome/help" \
+    "$stage/usr/share/i18n" \
+    "$stage/var/cache/man"
+
+  # Keep English message catalogs only. Compiled libc locale data is separately
+  # generated from config/locale.gen, which selects en_US.UTF-8 only.
+  if [[ -d "$stage/usr/share/locale" ]]; then
+    find "$stage/usr/share/locale" -mindepth 1 -maxdepth 1 -type d \
+      ! -name en - ! -name en_US - ! -name C -exec rm -rf {} +
+  fi
+  if [[ -d "$stage/usr/lib/locale" ]]; then
+    find "$stage/usr/lib/locale" -mindepth 1 -maxdepth 1 -type d \
+      ! -name C.utf8 - ! -name C.UTF-8 - ! -name en_US.utf8 - ! -name en_US.UTF-8 \
+      -exec rm -rf {} +
+  fi
+
+  # Do not ship the dotfiles repository's plugin developer docs, test trees,
+  # build caches or man-page index in the user runtime.
+  find "$stage/home" -type d \
+    \( -name .git -o -name tests -o -name test -o -name screenshots -o -name __pycache__ \) \
+    -prune -exec rm -rf {} + 2>/dev/null || true
+  find "$stage/home" -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.swp' -o -name '*.swo' \) -delete 2>/dev/null || true
+fi
+
 # Static archives, libtool metadata, and Python bytecode caches are not used by
 # installed runtime executables. Keep runtime shared libraries.
 find "$stage/usr" -type f \( -name '*.a' -o -name '*.la' -o -name '*.pyc' \) -delete 2>/dev/null || true
 find "$stage" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
 
 # Refresh the man-db index inside staging, while leaving /usr/share/man intact.
-if [[ -x "$stage/usr/bin/mandb" ]]; then
+if [[ "$MINIMAL_RUNTIME" != true && -x "$stage/usr/bin/mandb" ]]; then
   mkdir -p "$stage/var/cache/man"
   for mountpoint in dev proc sys run; do
     mkdir -p "$stage/$mountpoint"
@@ -221,6 +255,29 @@ echo "Creating SquashFS using zstd compression (kernel must enable SQUASHFS_ZSTD
 mksquashfs "$stage" "$tmp_output" -noappend -comp zstd -b 1M -Xcompression-level 15
 mv -f "$tmp_output" "$output"
 tmp_output=""
+
+if [[ "$MINIMAL_RUNTIME" == true ]]; then
+  tmp_filelist="$(mktemp "${TMPDIR:-/var/tmp}/d630-squashfs-list.XXXXXXXX")"
+  unsquashfs -ll "$output" > "$tmp_filelist"
+  for path in usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg; do
+    grep -Eq "squashfs-root/${path}([[:space:]]|$)" "$tmp_filelist" || {
+      echo "Required runtime application is absent from the final SquashFS: /${path}" >&2
+      exit 1
+    }
+  done
+  if grep -Eq 'squashfs-root/(etc/portage|var/db/pkg|usr/lib(64)?/portage|usr/share/man|usr/share/info|usr/share/doc|usr/share/gtk-doc|usr/share/help|usr/share/i18n|usr/include|var/cache/binpkgs|var/cache/distfiles|var/tmp/portage)(/|$)' "$tmp_filelist"; then
+    echo "Forbidden build/documentation payload remains in the final minimal SquashFS." >&2
+    grep -E 'squashfs-root/(etc/portage|var/db/pkg|usr/lib(64)?/portage|usr/share/man|usr/share/info|usr/share/doc|usr/share/gtk-doc|usr/share/help|usr/share/i18n|usr/include|var/cache/binpkgs|var/cache/distfiles|var/tmp/portage)(/|$)' "$tmp_filelist" | head -30 >&2
+    exit 1
+  fi
+  if grep -Eq 'squashfs-root/usr/bin/(emerge|emerge-webrsync|ebuild|emaint|portageq|gcc|g\+\+|make|ld\.bfd)([[:space:]]|$)' "$tmp_filelist"; then
+    echo "Portage or compiler executables remain in the final minimal SquashFS." >&2
+    exit 1
+  fi
+  rm -f "$tmp_filelist"
+  tmp_filelist=""
+fi
+
 echo
 du -shx "$src" "$output"
 echo "Preserved: /usr/share/man and /usr/share/licenses."
