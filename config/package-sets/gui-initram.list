@@ -17,5 +17,3 @@ sys-apps/file
 sys-apps/less
 x11-apps/xrdb
 x11-apps/xmodmap
-x11-apps/xrdb
-x11-apps/xmodmap
