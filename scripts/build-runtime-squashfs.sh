@@ -377,6 +377,61 @@ exec openbox-session
 EOF
   chmod 0644 "$ROOT/etc/skel/.xinitrc"
 fi
+# Configure the kernel's built-in ZRAM as 1.5 GiB LZ4 swap.
+cat > "$ROOT/etc/init.d/d630-zram" <<'EOF'
+#!/sbin/openrc-run
+description="D630 LZ4 compressed RAM swap"
+
+depend() {
+  before localmount
+}
+
+start() {
+  ebegin "Activating 1.5 GiB LZ4 ZRAM swap"
+  if [ ! -b /dev/zram0 ] || [ ! -w /sys/block/zram0/disksize ]; then
+    eerror "Built-in zram device is missing; expected CONFIG_ZRAM=y"
+    eend 1
+    return 1
+  fi
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    eend 0
+    return 0
+  fi
+  current_size="$(cat /sys/block/zram0/disksize)" || {
+    eend 1
+    return 1
+  }
+  if [ "$current_size" -eq 0 ]; then
+    echo lz4 > /sys/block/zram0/comp_algorithm || {
+      eend 1
+      return 1
+    }
+    echo 2 > /sys/block/zram0/max_comp_streams 2>/dev/null || true
+    echo 1610612736 > /sys/block/zram0/disksize || {
+      eend 1
+      return 1
+    }
+    mkswap -L d630-zram /dev/zram0 >/dev/null || {
+      eend 1
+      return 1
+    }
+  fi
+  swapon -p 100 /dev/zram0
+  result=$?
+  eend "$result"
+  return "$result"
+}
+
+stop() {
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    swapoff /dev/zram0 || return 1
+  fi
+  echo 1 > /sys/block/zram0/reset
+}
+EOF
+chmod 0755 "$ROOT/etc/init.d/d630-zram"
+chroot "$ROOT" /bin/bash -lc 'rc-update add d630-zram boot'
+
 # Create the live user during sysinit, before init starts the tty1 login.
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 
