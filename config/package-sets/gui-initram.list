@@ -1,5 +1,9 @@
 # Minimal X11 desktop for the D630; all atoms must resolve to compatible binpkgs.
 media-libs/mesa
+# Direct ALSA fallback alongside PipeWire: library, device profiles, and CLI mixer/test tools.
+media-libs/alsa-lib
+media-libs/alsa-ucm-conf
+media-sound/alsa-utils
 media-fonts/terminus-font
 sys-auth/elogind
 x11-apps/xinit
