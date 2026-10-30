@@ -22,13 +22,15 @@ Review the dry run:
 
     ./scripts/prune-obsolete-releases.sh
 
-Actual deletion requires an authenticated GitHub CLI session and an explicit typed confirmation:
+To run the cleanup from GitHub, open [Prune obsolete GitHub releases](https://github.com/AmrUser-48/d630-gentoo/actions/workflows/prune-obsolete-releases.yml), start **Run workflow**, and enter the exact confirmation phrase printed in this index (currently `DELETE 29 RELEASES`). The action uses the same guarded script and commits the regenerated index after a successful cleanup.
+
+Alternatively, run locally from an authenticated clone:
 
     ./scripts/prune-obsolete-releases.sh --apply
 
-The script searches active source and workflow references before deleting. It preserves the ten releases listed above, deletes candidate release assets and associated Git tags, and then regenerates this index. It does not delete Actions run artifacts or historical repository-root `output/` files.
+The script searches active source and workflow references before deleting. It preserves the ten releases listed above, deletes candidate release assets and associated Git tags, and regenerates this index. It does not delete Actions run artifacts or historical repository-root `output/` files.
 
-**No release deletion has been run as part of this update.** The connected GitHub repository interface used for source changes does not expose a release-delete operation; the script is ready for an authenticated maintainer to run.
+**No release deletion has been run as part of this update.** Both entry points require explicit confirmation; CI has successfully executed the dry-run.
 
 ## Full inventory
 
