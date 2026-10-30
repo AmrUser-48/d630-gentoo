@@ -141,7 +141,7 @@ jobs:
             usr/bin/nmcli usr/sbin/iw usr/sbin/wpa_supplicant
             usr/bin/alsamixer usr/bin/aplay usr/bin/arecord
           )
-          if sudo chroot "$root" /usr/bin/python3 -c 'import bz2, json, lzma, sqlite3, ssl, sys; print(sys.version)' >> "$report" 2>&1; then
+          if sudo chroot "$root" /usr/bin/python3 -c 'import bz2, json, lzma, sqlite3, ssl, sys; print(sys.version)' 2>&1 | tee -a "$report"; then
             echo "PASS: Python 3 runtime and standard-library imports execute" | tee -a "$report"
           else
             echo "FAIL: Python 3 runtime or standard-library imports failed" | tee -a "$report"
