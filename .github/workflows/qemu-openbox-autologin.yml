@@ -160,7 +160,7 @@ jobs:
           }
 
           after 2000
-          send -- "if ps -eo user=,tty=,comm= | awk '\$1 == \"gentoo\" && \$2 == \"tty1\" && \$3 == \"bash\" { found=1 } END { exit !found }'; then printf 'D630_TTY1_' 'AUTOLOGIN_PASS\\n'; else ps -eo user=,tty=,comm=; printf 'D630_TTY1_' 'AUTOLOGIN_FAIL\\n'; fi\r"
+          send -- "for n in {1..30}; do if ps -eo user=,tty=,comm= | awk '\$1 == \"gentoo\" && \$2 == \"tty1\" && \$3 == \"bash\" { found=1 } END { exit !found }'; then printf '%s%s\\n' 'D630_TTY1_' 'AUTOLOGIN_PASS'; exit 0; fi; sleep 1; done; ps -eo user=,tty=,comm=; printf '%s%s\\n' 'D630_TTY1_' 'AUTOLOGIN_FAIL'\r"
 
           expect {
             -exact "D630_TTY1_AUTOLOGIN_PASS" {
