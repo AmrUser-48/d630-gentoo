@@ -97,7 +97,7 @@ jobs:
           sudo mkdir -p "$root/etc/portage/package.accept_keywords"
           sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
           sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
-          sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
+          sudo cp -a d630-gentoo/config/package-sets/. "$root/etc/portage/package-sets/"
 
           # Enforce the intended ABI regardless of the downloaded Stage 3 defaults.
           sudo sed -i '/^ABI_X86=/d' "$root/etc/portage/make.conf"

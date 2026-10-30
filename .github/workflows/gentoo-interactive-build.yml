@@ -219,7 +219,7 @@ jobs:
           sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh "$root/etc/bash/bashrc.d/10-portage-ask.sh"
           sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
           sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
-          sudo install -m 0644 config/xorg/99-synaptics.conf "$root/etc/X11/xorg.conf.d/99-synaptics.conf"
+          sudo install -m 0644 d630-gentoo/config/xorg/99-synaptics.conf "$root/etc/X11/xorg.conf.d/99-synaptics.conf"
           # Enforce stable-only package selection: do not inherit per-package
           # testing keyword exceptions from the downloaded Stage 3.
           sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
@@ -228,7 +228,7 @@ jobs:
           sudo mkdir -p "$root/etc/portage/package.accept_keywords"
           sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
           sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
-          sudo cp -a config/package-sets/. "$root/etc/portage/package-sets/"
+          sudo cp -a d630-gentoo/config/package-sets/. "$root/etc/portage/package-sets/"
           sudo install -m 0755 scripts/gentoo-build-set "$root/usr/local/sbin/gentoo-build-set"
 
           if [[ ! -f "$root/etc/portage/repos.conf/gentoo.conf" ]]; then

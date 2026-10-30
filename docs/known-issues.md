@@ -1,3 +1,5 @@
+> **Status note (2026-10-30):** This is an operational TODO carried forward from the previous layout. Some checkboxes may no longer match the latest image or Actions run. Verify current release assets, workflow logs and actual hardware before acting; the authoritative project layout and kernel profiles are documented in the root README and OS-specific READMEs.
+
 # Current D630 Gentoo SquashFS TODO
 
 Date: 2026-10-29  
@@ -39,7 +41,7 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 ## Newly identified — QEMU VNC video adapter is unsupported by the D630 kernel config
 
 - [ ] Xorg now fails to find/open a usable video device during QEMU VNC testing. This is likely separate from the earlier serial-console `/dev/tty0` failure.
-- [ ] The current `config/kernel/d630-base.fragment` explicitly disables `CONFIG_DRM_BOCHS`, `CONFIG_DRM_VIRTIO_GPU`, `CONFIG_DRM_QXL`, and `CONFIG_DRM_VMWGFX`; `CONFIG_DRM_SIMPLEDRM=y` does not guarantee a DRM card with QEMU direct-kernel boot. QEMU's `-vga std` adapter uses the Bochs VBE interface, so the current D630-focused kernel may expose no usable `/dev/dri/card*` device to Xorg.
+- [ ] The current `kernels/profiles/40-d630-builtin.config` explicitly disables `CONFIG_DRM_BOCHS`, `CONFIG_DRM_VIRTIO_GPU`, `CONFIG_DRM_QXL`, and `CONFIG_DRM_VMWGFX`; `CONFIG_DRM_SIMPLEDRM=y` does not guarantee a DRM card with QEMU direct-kernel boot. QEMU's `-vga std` adapter uses the Bochs VBE interface, so the current D630-focused kernel may expose no usable `/dev/dri/card*` device to Xorg.
 - [ ] Confirm in the guest: `ls -l /dev/dri /dev/fb* 2>&1; grep -E '\\(EE\\)|No devices|modeset|drm|vesa|intel' /home/gentoo/.local/share/xorg/Xorg.0.log`.
 - [ ] For a reliable QEMU graphics test, build a separate test kernel with `CONFIG_DRM_BOCHS=y` and use QEMU `-vga std` (then verify `/dev/dri/card0` exists). Keep the physical D630 kernel profile unchanged unless there is a separate hardware reason to enable extra virtual-GPU drivers.
 - [ ] Alternative to test before a kernel rebuild: add Gentoo package `x11-drivers/xf86-video-vesa` to a test SFS and verify whether it can drive QEMU's standard VGA under this direct-kernel boot. Do not assume this works until Xorg log confirms it.
@@ -53,7 +55,7 @@ Target: three-file boot with the Openbox runtime SquashFS and kernel `6.18.56-d6
 - [ ] Acceptance: boot the current SFS in QEMU with `console=tty0`, see an automatic `gentoo` login on tty1 with no username/password prompt, run `startx`, and confirm Xorg opens the VT and Openbox starts once the QEMU video-driver issue above is resolved.
 ## Runtime SFS implementation updated — build and runtime proof still pending
 
-- [x] The `openbox` profile combines `config/package-sets/gui-initram.list` with `config/package-sets/cli.list`, omitting `sys-apps/man-db`.
+- [x] The `openbox` profile combines `d630-gentoo/config/package-sets/gui-initram.list` with `d630-gentoo/config/package-sets/cli.list`, omitting `sys-apps/man-db`.
 - [x] Added `app-misc/tealdeer` (GURU, `~amd64`) plus the required `less`/`file` package atoms and X resource/keymap/open-file helpers.
 - [x] Added pinned `deb12dots` user defaults into `/etc/skel`: Bash/Zsh, shared aliases, Readline, `lf`, Neovim and X resources. Debian-specific aliases are filtered out; `EDITOR`/`VISUAL` use Neovim and `PAGER` uses less.
 - [x] `agetty.tty1` generation now requests autologin for `gentoo`, and `/etc/sudoers.d/10-d630-wheel` grants passwordless sudo to the local live `wheel` group.

@@ -88,13 +88,13 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo --preserve-env=RUNTIME_PROFILE,BUILD_GUI_INITRAMFS,EARLY_MICROCODE_CPIO,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,BINPKG_RUN_IDS,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
-            bash scripts/build-runtime-squashfs.sh
+            bash d630-gentoo/scripts/build-runtime-squashfs.sh
 
       - name: Add GRUB entry and finalize release checksums
         shell: bash
         run: |
           set -Eeuo pipefail
-          cp grub2/d630-gui.cfg output/d630-gui.cfg
+          cp d630-gentoo/boot/grub/gui.cfg output/d630-gui.cfg
           {
             echo "D630 GUI initramfs"
             echo "Kernel: Linux 6.18.56-d630-gentoo for Intel Core 2"

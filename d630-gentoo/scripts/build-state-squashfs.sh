@@ -16,7 +16,7 @@ SUCCESS=false
 
 [[ "$EUID" -eq 0 ]] || die "run as root"
 [[ -x "$BUILD_ROOT/bin/bash" && -d "$BUILD_ROOT/var/db/pkg" ]] || die "not a Gentoo build root: $BUILD_ROOT"
-[[ -x "$REPO/scripts/build-squashfs.sh" ]] || die "repository checkout is incomplete"
+[[ -x "$REPO/d630-gentoo/scripts/build-squashfs.sh" ]] || die "repository checkout is incomplete"
 for tool in rsync chroot mount umount mksquashfs unsquashfs; do
     command -v "$tool" >/dev/null || die "required host tool missing: $tool"
 done
@@ -154,7 +154,7 @@ chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v rc-update && comm
 
 log "Configure first boot, OpenRC services, console login, and Openbox session"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
-install -m 0755 "$REPO/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
+install -m 0755 "$REPO/d630-gentoo/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
 printf '%s\n' '%wheel ALL=(ALL:ALL) ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
 chmod 0755 "$ROOT/etc/sudoers.d"
 chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
@@ -228,7 +228,7 @@ chmod 0755 "$ROOT/var"
 if find "$ROOT" -xdev \( -uid 1000 -o -gid 1000 \) -print -quit | grep -q .; then
     die "runtime root still contains host UID/GID 1000 ownership"
 fi
-bash "$REPO/scripts/build-squashfs-inplace.sh" "$ROOT" "$OUT/squashfs"
+bash "$REPO/d630-gentoo/scripts/build-squashfs-inplace.sh" "$ROOT" "$OUT/squashfs"
 unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
 unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
 [[ -x "$ROOT/usr/bin/openbox-session" ]] || die "runtime root lost openbox-session"

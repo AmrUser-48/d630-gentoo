@@ -215,7 +215,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo env RUNNER_TEMP="$RUNNER_TEMP" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
-            bash scripts/build-state-squashfs.sh "$GENTOO_ROOT" "$GITHUB_WORKSPACE/output"
+            bash d630-gentoo/scripts/build-state-squashfs.sh "$GENTOO_ROOT" "$GITHUB_WORKSPACE/output"
 
       - name: Boot-test the actual kernel + initramfs + SquashFS in QEMU
         shell: bash

@@ -16,7 +16,7 @@ mkdir -p "$DEST"
 [[ ! -e "$DEST/squashfs" ]] || die "refusing to overwrite $DEST/squashfs; move the old image first"
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-[[ -x "$REPO/scripts/build-runtime-squashfs.sh" ]] || die "repository checkout is incomplete"
+[[ -x "$REPO/d630-gentoo/scripts/build-runtime-squashfs.sh" ]] || die "repository checkout is incomplete"
 WORK_BASE="${2:-$(dirname "$DEST")/.d630-gentoo-build}"
 WORK_BASE="$(realpath -m "$WORK_BASE")"
 [[ "$WORK_BASE" != "$DEST" ]] || die "scratch directory must differ from the boot directory"
@@ -69,7 +69,7 @@ export OUTPUT_DIR="$DEST"
 
 echo "Building a minimal Gentoo OpenRC console root on Debian."
 echo "Source builds are disabled; Portage must use Stage 3 and available binpkgs."
-if bash "$REPO/scripts/build-runtime-squashfs.sh"; then
+if bash "$REPO/d630-gentoo/scripts/build-runtime-squashfs.sh"; then
   [[ -s "$DEST/squashfs" ]] || die "builder returned success but did not create $DEST/squashfs"
   echo
   echo "SquashFS ready: $DEST/squashfs"

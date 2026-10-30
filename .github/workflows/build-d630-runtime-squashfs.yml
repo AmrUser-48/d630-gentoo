@@ -114,7 +114,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,LOCAL_RELEASE_ASSETS_DIR,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
-            bash scripts/build-runtime-squashfs.sh
+            bash d630-gentoo/scripts/build-runtime-squashfs.sh
 
       - name: Upload SquashFS and diagnostics
         if: always()

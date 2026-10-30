@@ -1,3 +1,5 @@
+> Legacy notes retained for history. Current source of truth: kernels/README.md. This document contains obsolete ISO/persistence proposals and historical configuration guidance.
+
 # Kernel requirements and confirmed D630 hardware notes
 
 This is a focused design checklist, not a finished `.config`. Hardware IDs below come from the user's Debian 12 `lspci -nnk`, `lsusb`, ALSA and `glxinfo -B` output. See `docs/hardware-inventory.md` for the full inventory.
@@ -15,7 +17,7 @@ This is a reasoned starting choice, not a claim that 6.18 has been tested on thi
 ## Confirmed CPU and board
 
 - Dell Latitude D630, board `0KU184`, Dell BIOS A19.
-- Intel Core 2 Duo T7250, x86_64, 2 cores; current tested kernel reports `CONFIG_MCORE2=y`.
+- Intel Core 2 Duo T7250, x86_64, 2 cores; The x86-64 kernel uses a generic instruction baseline; CONFIG_MCORE2 is not an x86-64 Kconfig selector..
 - Host bridge Intel PM965/GM965/GL960 `8086:2a00`; ICH8M LPC `8086:2815`.
 - Compile for Core 2 (`-march=core2 -mtune=core2`); never `-march=native` in CI.
 

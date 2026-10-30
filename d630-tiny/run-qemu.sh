@@ -31,7 +31,13 @@ if [[ -z "$assets_dir" ]]; then
     echo "gh is required to download the latest test image." >&2
     exit 1
   }
-  tag=$(gh release view --repo AmrUser-48/d630-gentoo --json tagName --jq .tagName)
+  tag=$(gh release list --repo AmrUser-48/d630-gentoo --limit 100 \
+    --json tagName,publishedAt \
+    --jq '[.[] | select(.tagName | startswith("d630-tiny-shell-"))] | sort_by(.publishedAt) | last | .tagName // empty')
+  [[ -n "$tag" ]] || {
+    echo "No d630-tiny-shell-* release found." >&2
+    exit 1
+  }
   cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}
   assets_dir="$cache_root/d630-tiny/$tag"
   mkdir -p "$assets_dir"

@@ -89,13 +89,13 @@ install -m 0644 "$GITHUB_WORKSPACE/config/portage/profile/package.use.force" "$R
 install -m 0644 "$GITHUB_WORKSPACE/config/bash/bashrc.d/10-portage-ask.sh" "$ROOT/etc/bash/bashrc.d/10-portage-ask.sh"
 install -m 0644 "$GITHUB_WORKSPACE/config/locale.gen" "$ROOT/etc/locale.gen"
 install -m 0644 "$GITHUB_WORKSPACE/config/env.d/02locale" "$ROOT/etc/env.d/02locale"
-install -m 0644 "$GITHUB_WORKSPACE/config/xorg/99-synaptics.conf" "$ROOT/etc/X11/xorg.conf.d/99-synaptics.conf"
+install -m 0644 "$GITHUB_WORKSPACE/d630-gentoo/config/xorg/99-synaptics.conf" "$ROOT/etc/X11/xorg.conf.d/99-synaptics.conf"
 rm -rf "$ROOT/etc/portage/package.accept_keywords" "$ROOT/etc/portage/package.keywords"
 mkdir -p "$ROOT/etc/portage/package.accept_keywords"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.accept_keywords/." "$ROOT/etc/portage/package.accept_keywords/"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.use/." "$ROOT/etc/portage/package.use/"
 cp -a "$GITHUB_WORKSPACE/config/portage/binrepos.conf/." "$ROOT/etc/portage/binrepos.conf/"
-cp -a "$GITHUB_WORKSPACE/config/package-sets/." "$ROOT/etc/portage/package-sets/"
+cp -a "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/." "$ROOT/etc/portage/package-sets/"
 install -m 0755 "$GITHUB_WORKSPACE/scripts/gentoo-build-set" "$ROOT/usr/local/sbin/gentoo-build-set"
 if [[ ! -f "$ROOT/etc/portage/repos.conf/gentoo.conf" ]]; then
   cat > "$ROOT/etc/portage/repos.conf/gentoo.conf" <<'EOF'
@@ -198,7 +198,7 @@ sys-apps/util-linux
 sys-apps/shadow
 sys-apps/kmod
 EOF
-  cat "$GITHUB_WORKSPACE/config/package-sets/tiny-console.list" >> "$WORK/atoms.txt"
+  cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/tiny-console.list" >> "$WORK/atoms.txt"
 elif [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
   cat > "$WORK/atoms.txt" <<'EOF'
 app-admin/sudo
@@ -211,7 +211,7 @@ sys-apps/portage
 sys-apps/shadow
 sys-apps/util-linux
 EOF
-  cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
+  cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
 else
   cat > "$WORK/atoms.txt" <<'EOF'
 app-admin/sudo
@@ -240,13 +240,13 @@ net-wireless/wireless-regdb
 net-wireless/bluez
 EOF
   case "$RUNTIME_PROFILE" in
-    console) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
+    console) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
     openbox)
-      cat "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
-      grep -vx 'sys-apps/man-db' "$GITHUB_WORKSPACE/config/package-sets/cli.list" >> "$WORK/atoms.txt"
+      cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
+      grep -vx 'sys-apps/man-db' "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt"
       ;;
-    desktop) cat "$GITHUB_WORKSPACE/config/package-sets/cli.list" "$GITHUB_WORKSPACE/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
-    daily-driver) cat "$GITHUB_WORKSPACE/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
+    desktop) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
+    daily-driver) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
   esac
 fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
@@ -304,7 +304,7 @@ if [[ "$RUNTIME_PROFILE" == gui-initram || ( "$RUNTIME_PROFILE" == openbox && "$
       \( -name "$package-*.gpkg.tar" -o -name "$package-*.tbz2" \) -print -quit 2>/dev/null | grep -q .; then
       die "pinned binpkg release does not contain a binary for required GUI atom $atom"
     fi
-  done < "$GITHUB_WORKSPACE/config/package-sets/gui-initram.list"
+  done < "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list"
 fi
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
@@ -342,13 +342,13 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
 fi
 
 log "Install pinned deb12dots user configuration"
-bash "$GITHUB_WORKSPACE/scripts/install-runtime-dotfiles.sh" "$ROOT" "$WORK/dotfiles"
+bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/install-runtime-dotfiles.sh" "$ROOT" "$WORK/dotfiles"
 chroot "$ROOT" /bin/bash -lc 'env-update'
 
 log "Configure console login, first-boot account creation, and OpenRC"
 mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
 chroot "$ROOT" /bin/bash -lc 'getent group wheel >/dev/null 2>&1 || groupadd wheel'
-install -m 0755 "$GITHUB_WORKSPACE/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
+install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
 printf '%s\n' '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
 chmod 0755 "$ROOT/etc/sudoers.d"
 chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
@@ -634,9 +634,9 @@ INIT
 else
   log "Build Zstandard SquashFS from runtime-only root"
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-    MINIMAL_RUNTIME=true bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+    MINIMAL_RUNTIME=true bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
   else
-    bash "$GITHUB_WORKSPACE/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+    bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
   fi
   unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"

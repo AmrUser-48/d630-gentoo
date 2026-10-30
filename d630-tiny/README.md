@@ -20,9 +20,9 @@ cd "$(findmnt -rn -o TARGET | while IFS= read -r m; do
 done)" &&
 mkdir -vp d630-tiny &&
 cd d630-tiny &&
-curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/kernel &&
-curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/initramfs &&
-curl -fLO https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/grub2/d630-tiny.cfg &&
+curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-tiny-shell-40818375822/kernel &&
+curl -fLO https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-tiny-shell-40818375822/initramfs &&
+curl -fLO https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/d630-tiny/boot/grub.cfg &&
 mv d630-tiny.cfg tiny.cfg
 ```
 
@@ -85,7 +85,7 @@ done < <(findmnt -rn -o TARGET)
 
 stage=$(mktemp -d "$boot_dir/.update.XXXXXX")
 trap 'rm -rf -- "$stage"' EXIT
-base_url=https://github.com/AmrUser-48/d630-gentoo/releases/latest/download
+base_url=https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-tiny-shell-40818375822/download
 
 for asset in kernel initramfs SHA256SUMS; do
   curl -fL "$base_url/$asset" -o "$stage/$asset"
@@ -136,14 +136,14 @@ QEMU runs Tiny in a virtual machine, so you can try the shell without changing y
 
 ### Download the current release
 
-Open the [latest public release](https://github.com/AmrUser-48/d630-gentoo/releases/latest), or download the files needed for testing:
+Open the [latest public release](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-tiny-shell-40818375822), or download the files needed for testing:
 
 ```sh
 release_dir="$HOME/d630-tiny-release"
 mkdir -p "$release_dir"
 
 for asset in kernel initramfs SHA256SUMS; do
-  curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/$asset" \
+  curl -fL "https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-tiny-shell-40818375822/$asset" \
     -o "$release_dir/$asset"
 done
 ```
@@ -160,7 +160,7 @@ sudo apt-get install -y curl qemu-system-x86
 From the repository's root directory, run the launcher:
 
 ```sh
-./tinyos/run-qemu.sh --assets-dir "$HOME/d630-tiny-release"
+./d630-tiny/run-qemu.sh --assets-dir "$HOME/d630-tiny-release"
 ```
 
 The launcher checks the kernel and initramfs against `SHA256SUMS` before booting. Tiny starts its shell automatically as the passwordless `gmini` user; no username or password prompt is needed.
@@ -241,7 +241,7 @@ Your active NetworkManager row identifies the connection as `-_-` on `wlan0`. Fr
 
 ```sh
 helper=$(mktemp)
-curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/latest/download/export-wifi-profile.sh -o "$helper"
+curl -fL https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-tiny-shell-40818375822/export-wifi-profile.sh -o "$helper"
 bash "$helper" '-_-' "$HOME/.config/d630-tiny"
 rm -f "$helper"
 findmnt -no SOURCE,FSTYPE "$HOME"
@@ -419,4 +419,4 @@ The workflow validates CPIO contents and symlinks, then boots the actual kernel 
 - **A desktop does not start.** The current published Tiny image is text-only; use a separate GUI build when its required assets are published.
 - **The system boots in QEMU.** This verifies the tested virtual environment only. It does not guarantee physical Wi-Fi, graphics acceleration, or every D630 hardware feature will work.
 
-See the [latest release page](https://github.com/AmrUser-48/d630-gentoo/releases/latest) for the current downloadable assets.
+See the [latest release page](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-tiny-shell-40818375822) for the current downloadable assets.

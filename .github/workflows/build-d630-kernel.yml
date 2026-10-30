@@ -1,11 +1,11 @@
-name: Build D630 kernel and initramfs
-run-name: "D630 kernel ${{ inputs.kernel_version || '6.18.56' }} • build ${{ github.run_number }}"
+name: Build D630 Gentoo SFS built-in kernel and initramfs
+run-name: "D630 Gentoo SFS built-in kernel ${{ inputs.kernel_version || '6.18.56' }} • build ${{ github.run_number }}"
 
 on:
   push:
     paths:
-      - "config/kernel/**"
-      - "initramfs/**"
+      - "kernels/profiles/40-d630-builtin.config"
+      - "d630-gentoo/initramfs/**"
       - "scripts/validate-kernel-config.sh"
   workflow_dispatch:
     inputs:
@@ -154,8 +154,7 @@ jobs:
 
           make ARCH="$ARCH" x86_64_defconfig
           scripts/kconfig/merge_config.sh -m .config \
-            "$GITHUB_WORKSPACE/config/kernel/d630-base.fragment" \
-            "$GITHUB_WORKSPACE/config/kernel/d630-live.fragment" \
+            "$GITHUB_WORKSPACE/kernels/profiles/40-d630-builtin.config" \
             2>&1 | tee "$GITHUB_WORKSPACE/kernel-config-merge.log"
           # x86 compressed-image status output is controlled by this build-time option,
           # not by the normal quiet kernel command-line parameter.
@@ -300,7 +299,7 @@ jobs:
           ln -sfn busybox "$root/bin/sh"
           ln -sfn busybox "$root/bin/static-sh"
 
-          cp initramfs/init "$root/init"
+          cp d630-gentoo/initramfs/init "$root/init"
           chmod 0755 "$root/init"
           cp "$firmware_root/iwlwifi-3945-2.ucode" "$root/lib/firmware/"
           cp "$firmware_root/intel-ucode/"* "$root/lib/firmware/intel-ucode/"

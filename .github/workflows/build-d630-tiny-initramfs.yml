@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "tinyos/**"
-      - "grub2/d630-tiny*.cfg"
+      - "d630-tiny/**"
+      - "d630-tiny/boot/**"
       - ".github/workflows/build-d630-tiny-initramfs.yml"
   workflow_dispatch:
 
@@ -215,30 +215,30 @@ jobs:
           set -euo pipefail
 
           network_root="$RUNNER_TEMP/d630-network-tools"
-          sudo bash tinyos/build-network-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$GITHUB_WORKSPACE/tinyos/wifi-connect" "$GITHUB_WORKSPACE/tinyos/udhcpc-default.script"
+          sudo bash d630-tiny/build-network-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$GITHUB_WORKSPACE/d630-tiny/wifi-connect" "$GITHUB_WORKSPACE/d630-tiny/udhcpc-default.script"
 
           setup_root="$RUNNER_TEMP/d630-tiny-setup-tools"
-          sudo bash tinyos/build-setup-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$setup_root" "$GITHUB_WORKSPACE/tinyos/gmini.bashrc" "$GITHUB_WORKSPACE/tinyos/gmini.bash_profile" "$GITHUB_WORKSPACE/tinyos/gmini-lfrc" "$GITHUB_WORKSPACE/tinyos/gmini-lf-colors" "$GITHUB_WORKSPACE/tinyos/gmini-lf-icons" "$GITHUB_WORKSPACE/tinyos/lf-preview" "$GITHUB_WORKSPACE/tinyos/rebuild-initramfs.sh" "$RUNNER_TEMP/early-microcode.cpio" "$RUNNER_TEMP/terminus-powerline"
-          sudo bash tinyos/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output" "$GITHUB_WORKSPACE/tinyos/init" "$setup_root"
+          sudo bash d630-tiny/build-setup-tools.sh "$RUNNER_TEMP/d630-gentoo-network/root" "$network_root" "$setup_root" "$GITHUB_WORKSPACE/d630-tiny/gmini.bashrc" "$GITHUB_WORKSPACE/d630-tiny/gmini.bash_profile" "$GITHUB_WORKSPACE/d630-tiny/gmini-lfrc" "$GITHUB_WORKSPACE/d630-tiny/gmini-lf-colors" "$GITHUB_WORKSPACE/d630-tiny/gmini-lf-icons" "$GITHUB_WORKSPACE/d630-tiny/lf-preview" "$GITHUB_WORKSPACE/d630-tiny/rebuild-initramfs.sh" "$RUNNER_TEMP/early-microcode.cpio" "$RUNNER_TEMP/terminus-powerline"
+          sudo bash d630-tiny/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output" "$GITHUB_WORKSPACE/d630-tiny/init" "$setup_root"
 
-          cp grub2/d630-tiny.cfg output/d630-tiny.cfg
-          cp tinyos/README.md output/README-D630-Tiny.md
-          cp tinyos/init output/d630-tiny-init
-          cp tinyos/build-initramfs.sh output/build-initramfs.sh
-          cp tinyos/build-network-tools.sh output/build-network-tools.sh
-          cp tinyos/build-setup-tools.sh output/build-setup-tools.sh
-          cp tinyos/firmware-files.list output/firmware-files.list
-          cp tinyos/gentoo-chroot output/gentoo-chroot
-          cp tinyos/gmini.bashrc output/gmini.bashrc
-          cp tinyos/gmini.bash_profile output/gmini.bash_profile
-          cp tinyos/gmini-lfrc output/gmini-lfrc
-          cp tinyos/gmini-lf-colors output/gmini-lf-colors
-          cp tinyos/gmini-lf-icons output/gmini-lf-icons
-          cp tinyos/lf-preview output/lf-preview
-          cp tinyos/rebuild-initramfs.sh output/rebuild-initramfs.sh
-          cp tinyos/export-wifi-profile.sh output/export-wifi-profile.sh
-          cp tinyos/wifi-connect output/wifi-connect
-          cp tinyos/udhcpc-default.script output/udhcpc-default.script
+          cp d630-tiny/boot/grub.cfg output/d630-tiny.cfg
+          cp d630-tiny/README.md output/README-D630-Tiny.md
+          cp d630-tiny/init output/d630-tiny-init
+          cp d630-tiny/build-initramfs.sh output/build-initramfs.sh
+          cp d630-tiny/build-network-tools.sh output/build-network-tools.sh
+          cp d630-tiny/build-setup-tools.sh output/build-setup-tools.sh
+          cp d630-tiny/firmware-files.list output/firmware-files.list
+          cp d630-tiny/gentoo-chroot output/gentoo-chroot
+          cp d630-tiny/gmini.bashrc output/gmini.bashrc
+          cp d630-tiny/gmini.bash_profile output/gmini.bash_profile
+          cp d630-tiny/gmini-lfrc output/gmini-lfrc
+          cp d630-tiny/gmini-lf-colors output/gmini-lf-colors
+          cp d630-tiny/gmini-lf-icons output/gmini-lf-icons
+          cp d630-tiny/lf-preview output/lf-preview
+          cp d630-tiny/rebuild-initramfs.sh output/rebuild-initramfs.sh
+          cp d630-tiny/export-wifi-profile.sh output/export-wifi-profile.sh
+          cp d630-tiny/wifi-connect output/wifi-connect
+          cp d630-tiny/udhcpc-default.script output/udhcpc-default.script
           cat > output/BUILD-MANIFEST.txt <<EOF
           Project: AmrUser-48/d630-gentoo / D630 Tiny Linux
           Kernel release asset tag: $KERNEL_TAG
