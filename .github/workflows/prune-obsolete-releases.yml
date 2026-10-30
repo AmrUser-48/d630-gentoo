@@ -1,5 +1,5 @@
 name: Prune obsolete GitHub releases
-run-name: "Prune obsolete releases • \${{ github.actor }}"
+run-name: "Prune obsolete releases • ${{ github.actor }}"
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
       - name: Validate confirmation input
         shell: bash
         env:
-          RELEASE_CONFIRMATION: \${{ inputs.confirmation }}
+          RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -Eeuo pipefail
           [[ "$RELEASE_CONFIRMATION" =~ ^DELETE\ [0-9]+\ RELEASES$ ]] || {
@@ -35,8 +35,8 @@ jobs:
       - name: Run guarded release cleanup
         shell: bash
         env:
-          GH_TOKEN: \${{ github.token }}
-          RELEASE_CONFIRMATION: \${{ inputs.confirmation }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -Eeuo pipefail
           printf '%s\n' "$RELEASE_CONFIRMATION" | bash scripts/prune-obsolete-releases.sh --apply
