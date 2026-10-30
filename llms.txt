@@ -1,0 +1,49 @@
+# D630 Linux — LLM project context
+
+> Dell Latitude D630 / Intel Core 2 Duo project with two live operating systems, three kernel profiles and Core 2-tuned Gentoo userland builds.
+
+This is a navigation/context file for LLMs. Coding-agent operational rules live in [AGENTS.md](AGENTS.md). Human instructions live in the component READMEs and user guides.
+
+## Architecture
+
+- `d630-tiny/`: standalone BusyBox shell with an external initramfs; no Gentoo root or Portage; RAM-only changes.
+- `d630-gentoo/`: Gentoo/OpenRC live OS; read-only SquashFS root with volatile RAM OverlayFS.
+- `kernels/profiles/20-d630-base.config`: modular overlay for conventional installed Gentoo.
+- `kernels/profiles/30-d630-live.config`: standalone Tiny kernel profile; dedicated build/release pending.
+- `kernels/profiles/40-d630-builtin.config`: built-in Gentoo SFS live kernel; current kernel workflow target.
+
+## Current state
+
+- Preferred Gentoo boot: GRUB loads kernel, external initramfs and SquashFS directly from a normal partition.
+- ISO: retained as an optional packaging/distribution container. ISO-specific early userspace and end-to-end boot/persistence validation are incomplete.
+- Tiny release `d630-tiny-shell-40818375822`: QEMU-tested; physical D630 validation pending.
+- Gentoo release `d630-gentoo-openbox-2026.10.29`: QEMU console/OpenRC path tested; graphical and physical tests pending.
+- Newest kernel bundle: `d630-kernel-6.18.56-run-41134237939`. Older pinned bundles must be retained while active workflows use them.
+- Runner-state releases are encrypted full-root snapshots. Retain the newest two by policy; never disclose the decryption passphrase or decrypted contents.
+
+## Hardware and compiler
+
+Target: Intel Core 2 Duo T7250 (Merom), GM965/GMA X3100, Intel 3945ABG, HDA/SigmaTel, AHCI/ATA_PIIX, USB 2.0, legacy BIOS/GRUB.
+
+Gentoo userland flags: `-O2 -pipe -march=core2 -mtune=core2`. Kernel: generic x86-64 ISA baseline with `KCFLAGS=-mtune=core2`; no `CONFIG_MCORE2` selector and no `-march=native` in CI.
+
+## Authoritative documents
+
+- [Repository README](README.md)
+- [Root agent rules](AGENTS.md)
+- [Tiny README](d630-tiny/README.md) and [Tiny user guide](d630-tiny/docs/USER-GUIDE.md)
+- [Gentoo README](d630-gentoo/README.md) and [ISO packaging](d630-gentoo/iso/README.md)
+- [Kernel profiles](kernels/README.md)
+- [Hardware inventory](docs/hardware-inventory.md)
+- [Known issues](docs/known-issues.md)
+- [Release index](docs/releases.md)
+- [README template](docs/README-TEMPLATE.md)
+- [Archived notes](docs/archive/README.md)
+
+## Build and test entry points
+
+- `./scripts/validate-sources.sh`: static source/layout/README checks.
+- `bash scripts/validate-kernel-profiles.sh` and `bash scripts/validate-kernel-config.sh`: static kernel config checks.
+- `.github/workflows/`: kernel, Tiny, Gentoo runtime, runner save/restore and QEMU workflows.
+
+Static validation is not compilation, image creation, QEMU boot, graphics verification or physical D630 testing.
