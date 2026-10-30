@@ -15,7 +15,7 @@ DEST="$(realpath -m "$1")"
 mkdir -p "$DEST"
 [[ ! -e "$DEST/squashfs" ]] || die "refusing to overwrite $DEST/squashfs; move the old image first"
 
-REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 [[ -x "$REPO/d630-gentoo/scripts/build-runtime-squashfs.sh" ]] || die "repository checkout is incomplete"
 WORK_BASE="${2:-$(dirname "$DEST")/.d630-gentoo-build}"
 WORK_BASE="$(realpath -m "$WORK_BASE")"

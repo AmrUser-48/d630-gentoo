@@ -21,7 +21,7 @@ Status labels: **Known** means explicitly established for this target; **identif
 
 | Component | Current knowledge | Kernel / userspace plan |
 |---|---|---|
-| CPU | **Confirmed:** Intel Core 2 Duo T7250, family 6/model 15/stepping 13, 2 cores, x86_64; VT-x present | Current running kernel reports `CONFIG_MCORE2=y`. Keep Core 2-compatible compiler flags; never use `-march=native` in CI. |
+| CPU | **Confirmed:** Intel Core 2 Duo T7250, family 6/model 15/stepping 13, 2 cores, x86_64; VT-x present | Use the generic x86-64 ISA baseline; Linux x86-64 has no CONFIG_MCORE2 selector. Use Core 2 userland flags and never use -march=native in CI. |
 | Firmware boot | **Known:** legacy BIOS | BIOS boot path and GRUB PC target; no UEFI dependency. |
 | Integrated GPU | **Confirmed:** PCI `8086:2a02` (primary VGA), secondary display function `8086:2a03`, Dell subsystem `1028:01f9`; `i915` is active | Running system has `CONFIG_DRM_I915=m`; `dmesg` shows `i915drmfb` framebuffer. Mesa 22.3.6 reports `Mesa Intel(R) 965GM (CL)`, accelerated=yes, OpenGL 2.1. Keep the tested classic Intel Gen4 path; validate Crocus separately rather than replacing a known-working driver blindly. |
 | Wi-Fi | **Confirmed:** PCI `8086:4222`, subsystem `8086:1021`; `iwl3945` is active and firmware `iwlwifi-3945-2.ucode` version `15.32.2.9` loaded | Build `CONFIG_IWL3945` and its required wireless stack in (`=y`); include matching firmware and regulatory database in the runtime ISO. |

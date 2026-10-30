@@ -85,7 +85,7 @@ done < <(findmnt -rn -o TARGET)
 
 stage=$(mktemp -d "$boot_dir/.update.XXXXXX")
 trap 'rm -rf -- "$stage"' EXIT
-base_url=https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-tiny-shell-40818375822/download
+base_url=https://github.com/AmrUser-48/d630-gentoo/releases/download/d630-tiny-shell-40818375822
 
 for asset in kernel initramfs SHA256SUMS; do
   curl -fL "$base_url/$asset" -o "$stage/$asset"
