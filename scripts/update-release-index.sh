@@ -43,8 +43,8 @@ lines = [
     "",
     "Live inventory fetched from the GitHub Releases API. Asset download counts are cumulative per asset, not unique users.",
     "",
-    "| Type | Release | Published (UTC) | Assets | Total size (MiB) | Asset downloads |",
-    "|---|---|---:|---:|---:|---:|",
+    "| Channel | Type | Release | Published (UTC) | Assets | Total size (MiB) | Asset downloads |",
+    "|---|---|---|---:|---:|---:|---:|",
 ]
 for item in releases:
     assets = item.get("assets") or []
@@ -54,8 +54,9 @@ for item in releases:
     title = (item.get("name") or tag).replace("|", r"\|")
     url = item.get("html_url") or f"https://github.com/{repo}/releases/tag/{tag}"
     published = (item.get("published_at") or "")[:10] or "—"
+    channel = "Draft" if item.get("draft") else ("Pre-release" if item.get("prerelease") else "Release")
     lines.append(
-        f"| {classify(tag)} | [{title}]({url})<br><code>{tag}</code> | "
+        f"| {channel} | {classify(tag)} | [{title}]({url})<br><code>{tag}</code> | "
         f"{published} | {len(assets)} | {size_mib:.1f} | {downloads} |"
     )
 
