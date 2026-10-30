@@ -17,6 +17,7 @@ command -v grep >/dev/null || { echo "grep is required." >&2; exit 1; }
 KEEP_TAGS=(
   "runner-state-20261030T214009Z"
   "runner-state-20261030T010021Z"
+  "runner-state-20261015T153832Z"
   "d630-kernel-6.18.56-run-41134237939"
   "d630-kernel-6.18.56-run-40922514538"
   "d630-kernel-6.18.56-run-40813428910"
@@ -53,7 +54,6 @@ DELETE_TAGS=(
   "d630-kernel-6.18.56-build-15"
   "d630-kernel-6.18.56-build-14"
   "runner-state-20261029T172846Z"
-  "runner-state-20261015T153832Z"
   "runner-state-20261015T100327Z"
   "binpkgs-39497302427"
   "d630-rescue-20261015-1734"
