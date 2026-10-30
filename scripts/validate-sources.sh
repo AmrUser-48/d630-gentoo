@@ -1,5 +1,6 @@
 #!/bin/sh
-set -eu
+PS4='+${LINENO}: '
+set -eux
 
 test -s README.md
 test -s d630-tiny/README.md
