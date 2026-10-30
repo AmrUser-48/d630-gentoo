@@ -241,3 +241,32 @@ bash scripts/validate-kernel-profiles.sh
 test -s scripts/validate-kernel-config.sh
 bash scripts/validate-kernel-config.sh
 echo "D630 Tiny + Gentoo OS sources and all three kernel profiles: validation passed"
+
+
+# Standard documentation and AI-agent entry points.
+test -s AGENTS.md
+test -s llms.txt
+test -s .github/copilot-instructions.md
+test -s docs/README-TEMPLATE.md
+test -s docs/releases.md
+test -s scripts/prune-obsolete-releases.sh
+test -s scripts/update-release-index.sh
+test -s d630-tiny/AGENTS.md
+test -s d630-gentoo/AGENTS.md
+test -s kernels/AGENTS.md
+test -s d630-tiny/docs/USER-GUIDE.md
+test -s docs/archive/legacy-iso-design.md
+! test -e d630-gentoo/docs/legacy-iso-design.md
+grep -Fq 'cp d630-tiny/docs/USER-GUIDE.md output/README-D630-Tiny.md' .github/workflows/build-d630-tiny-initramfs.yml
+
+for readme in README.md d630-tiny/README.md d630-gentoo/README.md d630-gentoo/iso/README.md kernels/README.md docs/archive/README.md; do
+    for section in Overview Status Layout Requirements Use Build Releases Validation "Related documentation"; do
+        grep -Fxq "## $section" "$readme" || {
+            echo "Missing standard README section '$section' in $readme" >&2
+            exit 1
+        }
+    done
+done
+
+bash -n scripts/prune-obsolete-releases.sh
+bash -n scripts/update-release-index.sh
