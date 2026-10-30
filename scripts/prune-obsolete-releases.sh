@@ -91,9 +91,10 @@ for tag in "${DELETE_TAGS[@]}"; do
   gh release view "$tag" --repo "$REPO" >/dev/null
 done
 
-echo "This permanently deletes 30 GitHub Releases, their release assets, and their associated Git tags."
-read -r -p 'Type DELETE 30 RELEASES to continue: ' answer
-[[ "$answer" == "DELETE 30 RELEASES" ]] || { echo "Cancelled."; exit 1; }
+confirm_text="DELETE ${#DELETE_TAGS[@]} RELEASES"
+echo "This permanently deletes ${#DELETE_TAGS[@]} GitHub Releases, their release assets, and their associated Git tags."
+read -r -p "Type $confirm_text to continue: " answer
+[[ "$answer" == "$confirm_text" ]] || { echo "Cancelled."; exit 1; }
 
 for tag in "${DELETE_TAGS[@]}"; do
   gh release view "$tag" --repo "$REPO" >/dev/null 2>&1 || { echo "Already absent; skipping $tag"; continue; }
