@@ -101,7 +101,7 @@ jobs:
           report="$GITHUB_WORKSPACE/SFS-AUDIT.txt"
           mkdir -p "$root"
           unsquashfs -s "$runtime/squashfs" > "$RUNNER_TEMP/sfs-superblock.txt"
-          sudo unsquashfs -d "$root" -no-progress "$runtime/squashfs" > "$RUNNER_TEMP/sfs-extract.log"
+          sudo unsquashfs -d "$root" -no-progress "$runtime/squashfs" 2>&1 | tee "$RUNNER_TEMP/sfs-extract.log"
           {
             echo "D630 Openbox SFS payload audit"
             echo "Artifact: $RUNTIME_ARTIFACT (run $RUNTIME_RUN_ID)"
@@ -128,7 +128,7 @@ jobs:
             usr/bin/binutils-config usr/bin/gcc-config
           )
           failed=0
-          for path in ${forbidden[@]}; do
+          for path in "${forbidden[@]}"; do
             if [[ -e "$root/$path" || -L "$root/$path" ]]; then
               echo "FAIL: /$path exists" | tee -a "$report"
               failed=1
@@ -151,7 +151,7 @@ jobs:
             usr/bin/nmcli usr/sbin/iw usr/sbin/wpa_supplicant
             usr/bin/alsamixer usr/bin/aplay usr/bin/arecord
           )
-          for path in ${required[@]}; do
+          for path in "${required[@]}"; do
             if [[ -x "$root/$path" ]]; then
               echo "PASS: /$path" >> "$report"
             else
