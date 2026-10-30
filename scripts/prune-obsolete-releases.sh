@@ -12,7 +12,6 @@ case "${1:-}" in
 esac
 [[ $# -le 1 ]] || { echo "Too many arguments." >&2; exit 2; }
 
-command -v gh >/dev/null || { echo "GitHub CLI (gh) is required." >&2; exit 1; }
 command -v grep >/dev/null || { echo "grep is required." >&2; exit 1; }
 
 KEEP_TAGS=(
@@ -83,6 +82,7 @@ if [[ "$MODE" == "dry-run" ]]; then
   exit 0
 fi
 
+command -v gh >/dev/null || { echo "GitHub CLI (gh) is required for --apply." >&2; exit 1; }
 gh auth status --hostname github.com >/dev/null
 for tag in "${KEEP_TAGS[@]}"; do
   gh release view "$tag" --repo "$REPO" >/dev/null
