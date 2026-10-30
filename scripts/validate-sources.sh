@@ -154,7 +154,7 @@ grep -Fxq 'CONFIG_BLK_DEV_LOOP=y' kernels/profiles/40-d630-builtin.config
 grep -q 'd630.persistence=auto' d630-gentoo/iso/boot/grub/loopback.cfg
 grep -q 'd630.persistence=volatile' d630-gentoo/iso/boot/grub/loopback.cfg
 sh -n d630-gentoo/initramfs/init
-sh -n d630-gentoo/boot/iso/create-persistence-image.sh
+sh -n d630-gentoo/iso/scripts/create-persistence-image.sh
 sh -n d630-tiny/init
 sh -n d630-tiny/wifi-connect
 sh -n d630-tiny/lf-preview
