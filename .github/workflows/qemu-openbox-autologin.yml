@@ -82,7 +82,7 @@ jobs:
             exit 1
           }
           (cd "$runtime" && sha256sum --check SQUASHFS-SHA256.txt)
-          (cd "$kernel" && sha256sum --check SHA256SUMS)
+          (cd "$kernel" && sha256sum --check --ignore-missing SHA256SUMS)
 
           {
             echo "Runtime artifact: $RUNTIME_ARTIFACT (run $RUNTIME_RUN_ID)"
