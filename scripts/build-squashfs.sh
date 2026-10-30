@@ -103,16 +103,7 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
         case "$path" in
           /usr/lib/gcc/*/*/libgcc_s.so.[0-9]*|\
           /usr/lib/gcc/*/*/libstdc++.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libgomp.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libatomic.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libgfortran.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libquadmath.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libasan.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libhwasan.so.[0-9]*|\
-          /usr/lib/gcc/*/*/liblsan.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libtsan.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libubsan.so.[0-9]*|\
-          /usr/lib/gcc/*/*/libitm.so.[0-9]*) continue
+          /usr/lib/gcc/*/*/libatomic.so.[0-9]*) continue
           ;;
         esac
       fi
@@ -135,14 +126,14 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
   for atom in \
     sys-apps/portage sys-apps/man-db app-portage/gemato app-portage/getuto app-portage/portage-utils \
     app-admin/eselect app-admin/perl-cleaner sys-apps/locale-gen \
-    dev-lang/python dev-lang/python-exec dev-lang/python-exec-conf dev-lang/perl \
+    dev-lang/perl \
     dev-build/make \
     sys-devel/binutils sys-devel/binutils-config sys-devel/gcc-config \
     sys-devel/gettext sys-devel/gnuconfig sys-devel/patch \
     dev-libs/gobject-introspection-common; do
     remove_package_payload "$atom"
   done
-  for family in dev-python dev-perl dev-util perl-core app-eselect; do
+  for family in dev-perl dev-util perl-core app-eselect; do
     for package_dir in "$package_db/$family"/*; do
       [[ -f "$package_dir/CONTENTS" ]] || continue
       remove_package_contents "$package_dir"
@@ -150,22 +141,19 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
   done
   remove_package_payload sys-devel/gcc true
 
-  find "$stage/usr" -type l -lname '*python-exec*' -delete
   rm -rf "$stage/etc/portage" "$stage/usr/lib/portage" "$stage/usr/lib64/portage" \
-    "$stage/usr/share/portage" "$stage/usr/lib/python-exec" "$stage/usr/lib/python"* \
-    "$stage/usr/lib64/python"* "$stage/usr/lib/perl5" "$stage/usr/lib64/perl5" \
+    "$stage/usr/share/portage" \
+    "$stage/usr/lib/perl5" "$stage/usr/lib64/perl5" \
     "$stage/usr/share/perl5" "$stage/usr/lib64/gobject-introspection" \
     "$stage/usr/share/gobject-introspection-1.0" "$stage/var/lib/portage" \
     "$stage/var/db/pkg" "$stage/var/db/repos" "$stage/var/log/portage"
-  rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,python*,perl*}
+  rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,perl*}
   find "$stage/usr/lib/gcc" -mindepth 3 -maxdepth 3 -type d -name 32 -prune -exec rm -rf {} + 2>/dev/null || true
   rm -rf "$stage/usr/libexec/gcc" "$stage/usr/x86_64-pc-linux-gnu" \
     "$stage/usr/share/gcc-data" "$stage/usr/share/binutils-data"
   find "$stage/usr/lib/gcc" \( -type f -o -type l \) -print0 | while IFS= read -r -d '' path; do
     case "${path##*/}" in
-      libgcc_s.so.[0-9]*|libstdc++.so.[0-9]*|libgomp.so.[0-9]*|libatomic.so.[0-9]*|\
-      libgfortran.so.[0-9]*|libquadmath.so.[0-9]*|libasan.so.[0-9]*|libhwasan.so.[0-9]*|\
-      liblsan.so.[0-9]*|libtsan.so.[0-9]*|libubsan.so.[0-9]*|libitm.so.[0-9]*) ;;
+      libgcc_s.so.[0-9]*|libstdc++.so.[0-9]*|libatomic.so.[0-9]*) ;;
       *) rm -f -- "$path" ;;
     esac
   done
@@ -176,13 +164,18 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
     ln -s ../usr/lib/netifrc "$stage/lib/netifrc"
   fi
 
+  chroot "$stage" /usr/bin/python3 -c 'import bz2, json, lzma, sqlite3, ssl, sys; print(sys.version)' || {
+    echo "Minimal runtime Python 3 interpreter or standard-library modules are broken." >&2
+    exit 1
+  }
+  rm -f "$stage/usr/share/hwdata/oui.txt"
+
   for path in \
     "$stage/etc/portage" "$stage/var/db/pkg" "$stage/var/lib/portage" \
-    "$stage/usr/lib/portage" "$stage/usr/lib64/portage" "$stage/usr/share/portage" \
-    "$stage/usr/lib/python-exec" "$stage/usr/lib64/perl5" \
+    "$stage/usr/share/portage" \
+    "$stage/usr/lib64/perl5" \
     "$stage/usr/lib64/gobject-introspection" "$stage/usr/share/gobject-introspection-1.0" \
-    "$stage/usr/lib/python"* "$stage/usr/lib64/python"* \
-    "$stage/usr/bin"/{emerge,emerge-webrsync,ebuild,emaint,portageq,gemato,getuto,quickpkg,qatom,qcheck,qdepends,qfile,qgrep,qkeyword,qlist,qlop,qmanifest,qmerge,qpkg,qsearch,qsize,qtegrity,quse,qwhich,qxpak,gcc,g++,gcc-*,g++-*,gcc-ar,gcc-nm,gcc-ranlib,gcov,gcov-*,gcov-dump,gcov-tool,lto-dump,cc,c++,cpp,ld,ld.bfd,as,ar,nm,objcopy,objdump,ranlib,strip,addr2line,c++filt,elfedit,gprof,readelf,size,strings,gcc-config,binutils-config,make,g-ir-*,eu-*,sqlite3,python*,perl*}; do
+    "$stage/usr/bin"/{emerge,emerge-webrsync,ebuild,emaint,portageq,gemato,getuto,quickpkg,qatom,qcheck,qdepends,qfile,qgrep,qkeyword,qlist,qlop,qmanifest,qmerge,qpkg,qsearch,qsize,qtegrity,quse,qwhich,qxpak,gcc,g++,gcc-*,g++-*,gcc-ar,gcc-nm,gcc-ranlib,gcov,gcov-*,gcov-dump,gcov-tool,lto-dump,cc,c++,cpp,ld,ld.bfd,as,ar,nm,objcopy,objdump,ranlib,strip,addr2line,c++filt,elfedit,gprof,readelf,size,strings,gcc-config,binutils-config,make,g-ir-*,eu-*,sqlite3,perl*}; do
     [[ ! -e "$path" && ! -L "$path" ]] || {
       echo "Minimal runtime still contains forbidden build/package-manager payload: ${path#"$stage"}" >&2
       exit 1
@@ -259,7 +252,7 @@ tmp_output=""
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
   tmp_filelist="$(mktemp "${TMPDIR:-/var/tmp}/d630-squashfs-list.XXXXXXXX")"
   unsquashfs -ll "$output" > "$tmp_filelist"
-  for path in usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg \
+  for path in usr/bin/python3 usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg \
     usr/bin/zsh usr/bin/nano usr/bin/tmux usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do
     grep -Eq "squashfs-root/${path}([[:space:]]|$)" "$tmp_filelist" || {
       echo "Required runtime application is absent from the final SquashFS: /${path}" >&2
@@ -288,8 +281,9 @@ else
 fi
 echo "Removed from the image staging copy: documentation/info trees, Portage build/download caches, ebuild repository checkout, headers and common development metadata."
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
-  echo "Removed Portage, Python/Perl, development tools, GCC/binutils compilers, and package metadata."
-  echo "Retained versioned GCC runtime shared libraries; no LLVM/Clang package records were present."
+  echo "Removed Portage, Perl, development tools, GCC/binutils compilers, and package metadata; retained Python 3."
+  echo "Retained only GCC libgcc_s/libstdc++/libatomic runtime libraries; removed Fortran and sanitizer runtimes."
+  echo "Removed hwdata/oui.txt; retained Mesa Crocus and its required Gallium runtime."
 else
   echo "Preserved package metadata and the compiler toolchain."
 fi
