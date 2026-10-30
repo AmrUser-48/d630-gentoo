@@ -2,12 +2,7 @@ name: Build D630 Tiny standalone initramfs
 run-name: "D630 Tiny standalone initramfs / #${{ github.run_number }}"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "d630-tiny/**"
-      - "d630-tiny/boot/**"
-      - ".github/workflows/build-d630-tiny-initramfs.yml"
+
   workflow_dispatch:
 
 permissions:

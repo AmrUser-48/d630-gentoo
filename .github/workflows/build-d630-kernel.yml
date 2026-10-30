@@ -2,11 +2,7 @@ name: Build D630 Gentoo SFS built-in kernel and initramfs
 run-name: "D630 Gentoo SFS built-in kernel ${{ inputs.kernel_version || '6.18.56' }} • build ${{ github.run_number }}"
 
 on:
-  push:
-    paths:
-      - "kernels/profiles/40-d630-builtin.config"
-      - "d630-gentoo/initramfs/**"
-      - "scripts/validate-kernel-config.sh"
+
   workflow_dispatch:
     inputs:
       kernel_version:
