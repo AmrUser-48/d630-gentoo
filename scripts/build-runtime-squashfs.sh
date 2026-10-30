@@ -552,7 +552,7 @@ chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERG
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   filtered_packages="$OUT/INSTALLED-PACKAGES.txt.tmp"
-  grep -Ev '^(app-admin/(eselect|perl-cleaner)-|app-eselect/|app-portage/|dev-(build|lang|python|util)/|dev-libs/gobject-introspection-common-|sys-apps/(locale-gen|portage)-|sys-devel/(binutils|binutils-config|gcc|gcc-config|gettext|gnuconfig|patch)-)' \
+  grep -Ev '^(app-admin/(eselect|perl-cleaner)-|app-eselect/|app-portage/|dev-build/|dev-lang/perl-|dev-perl/|dev-util/|perl-core/|dev-libs/gobject-introspection-common-|sys-apps/(locale-gen|portage)-|sys-devel/(binutils|binutils-config|gcc|gcc-config|gettext|gnuconfig|patch)-)' \
     "$OUT/INSTALLED-PACKAGES.txt" > "$filtered_packages"
   mv -f "$filtered_packages" "$OUT/INSTALLED-PACKAGES.txt"
 fi
@@ -570,7 +570,7 @@ Source fallback: $SOURCE_FALLBACK
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
-$(if [[ "$RUNTIME_PROFILE" == openbox ]]; then echo "Minimal runtime: no Portage, package database, Python/Perl, development tools, or compiler binaries; versioned GCC runtime libraries retained."; fi)
+$(if [[ "$RUNTIME_PROFILE" == openbox ]]; then echo "Minimal runtime: Python 3 and its installed runtime modules retained; no Portage, package database, Perl, development tools, or compiler binaries. Only libgcc_s/libstdc++/libatomic GCC runtime libraries retained."; fi)
 $(cat "$OUT/KERNEL-MODULES.txt")
 EOF
 cat > "$OUT/RELEASE-NOTES.md" <<EOF

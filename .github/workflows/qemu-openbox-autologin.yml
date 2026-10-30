@@ -2,10 +2,6 @@ name: D630 Openbox QEMU autologin test
 run-name: "D630 Openbox QEMU autologin test • runtime run ${{ inputs.runtime_run_id || '40983813255' }}"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/qemu-openbox-autologin.yml"
   workflow_dispatch:
     inputs:
       runtime_run_id:
@@ -121,7 +117,7 @@ jobs:
             etc/portage var/db/pkg var/db/repos var/lib/portage var/log/portage
             usr/lib/portage usr/lib64/portage usr/share/portage usr/include
             usr/share/man usr/share/info usr/share/doc usr/share/gtk-doc
-            usr/share/help usr/share/i18n usr/lib/python-exec
+            usr/share/help usr/share/i18n usr/share/hwdata/oui.txt
             usr/lib64/perl5 usr/lib/perl5 usr/share/perl5
             usr/bin/emerge usr/bin/emerge-webrsync usr/bin/ebuild usr/bin/emaint
             usr/bin/portageq usr/bin/gcc usr/bin/g++ usr/bin/make
@@ -136,21 +132,29 @@ jobs:
               echo "PASS: /$path absent" >> "$report"
             fi
           done
-          for pattern in "$root"/usr/lib/python* "$root"/usr/lib64/python*; do
-            if [[ -e "$pattern" ]]; then
-              echo "FAIL: ${pattern#"$root"} exists" | tee -a "$report"
-              failed=1
-            fi
-          done
           echo >> "$report"
           echo "Required interactive/runtime commands:" >> "$report"
           required=(
-            usr/bin/bash usr/bin/zsh usr/bin/lf usr/bin/mc usr/bin/nvim
+            usr/bin/bash usr/bin/python3 usr/bin/zsh usr/bin/lf usr/bin/mc usr/bin/nvim
             usr/bin/fd usr/bin/rg usr/bin/tmux usr/bin/btop usr/bin/htop
             usr/bin/startx usr/bin/xterm usr/bin/openbox-session usr/bin/sudo
             usr/bin/nmcli usr/sbin/iw usr/sbin/wpa_supplicant
             usr/bin/alsamixer usr/bin/aplay usr/bin/arecord
           )
+          if sudo chroot "$root" /usr/bin/python3 -c 'import bz2, json, lzma, sqlite3, ssl, sys; print(sys.version)' 2>&1 | tee -a "$report"; then
+            echo "PASS: Python 3 runtime and standard-library imports execute" | tee -a "$report"
+          else
+            echo "FAIL: Python 3 runtime or standard-library imports failed" | tee -a "$report"
+            failed=1
+          fi
+          crocus_driver="$(sudo find "$root/usr/lib" "$root/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null || true)"
+          gallium_lib="$(sudo find "$root/usr/lib" "$root/usr/lib64" -maxdepth 1 -name 'libgallium-*.so' -print -quit 2>/dev/null || true)"
+          if [[ -n "$crocus_driver" && -n "$gallium_lib" ]]; then
+            echo "PASS: Crocus DRI driver and libgallium retained for GM965" | tee -a "$report"
+          else
+            echo "FAIL: Mesa Crocus/libgallium runtime is incomplete" | tee -a "$report"
+            failed=1
+          fi
           for path in "${required[@]}"; do
             if [[ -x "$root/$path" ]]; then
               echo "PASS: /$path" >> "$report"
