@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 REPO="AmrUser-48/d630-gentoo"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 MODE="dry-run"
 case "${1:-}" in
   ""|--dry-run) ;;
@@ -94,6 +96,7 @@ read -r -p 'Type DELETE 30 RELEASES to continue: ' answer
 [[ "$answer" == "DELETE 30 RELEASES" ]] || { echo "Cancelled."; exit 1; }
 
 for tag in "${DELETE_TAGS[@]}"; do
+  gh release view "$tag" --repo "$REPO" >/dev/null 2>&1 || { echo "Already absent; skipping $tag"; continue; }
   echo "Deleting $tag"
   gh release delete "$tag" --repo "$REPO" --cleanup-tag --yes
 done
