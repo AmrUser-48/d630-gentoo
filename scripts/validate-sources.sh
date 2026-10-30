@@ -2,7 +2,7 @@
 set -eu
 
 test -s README.md
-test -s config/package.list
+test -s d630-gentoo/config/package.list
 test -s config/make.conf
 test -s kernels/README.md
 test -s d630-gentoo/initramfs/init
@@ -41,7 +41,7 @@ grep -Fq 'x11-base/xorg-drivers VIDEO_CARDS: -* intel' config/portage/package.us
 grep -Fq 'x11-base/xorg-drivers INPUT_DEVICES: -* evdev joystick libinput synaptics' config/portage/package.use/10-d630-hardware
 test -s d630-gentoo/config/xorg/99-synaptics.conf
 grep -Fq 'x11-base/xorg-server -minimal' config/portage/package.use/10-d630-hardware
-grep -Fxq 'x11-base/xorg-drivers' config/package.list
+grep -Fxq 'x11-base/xorg-drivers' d630-gentoo/config/package.list
 
 test -s d630-gentoo/config/package-sets/runner-tools.list
 test -s d630-gentoo/config/package-sets/cli.list
@@ -136,8 +136,8 @@ grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
 grep -q 'CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'CPU_FLAGS_X86:.*(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'cpu_flags_x86_(sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
-grep -q 'x11-base/xorg-server' config/package.list
-grep -q 'x11-wm/openbox' config/package.list
+grep -q 'x11-base/xorg-server' d630-gentoo/config/package.list
+grep -q 'x11-wm/openbox' d630-gentoo/config/package.list
 grep -qi 'squashfs' kernels/README.md
 grep -q 'CONFIG_OVERLAY_FS=y' kernels/README.md
 grep -q 'CONFIG_BLK_DEV_LOOP=y' kernels/README.md
