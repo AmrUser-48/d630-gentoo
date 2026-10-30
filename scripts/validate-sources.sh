@@ -177,11 +177,15 @@ grep -Fq "MINIMAL_RUNTIME=true bash" scripts/build-runtime-squashfs.sh
 grep -Fq -- "--exclude='/var/cache/***'" scripts/build-squashfs.sh
 grep -Fq 'Removing Portage, language runtimes, development tools, and compiler binaries.' scripts/build-squashfs.sh
 grep -Fq 'remove_package_payload sys-devel/gcc true' scripts/build-squashfs.sh
+grep -Fq 'import bz2, json, lzma, sqlite3, ssl, sys' scripts/build-squashfs.sh
+grep -Fq 'libgcc_s.so.[0-9]*|libstdc++.so.[0-9]*|libatomic.so.[0-9]*)' scripts/build-squashfs.sh
+grep -Fq 'rm -f "$stage/usr/share/hwdata/oui.txt"' scripts/build-squashfs.sh
+grep -Fq 'dev-lang/python' config/package-sets/gui-initram.list
 grep -Fq '"$stage/var/db/pkg"' scripts/build-squashfs.sh
-grep -Fq 'rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,python*,perl*}' scripts/build-squashfs.sh
+grep -Fq 'rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,perl*}' scripts/build-squashfs.sh
 grep -Fq 'ln -s ../usr/lib/netifrc "$stage/lib/netifrc"' scripts/build-squashfs.sh
 grep -Fq 'LLVM/Clang package records are present in the input root' scripts/build-squashfs.sh
-grep -Fq 'dev-(build|lang|python|util)' scripts/build-runtime-squashfs.sh
+grep -Fq 'dev-build/|dev-lang/perl-|dev-perl/|dev-util/|perl-core/' scripts/build-runtime-squashfs.sh
 grep -Fq 'LOCAL_BINPKG_ARCHIVE' scripts/build-runtime-squashfs.sh
 grep -Fq 'OUTPUT_DIR' scripts/build-runtime-squashfs.sh
 grep -Fq -- "--getbinpkg --usepkgonly" scripts/build-runtime-squashfs.sh
