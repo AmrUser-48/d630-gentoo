@@ -2,7 +2,7 @@
 
 Snapshot: **2026-10-31 UTC**. Source: GitHub Releases API. Asset download totals are sums of per-asset GitHub counters, not unique users.
 
-The repository has **39 releases** in this snapshot: 9 selected for retention and 30 cleanup candidates.
+The repository has **39 releases** in this snapshot: 10 selected for retention and 29 cleanup candidates.
 
 ## Retention set
 
@@ -10,13 +10,13 @@ The repository has **39 releases** in this snapshot: 9 selected for retention an
 - Gentoo Openbox SquashFS: `d630-gentoo-openbox-2026.10.29`.
 - Kernel bundles: newest `41134237939`, plus the three bundles pinned by current workflows: `40922514538`, `40813428910` and `39509781896`.
 - Gentoo binary packages: `binpkgs-39507549274`, containing the Mesa-related package set used by current build workflows.
-- Encrypted saved runner states: newest two, `runner-state-20261030T214009Z` and `runner-state-20261030T010021Z`.
+- Encrypted runner states: newest two, `runner-state-20261030T214009Z` and `runner-state-20261030T010021Z`, plus `runner-state-20261015T153832Z`, which is the explicit default input of `.github/workflows/build-d630-state-boot-bundle.yml`.
 
-Older kernel builds remain retained while workflows pin their exact release tags; their configs and checksums are not interchangeable with the newest bundle.
+Older kernel builds and saved stages remain retained when active workflows pin their exact tags; their configs and checksums are not interchangeable with newer artifacts.
 
 ## Cleanup policy
 
-The 30 entries marked **CLEANUP CANDIDATE** are older duplicate Tiny builds, unpinned kernel bundles, older encrypted runner snapshots, an old binary-package snapshot and the obsolete rescue SFS.
+The 29 entries marked **CLEANUP CANDIDATE** are older duplicate Tiny builds, unpinned kernel bundles, older encrypted runner snapshots, an old binary-package snapshot and the obsolete rescue SFS.
 
 Review the dry run:
 
@@ -26,7 +26,7 @@ Actual deletion requires an authenticated GitHub CLI session and an explicit typ
 
     ./scripts/prune-obsolete-releases.sh --apply
 
-The script searches active source and workflow references before deleting. It preserves the nine releases listed above, deletes candidate release assets and associated Git tags, and then regenerates this index. It does not delete Actions run artifacts or historical repository-root `output/` files.
+The script searches active source and workflow references before deleting. It preserves the ten releases listed above, deletes candidate release assets and associated Git tags, and then regenerates this index. It does not delete Actions run artifacts or historical repository-root `output/` files.
 
 **No release deletion has been run as part of this update.** The connected GitHub repository interface used for source changes does not expose a release-delete operation; the script is ready for an authenticated maintainer to run.
 
@@ -70,6 +70,6 @@ The script searches active source and workflow references before deleting. It pr
 | Pre-release | Kernel bundle | [D630 Gentoo kernel bundle 6.18.56 — build 16](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-kernel-6.18.56-build-16)<br><code>d630-kernel-6.18.56-build-16</code> | 2026-10-15 | 10 | 12.1 | 8 | CLEANUP CANDIDATE |
 | Release | Gentoo SquashFS | [D630 Minimal Rescue SFS](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-rescue-20261015-1734)<br><code>d630-rescue-20261015-1734</code> | 2026-10-15 | 2 | 113.8 | 5 | CLEANUP CANDIDATE |
 | Pre-release | Kernel bundle | [D630 Gentoo kernel bundle 6.18.56 — build 15](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-kernel-6.18.56-build-15)<br><code>d630-kernel-6.18.56-build-15</code> | 2026-10-15 | 10 | 12.1 | 10 | CLEANUP CANDIDATE |
-| Pre-release | Encrypted runner state | [Gentoo runner state (encrypted) — runner-state-20261015T153832Z](https://github.com/AmrUser-48/d630-gentoo/releases/tag/runner-state-20261015T153832Z)<br><code>runner-state-20261015T153832Z</code> | 2026-10-15 | 5 | 4020.2 | 50 | CLEANUP CANDIDATE |
+| Pre-release | Encrypted runner state | [Gentoo runner state (encrypted) — runner-state-20261015T153832Z](https://github.com/AmrUser-48/d630-gentoo/releases/tag/runner-state-20261015T153832Z)<br><code>runner-state-20261015T153832Z</code> | 2026-10-15 | 5 | 4020.2 | 50 | KEEP |
 | Pre-release | Kernel bundle | [D630 Gentoo kernel bundle 6.18.56 — build 14](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-kernel-6.18.56-build-14)<br><code>d630-kernel-6.18.56-build-14</code> | 2026-10-15 | 10 | 12.1 | 8 | CLEANUP CANDIDATE |
 | Pre-release | Encrypted runner state | [Gentoo runner state (encrypted) — runner-state-20261015T100327Z](https://github.com/AmrUser-48/d630-gentoo/releases/tag/runner-state-20261015T100327Z)<br><code>runner-state-20261015T100327Z</code> | 2026-10-15 | 5 | 3937.3 | 20 | CLEANUP CANDIDATE |
