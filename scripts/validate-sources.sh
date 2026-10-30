@@ -1,6 +1,5 @@
 #!/bin/sh
-PS4='+${LINENO}: '
-set -eux
+set -eu
 
 test -s README.md
 test -s d630-tiny/README.md
@@ -13,7 +12,6 @@ test -s d630-gentoo/config/initramfs-package.list
 ! test -e initramfs
 ! test -e config/kernel
 
-test -s README.md
 test -s d630-gentoo/config/package.list
 test -s config/make.conf
 test -s kernels/README.md
@@ -63,7 +61,7 @@ grep -Fxq 'media-libs/alsa-lib' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fxq 'media-libs/alsa-ucm-conf' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fxq 'media-sound/alsa-utils' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'CONFIG_SND_HDA_INTEL=y' kernels/profiles/40-d630-builtin.config
-grep -Fq 'CONFIG_SND_HDA_INTEL=y' kernels/profiles/40-d630-builtin.config
+grep -Fq 'CONFIG_SND_HDA_CODEC_SIGMATEL=y' kernels/profiles/40-d630-builtin.config
 test -s config/portage/package.use/50-tiny-console
 test -s d630-gentoo/config/package-sets/development.list
 test -s d630-gentoo/config/package-sets/desktop.list
@@ -151,8 +149,8 @@ grep -q 'CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-c
 grep -q 'x11-base/xorg-server' d630-gentoo/config/package.list
 grep -q 'x11-wm/openbox' d630-gentoo/config/package.list
 grep -qi 'squashfs' kernels/README.md
-grep -q 'CONFIG_OVERLAY_FS=y' kernels/README.md
-grep -q 'CONFIG_BLK_DEV_LOOP=y' kernels/README.md
+grep -Fxq 'CONFIG_OVERLAY_FS=y' kernels/profiles/40-d630-builtin.config
+grep -Fxq 'CONFIG_BLK_DEV_LOOP=y' kernels/profiles/40-d630-builtin.config
 grep -q 'd630.persistence=auto' d630-gentoo/boot/iso/loopback.cfg
 grep -q 'd630.persistence=volatile' d630-gentoo/boot/iso/loopback.cfg
 sh -n d630-gentoo/initramfs/init
