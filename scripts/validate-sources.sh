@@ -2,6 +2,17 @@
 set -eu
 
 test -s README.md
+test -s d630-tiny/README.md
+test -s d630-gentoo/README.md
+test -s kernels/README.md
+test -s d630-gentoo/config/package.list
+test -s d630-gentoo/config/initramfs-package.list
+! test -e tinyos
+! test -e grub2
+! test -e initramfs
+! test -e config/kernel
+
+test -s README.md
 test -s d630-gentoo/config/package.list
 test -s config/make.conf
 test -s kernels/README.md
@@ -222,4 +233,4 @@ bash scripts/validate-kernel-profiles.sh
 
 test -s scripts/validate-kernel-config.sh
 bash scripts/validate-kernel-config.sh
-echo "d630-gentoo source scaffold: validation passed"
+echo "D630 Tiny + Gentoo OS sources and all three kernel profiles: validation passed"
