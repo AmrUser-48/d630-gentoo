@@ -154,9 +154,17 @@ grep -Fxq 'CONFIG_BLK_DEV_LOOP=y' kernels/profiles/40-d630-builtin.config
 grep -q 'd630.persistence=auto' d630-gentoo/boot/iso/loopback.cfg
 grep -q 'd630.persistence=volatile' d630-gentoo/boot/iso/loopback.cfg
 sh -n d630-gentoo/initramfs/init
-sh -n d630-gentoo/scripts/create-persistence-image.sh
-sh -n d630-tiny/init d630-tiny/wifi-connect
-bash -n d630-tiny/export-wifi-profile.sh d630-tiny/build-setup-tools.sh d630-tiny/build-initramfs.sh
+sh -n d630-gentoo/boot/iso/create-persistence-image.sh
+sh -n d630-tiny/init
+sh -n d630-tiny/wifi-connect
+sh -n d630-tiny/lf-preview
+sh -n d630-tiny/udhcpc-default.script
+bash -n d630-tiny/export-wifi-profile.sh
+bash -n d630-tiny/build-setup-tools.sh
+bash -n d630-tiny/build-initramfs.sh
+bash -n d630-tiny/build-network-tools.sh
+bash -n d630-tiny/rebuild-initramfs.sh
+bash -n d630-tiny/gentoo-chroot
 bash -n scripts/gentoo-build-set
 bash -n scripts/package-binpkgs-release.sh
 bash -n scripts/install-binpkgs-release.sh
