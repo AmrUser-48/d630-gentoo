@@ -1,0 +1,56 @@
+name: Prune obsolete GitHub releases
+run-name: "Prune obsolete releases • \${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type the exact confirmation phrase shown in docs/releases.md (currently DELETE 29 RELEASES)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    name: Verify and remove approved release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate confirmation input
+        shell: bash
+        env:
+          RELEASE_CONFIRMATION: \${{ inputs.confirmation }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RELEASE_CONFIRMATION" =~ ^DELETE\ [0-9]+\ RELEASES$ ]] || {
+            echo "::error::Confirmation must match 'DELETE N RELEASES'."
+            exit 2
+          }
+
+      - name: Run guarded release cleanup
+        shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
+          RELEASE_CONFIRMATION: \${{ inputs.confirmation }}
+        run: |
+          set -Eeuo pipefail
+          printf '%s\n' "$RELEASE_CONFIRMATION" | bash scripts/prune-obsolete-releases.sh --apply
+
+      - name: Commit regenerated release index
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git diff --quiet -- docs/releases.md; then
+            echo "Release index is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/releases.md
+          git commit -m "docs: refresh GitHub release index after cleanup"
+          git push
