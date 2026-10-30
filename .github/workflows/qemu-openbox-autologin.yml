@@ -47,7 +47,7 @@ jobs:
           set -Eeuo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            qemu-system-x86 qemu-utils expect e2fsprogs util-linux
+            qemu-system-x86 qemu-utils expect e2fsprogs util-linux squashfs-tools
           sudo apt-get clean
           df -h / | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -91,6 +91,98 @@ jobs:
             echo "Kernel bytes: $(stat -c %s "$kernel/kernel")"
             echo "Initramfs bytes: $(stat -c %s "$kernel/initramfs")"
           } | tee "$RUNNER_TEMP/boot-inputs.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Audit exact SquashFS payload and size contributors
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          runtime="$RUNNER_TEMP/runtime"
+          root="$RUNNER_TEMP/sfs-root"
+          report="$GITHUB_WORKSPACE/SFS-AUDIT.txt"
+          mkdir -p "$root"
+          unsquashfs -s "$runtime/squashfs" > "$RUNNER_TEMP/sfs-superblock.txt"
+          unsquashfs -d "$root" -no-progress "$runtime/squashfs" > "$RUNNER_TEMP/sfs-extract.log"
+          {
+            echo "D630 Openbox SFS payload audit"
+            echo "Artifact: $RUNTIME_ARTIFACT (run $RUNTIME_RUN_ID)"
+            echo "Kernel bundle: $KERNEL_BUNDLE_TAG"
+            echo "SHA-256: $(sha256sum "$runtime/squashfs" | awk '{print $1}')"
+            echo "Compressed bytes: $(stat -c %s "$runtime/squashfs")"
+            echo "Extracted apparent size: $(du -sh --apparent-size "$root" | awk '{print $1}')"
+            echo "Extracted allocated size: $(du -sh "$root" | awk '{print $1}')"
+            echo "Regular files: $(find "$root" -xdev -type f | wc -l)"
+            echo "All filesystem objects: $(find "$root" -xdev | wc -l)"
+            echo
+            cat "$RUNNER_TEMP/sfs-superblock.txt"
+            echo
+            echo "Forbidden build/package-manager payload:"
+          } > "$report"
+          forbidden=(
+            etc/portage var/db/pkg var/db/repos var/lib/portage var/log/portage
+            usr/lib/portage usr/lib64/portage usr/share/portage usr/include
+            usr/share/man usr/share/info usr/share/doc usr/share/gtk-doc
+            usr/share/help usr/share/i18n usr/lib/python-exec
+            usr/lib64/perl5 usr/lib/perl5 usr/share/perl5
+            usr/bin/emerge usr/bin/emerge-webrsync usr/bin/ebuild usr/bin/emaint
+            usr/bin/portageq usr/bin/gcc usr/bin/g++ usr/bin/make
+            usr/bin/binutils-config usr/bin/gcc-config
+          )
+          failed=0
+          for path in ${forbidden[@]}; do
+            if [[ -e "$root/$path" || -L "$root/$path" ]]; then
+              echo "FAIL: /$path exists" | tee -a "$report"
+              failed=1
+            else
+              echo "PASS: /$path absent" >> "$report"
+            fi
+          done
+          for pattern in "$root"/usr/lib/python* "$root"/usr/lib64/python*; do
+            if [[ -e "$pattern" ]]; then
+              echo "FAIL: ${pattern#"$root"} exists" | tee -a "$report"
+              failed=1
+            fi
+          done
+          echo >> "$report"
+          echo "Required interactive/runtime commands:" >> "$report"
+          required=(
+            usr/bin/bash usr/bin/zsh usr/bin/lf usr/bin/mc usr/bin/nvim
+            usr/bin/fd usr/bin/rg usr/bin/tmux usr/bin/btop usr/bin/htop
+            usr/bin/startx usr/bin/xterm usr/bin/openbox-session usr/bin/sudo
+            usr/bin/nmcli usr/sbin/iw usr/sbin/wpa_supplicant
+            usr/bin/alsamixer usr/bin/aplay usr/bin/arecord
+          )
+          for path in ${required[@]}; do
+            if [[ -x "$root/$path" ]]; then
+              echo "PASS: /$path" >> "$report"
+            else
+              echo "MISSING: /$path" | tee -a "$report"
+              failed=1
+            fi
+          done
+          {
+            echo "Top extracted directory sizes (allocated):"
+            du -x -B1 --max-depth=2 "$root" | sort -nr | head -n 60
+          } > "$GITHUB_WORKSPACE/SFS-TOP-DIRECTORIES.txt"
+          {
+            echo "Largest individual regular files (logical bytes):"
+            find "$root" -xdev -type f -printf '%s\t%p\n' | sort -nr | head -n 80
+          } > "$GITHUB_WORKSPACE/SFS-LARGEST-FILES.txt"
+          {
+            echo "Requested top-level package atoms (PACKAGES.txt):"
+            cat "$runtime/PACKAGES.txt"
+            echo
+            echo "Builder-recorded package inventory (captured before final payload pruning):"
+            cat "$runtime/INSTALLED-PACKAGES.txt"
+          } > "$GITHUB_WORKSPACE/SFS-PACKAGE-MANIFESTS.txt"
+          {
+            cat "$report"
+            echo
+            cat "$GITHUB_WORKSPACE/SFS-TOP-DIRECTORIES.txt"
+            echo
+            cat "$GITHUB_WORKSPACE/SFS-LARGEST-FILES.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$report"
+          [[ "$failed" -eq 0 ]] || exit 1
 
       - name: Prepare an ext4 disk containing the exact SquashFS
         shell: bash
@@ -198,6 +290,10 @@ jobs:
           path: |
             QEMU-BOOT-TEST.log
             QEMU-BOOT-TEST.txt
+            SFS-AUDIT.txt
+            SFS-TOP-DIRECTORIES.txt
+            SFS-LARGEST-FILES.txt
+            SFS-PACKAGE-MANIFESTS.txt
             ${{ runner.temp }}/boot-inputs.txt
           if-no-files-found: warn
           retention-days: 30
