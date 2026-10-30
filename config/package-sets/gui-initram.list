@@ -1,4 +1,6 @@
 # Minimal X11 desktop for the D630; all atoms must resolve to compatible binpkgs.
+# Keep Python 3 in the Openbox runtime.
+dev-lang/python
 media-libs/mesa
 # Direct ALSA fallback alongside PipeWire: library, device profiles, and CLI mixer/test tools.
 media-libs/alsa-lib
