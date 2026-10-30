@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   qemu:
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'QEMU autologin test') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
     name: Boot exact Openbox SFS and verify tty1 autologin
     runs-on: ubuntu-24.04
     timeout-minutes: 15
