@@ -8,6 +8,11 @@ on:
       - ".github/workflows/publish-updated-binpkgs-and-build-openbox.yml"
   workflow_dispatch:
     inputs:
+      build_openbox:
+        description: "Also build the Openbox SquashFS after publishing; disable for binpkgs-only publication"
+        required: true
+        type: boolean
+        default: false
       state_tag:
         description: "Optional runner-state-* release tag; blank selects the newest saved state"
         required: false
@@ -261,7 +266,7 @@ jobs:
           compression-level: 0
 
   build-openbox:
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_openbox) || (github.event_name == 'push' && contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS')) }}
     name: Build and verify Openbox SFS from refreshed packages
     needs: publish-binpkgs
     runs-on: ubuntu-24.04
