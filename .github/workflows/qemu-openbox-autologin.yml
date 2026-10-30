@@ -101,17 +101,17 @@ jobs:
           report="$GITHUB_WORKSPACE/SFS-AUDIT.txt"
           mkdir -p "$root"
           unsquashfs -s "$runtime/squashfs" > "$RUNNER_TEMP/sfs-superblock.txt"
-          unsquashfs -d "$root" -no-progress "$runtime/squashfs" > "$RUNNER_TEMP/sfs-extract.log"
+          sudo unsquashfs -d "$root" -no-progress "$runtime/squashfs" > "$RUNNER_TEMP/sfs-extract.log"
           {
             echo "D630 Openbox SFS payload audit"
             echo "Artifact: $RUNTIME_ARTIFACT (run $RUNTIME_RUN_ID)"
             echo "Kernel bundle: $KERNEL_BUNDLE_TAG"
             echo "SHA-256: $(sha256sum "$runtime/squashfs" | awk '{print $1}')"
             echo "Compressed bytes: $(stat -c %s "$runtime/squashfs")"
-            echo "Extracted apparent size: $(du -sh --apparent-size "$root" | awk '{print $1}')"
-            echo "Extracted allocated size: $(du -sh "$root" | awk '{print $1}')"
-            echo "Regular files: $(find "$root" -xdev -type f | wc -l)"
-            echo "All filesystem objects: $(find "$root" -xdev | wc -l)"
+            echo "Extracted apparent size: $(sudo du -sh --apparent-size "$root" | awk '{print $1}')"
+            echo "Extracted allocated size: $(sudo du -sh "$root" | awk '{print $1}')"
+            echo "Regular files: $(sudo find "$root" -xdev -type f | wc -l)"
+            echo "All filesystem objects: $(sudo find "$root" -xdev | wc -l)"
             echo
             cat "$RUNNER_TEMP/sfs-superblock.txt"
             echo
@@ -161,11 +161,11 @@ jobs:
           done
           {
             echo "Top extracted directory sizes (allocated):"
-            du -x -B1 --max-depth=2 "$root" | sort -nr | head -n 60
+            sudo du -x -B1 --max-depth=2 "$root" | sort -nr | head -n 60
           } > "$GITHUB_WORKSPACE/SFS-TOP-DIRECTORIES.txt"
           {
             echo "Largest individual regular files (logical bytes):"
-            find "$root" -xdev -type f -printf '%s\t%p\n' | sort -nr | head -n 80
+            sudo find "$root" -xdev -type f -printf '%s\t%p\n' | sort -nr | head -n 80
           } > "$GITHUB_WORKSPACE/SFS-LARGEST-FILES.txt"
           {
             echo "Requested top-level package atoms (PACKAGES.txt):"
