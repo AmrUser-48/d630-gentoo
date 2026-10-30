@@ -117,9 +117,6 @@ jobs:
         run: |
           set -Eeuo pipefail
           export QEMU_LOG="$GITHUB_WORKSPACE/QEMU-BOOT-TEST.log"
-          kernel="$RUNNER_TEMP/kernel"
-          disk="$RUNNER_TEMP/d630-qemu-root.raw"
-
           timeout --foreground --signal=TERM --kill-after=10s 210s expect <<'EXPECT'
           set timeout 150
           log_file -noappend $env(QEMU_LOG)
