@@ -161,11 +161,11 @@ jobs:
           done
           {
             echo "Top extracted directory sizes (allocated):"
-            sudo du -x -B1 --max-depth=2 "$root" | sort -nr | head -n 60
+            sudo du -x -B1 --max-depth=2 "$root" | sort -nr | sed -n '1,60p'
           } > "$GITHUB_WORKSPACE/SFS-TOP-DIRECTORIES.txt"
           {
             echo "Largest individual regular files (logical bytes):"
-            sudo find "$root" -xdev -type f -printf '%s\t%p\n' | sort -nr | head -n 80
+            sudo find "$root" -xdev -type f -printf '%s\t%p\n' | sort -nr | sed -n '1,80p'
           } > "$GITHUB_WORKSPACE/SFS-LARGEST-FILES.txt"
           {
             echo "Requested top-level package atoms (PACKAGES.txt):"
