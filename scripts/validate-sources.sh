@@ -259,7 +259,7 @@ test -s docs/archive/legacy-iso-design.md
 ! test -e d630-gentoo/docs/legacy-iso-design.md
 grep -Fq 'cp d630-tiny/docs/USER-GUIDE.md output/README-D630-Tiny.md' .github/workflows/build-d630-tiny-initramfs.yml
 
-expected_sections="$(printf '%s\\n' Overview Status Layout Requirements Use Build Releases Validation 'Related documentation')"
+expected_sections="$(printf '%s\n' Overview Status Layout Requirements Use Build Releases Validation 'Related documentation')"
 for readme in README.md d630-tiny/README.md d630-gentoo/README.md d630-gentoo/iso/README.md kernels/README.md docs/archive/README.md; do
     actual_sections="$(grep '^## ' "$readme" | sed 's/^## //')"
     if [ "$actual_sections" != "$expected_sections" ]; then
