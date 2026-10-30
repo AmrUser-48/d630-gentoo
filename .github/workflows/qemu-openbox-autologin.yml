@@ -1,0 +1,207 @@
+name: D630 Openbox QEMU autologin test
+run-name: "D630 Openbox QEMU autologin test • runtime run ${{ inputs.runtime_run_id || '40983813255' }}"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/qemu-openbox-autologin.yml"
+  workflow_dispatch:
+    inputs:
+      runtime_run_id:
+        description: Actions run ID containing the Openbox runtime artifact
+        required: true
+        type: string
+        default: "40983813255"
+      runtime_artifact:
+        description: Exact artifact name from the runtime build
+        required: true
+        type: string
+        default: "d630-openbox-runtime-run-527"
+      kernel_bundle_tag:
+        description: Matching D630 kernel/initramfs release tag from RUNTIME-MANIFEST.txt
+        required: true
+        type: string
+        default: "d630-kernel-6.18.56-run-40922514538"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  qemu:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'QEMU autologin test') }}
+    name: Boot exact Openbox SFS and verify tty1 autologin
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME_RUN_ID: ${{ inputs.runtime_run_id || '40983813255' }}
+      RUNTIME_ARTIFACT: ${{ inputs.runtime_artifact || 'd630-openbox-runtime-run-527' }}
+      KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-40922514538' }}
+
+    steps:
+      - name: Install QEMU and test tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils expect e2fsprogs util-linux
+          sudo apt-get clean
+          df -h / | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Download exact runtime artifact and matching boot files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          runtime="$RUNNER_TEMP/runtime"
+          kernel="$RUNNER_TEMP/kernel"
+          mkdir -p "$runtime" "$kernel"
+
+          gh run download "$RUNTIME_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "$RUNTIME_ARTIFACT" --dir "$runtime"
+          gh release download "$KERNEL_BUNDLE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$kernel"
+
+          [[ -s "$runtime/squashfs" && -s "$runtime/SQUASHFS-SHA256.txt" ]] || {
+            echo "::error::Runtime artifact is missing the SquashFS or its checksum."
+            exit 1
+          }
+          [[ -s "$runtime/RUNTIME-MANIFEST.txt" ]] || {
+            echo "::error::Runtime manifest is missing."
+            exit 1
+          }
+          [[ -s "$kernel/kernel" && -s "$kernel/initramfs" && -s "$kernel/SHA256SUMS" ]] || {
+            echo "::error::Kernel release is missing kernel/initramfs/checksums."
+            exit 1
+          }
+
+          grep -F "Release: ${KERNEL_BUNDLE_TAG}" "$runtime/RUNTIME-MANIFEST.txt" || {
+            echo "::error::Kernel release tag does not match the runtime manifest."
+            cat "$runtime/RUNTIME-MANIFEST.txt"
+            exit 1
+          }
+          (cd "$runtime" && sha256sum --check SQUASHFS-SHA256.txt)
+          (cd "$kernel" && sha256sum --check SHA256SUMS)
+
+          {
+            echo "Runtime artifact: $RUNTIME_ARTIFACT (run $RUNTIME_RUN_ID)"
+            echo "Kernel bundle: $KERNEL_BUNDLE_TAG"
+            echo "SquashFS bytes: $(stat -c %s "$runtime/squashfs")"
+            echo "Kernel bytes: $(stat -c %s "$kernel/kernel")"
+            echo "Initramfs bytes: $(stat -c %s "$kernel/initramfs")"
+          } | tee "$RUNNER_TEMP/boot-inputs.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare an ext4 disk containing the exact SquashFS
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          disk="$RUNNER_TEMP/d630-qemu-root.raw"
+          mountpoint="$RUNNER_TEMP/d630-qemu-root-mount"
+          mkdir -p "$mountpoint"
+          truncate -s 2G "$disk"
+          mkfs.ext4 -F -q "$disk"
+          sudo mount -o loop "$disk" "$mountpoint"
+          cleanup() { sudo umount "$mountpoint" 2>/dev/null || true; }
+          trap cleanup EXIT
+          sudo install -D -m 0644 "$RUNNER_TEMP/runtime/squashfs" \
+            "$mountpoint/d630-gentoo/squashfs"
+          sync
+          sudo umount "$mountpoint"
+          trap - EXIT
+
+      - name: Boot QEMU and verify automatic login on tty1
+        id: boot
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -Eeuo pipefail
+          export QEMU_LOG="$GITHUB_WORKSPACE/QEMU-BOOT-TEST.log"
+          kernel="$RUNNER_TEMP/kernel"
+          disk="$RUNNER_TEMP/d630-qemu-root.raw"
+
+          timeout --foreground --signal=TERM --kill-after=10s 210s expect <<'EXPECT'
+          set timeout 150
+          log_file -noappend $env(QEMU_LOG)
+          spawn -noecho qemu-system-x86_64 \
+            -machine pc,accel=tcg -cpu Conroe -m 2048 -smp 2 \
+            -no-reboot -no-shutdown \
+            -kernel $env(RUNNER_TEMP)/kernel/kernel \
+            -initrd $env(RUNNER_TEMP)/kernel/initramfs \
+            -append "console=ttyS0,115200n8 loglevel=7 ignore_loglevel d630.squashfs=/d630-gentoo/squashfs" \
+            -drive file=$env(RUNNER_TEMP)/d630-qemu-root.raw,format=raw,if=ide \
+            -display none -serial stdio -monitor none
+          set qemu_pid [exp_pid]
+
+          expect {
+            -re {login: ?} { send -- "gentoo\r" }
+            timeout {
+              puts stderr "QEMU never reached the serial login prompt."
+              catch {exec kill -TERM $qemu_pid}
+              exit 10
+            }
+            eof {
+              puts stderr "QEMU exited before the serial login prompt."
+              exit 11
+            }
+          }
+
+          expect {
+            -re {Password: ?} { send -- "gentoo\r" }
+            timeout {
+              puts stderr "Serial login did not request the gentoo password."
+              catch {exec kill -TERM $qemu_pid}
+              exit 12
+            }
+            eof {
+              puts stderr "QEMU exited during serial login."
+              exit 13
+            }
+          }
+
+          after 2000
+          send -- "if ps -eo user=,tty=,comm= | awk '\$1 == \"gentoo\" && \$2 == \"tty1\" && \$3 == \"bash\" { found=1 } END { exit !found }'; then printf 'D630_TTY1_' 'AUTOLOGIN_PASS\\n'; else ps -eo user=,tty=,comm=; printf 'D630_TTY1_' 'AUTOLOGIN_FAIL\\n'; fi\r"
+
+          expect {
+            -exact "D630_TTY1_AUTOLOGIN_PASS" {
+              puts "PASS: gentoo has an interactive Bash session on tty1 without entering credentials there."
+            }
+            -exact "D630_TTY1_AUTOLOGIN_FAIL" {
+              puts stderr "FAIL: no gentoo Bash autologin session found on tty1."
+              catch {exec kill -TERM $qemu_pid}
+              exit 20
+            }
+            timeout {
+              puts stderr "Timed out waiting for the tty1 autologin verification command."
+              catch {exec kill -TERM $qemu_pid}
+              exit 21
+            }
+            eof {
+              puts stderr "QEMU exited before the tty1 autologin check completed."
+              exit 22
+            }
+          }
+
+          catch {exec kill -TERM $qemu_pid}
+          expect eof
+          EXPECT
+
+          {
+            echo "QEMU autologin test: PASS"
+            echo "Booted the exact runtime artifact with its declared matching kernel/initramfs."
+            echo "Authenticated on ttyS0 as gentoo, then verified a gentoo Bash session on tty1."
+            echo "The tty1 session was created by agetty --autologin; no tty1 credentials were entered."
+          } | tee "$GITHUB_WORKSPACE/QEMU-BOOT-TEST.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload QEMU boot log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d630-openbox-qemu-autologin-run-${{ github.run_number }}
+          path: |
+            QEMU-BOOT-TEST.log
+            QEMU-BOOT-TEST.txt
+            ${{ runner.temp }}/boot-inputs.txt
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
