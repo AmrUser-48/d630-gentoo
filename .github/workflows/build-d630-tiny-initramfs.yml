@@ -217,7 +217,7 @@ jobs:
           sudo bash d630-tiny/build-initramfs.sh "$(command -v busybox)" "$RUNNER_TEMP/d630-firmware.tar.zst" "$RUNNER_TEMP/early-microcode.cpio" "$GITHUB_WORKSPACE/output" "$GITHUB_WORKSPACE/d630-tiny/init" "$setup_root"
 
           cp d630-tiny/boot/grub.cfg output/d630-tiny.cfg
-          cp d630-tiny/README.md output/README-D630-Tiny.md
+          cp d630-tiny/docs/USER-GUIDE.md output/README-D630-Tiny.md
           cp d630-tiny/init output/d630-tiny-init
           cp d630-tiny/build-initramfs.sh output/build-initramfs.sh
           cp d630-tiny/build-network-tools.sh output/build-network-tools.sh
