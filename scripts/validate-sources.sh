@@ -16,7 +16,7 @@ test -s d630-gentoo/config/package.list
 test -s config/make.conf
 test -s kernels/README.md
 test -s d630-gentoo/initramfs/init
-test -s d630-gentoo/boot/iso/loopback.cfg
+test -s d630-gentoo/iso/boot/grub/loopback.cfg
 test -s d630-gentoo/config/kernel-cmdline.txt
 test -s config/portage/make.conf
 test -s config/portage/binrepos.conf/gentoobinhost.conf
@@ -151,8 +151,8 @@ grep -q 'x11-wm/openbox' d630-gentoo/config/package.list
 grep -qi 'squashfs' kernels/README.md
 grep -Fxq 'CONFIG_OVERLAY_FS=y' kernels/profiles/40-d630-builtin.config
 grep -Fxq 'CONFIG_BLK_DEV_LOOP=y' kernels/profiles/40-d630-builtin.config
-grep -q 'd630.persistence=auto' d630-gentoo/boot/iso/loopback.cfg
-grep -q 'd630.persistence=volatile' d630-gentoo/boot/iso/loopback.cfg
+grep -q 'd630.persistence=auto' d630-gentoo/iso/boot/grub/loopback.cfg
+grep -q 'd630.persistence=volatile' d630-gentoo/iso/boot/grub/loopback.cfg
 sh -n d630-gentoo/initramfs/init
 sh -n d630-gentoo/boot/iso/create-persistence-image.sh
 sh -n d630-tiny/init
@@ -210,8 +210,8 @@ grep -Fq -- "--getbinpkg --usepkgonly" d630-gentoo/scripts/build-runtime-squashf
 grep -Fq "net-wireless/wireless-regdb" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
 grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
-grep -q 'rootfs.squashfs' d630-gentoo/boot/iso/loopback.cfg
-grep -q 'gentoo-data.img' d630-gentoo/boot/iso/loopback.cfg
+grep -q 'rootfs.squashfs' d630-gentoo/iso/boot/grub/loopback.cfg
+grep -q 'gentoo-data.img' d630-gentoo/iso/boot/grub/loopback.cfg
 ! grep -q '@SHELL@' d630-gentoo/config/package-sets/daily-driver.list
 
 test -s d630-gentoo/boot/grub/three-file.cfg

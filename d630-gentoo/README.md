@@ -13,7 +13,7 @@ Copy the matching three artifacts to one GRUB-readable partition:
 
 Use the three-file GRUB entry in boot/grub/three-file.cfg. The kernel and external initramfs start early userspace; initramfs/init searches supported partitions for /d630-gentoo/squashfs, mounts the SquashFS read-only and creates a RAM-backed OverlayFS root before switching to Gentoo/OpenRC.
 
-Persistence: the current direct-folder live mode uses a temporary RAM upper layer. System changes and home-directory changes disappear at reboot. This is not a conventional installed Gentoo system and it does not yet implement persistent storage.
+Persistence: the current direct-folder live mode uses a temporary RAM upper layer. System changes and home-directory changes disappear at reboot. The optional ISO design supports a separate writable ext4 persistence-image concept; its ISO-specific early userspace and end-to-end workflow still need implementation and testing.
 
 ## Runtime profiles
 
@@ -33,4 +33,4 @@ Use kernel profile 40, built-in D630 live/SFS. Its loop, SquashFS-Zstd, OverlayF
 
 From repository root, runtime package sets are in config/package-sets/, early userspace in initramfs/init, runtime builder in scripts/build-runtime-squashfs.sh, shared Portage configuration in ../config/portage/, and the boot recipe in boot/grub/three-file.cfg.
 
-The builder produces files in repository-root output/. Keep the original build root and /var/cache/binpkgs intact; trimming must operate on a separate runtime staging root. See the root README and kernel profile guide.
+The builder produces files in repository-root output/. Keep the original build root and /var/cache/binpkgs intact; trimming must operate on a separate runtime staging root. ISO packaging notes and GRUB loopback assets are in iso/. Prefer direct GRUB boot from /d630-gentoo/ files; ISO is an optional container/distribution format. See iso/README.md, the root README and kernel profile guide.

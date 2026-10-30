@@ -9,7 +9,7 @@ This repository contains two distinct operating systems and three distinct kerne
 | [d630-tiny/](d630-tiny/README.md) | Standalone BusyBox shell and utilities; no Portage and no Gentoo root | RAM-only initramfs; changes vanish on reboot | /d630-tiny/kernel, /d630-tiny/initramfs | QEMU-tested release [d630-tiny-shell-40818375822](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-tiny-shell-40818375822); physical D630 test pending |
 | [d630-gentoo/](d630-gentoo/README.md) | Gentoo/OpenRC live OS, from console to Openbox runtime | Read-only SquashFS plus temporary RAM OverlayFS | /d630-gentoo/kernel, /d630-gentoo/initramfs, /d630-gentoo/squashfs | Openbox SFS release [2026-10-29](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29); QEMU console/OpenRC boot verified; graphical and physical tests pending |
 
-These are not two package variants of the same image. Tiny is initramfs-only. Gentoo live boots a separate SquashFS root. Neither currently provides persistent changes between boots.
+These are not two package variants of the same image. Tiny is initramfs-only. Gentoo live boots a separate SquashFS root. The preferred boot method loads files directly from a normal partition. An ISO remains an optional container/distribution target; the ISO-specific persistent boot path is still being implemented and validated.
 
 ## Three kernel profiles
 
@@ -32,7 +32,7 @@ Use -O2 -pipe -march=core2 -mtune=core2 for target userland. For 64-bit Linux ke
 ## Repository map
 
 - d630-tiny/: standalone Tiny OS, initramfs builder, firmware manifest, network/setup tools and GRUB entry.
-- d630-gentoo/: Gentoo live SFS initramfs, runtime package sets, SquashFS builders and GRUB entries.
+- d630-gentoo/: Gentoo live SFS initramfs, runtime package sets, SquashFS builders, direct-file GRUB entries and optional ISO packaging assets under d630-gentoo/iso/.
 - kernels/: three mutually exclusive D630 kernel profiles and configuration rules.
 - config/portage/, config/make.conf: shared Gentoo builder/Portage configuration.
 - scripts/: shared runner-state, binpkg export/import and validation utilities.
