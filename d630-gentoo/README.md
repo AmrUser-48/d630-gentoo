@@ -1,36 +1,63 @@
 # D630 Gentoo live OS
 
-This directory contains the Gentoo/OpenRC live operating system. It is separate from D630 Tiny, which is a BusyBox-only initramfs with no Gentoo root.
+## Overview
 
-## Boot layout
+This directory contains the Gentoo/OpenRC live operating system. It is separate from D630 Tiny, which is a BusyBox-only initramfs without a Gentoo root. Gentoo live boots a read-only SquashFS root and creates a temporary RAM-backed OverlayFS upper layer.
 
-Copy the matching three artifacts to one GRUB-readable partition:
+## Status
+
+The current runtime is [d630-gentoo-openbox-2026.10.29](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29). Its kernel/initramfs/SquashFS bundle passed QEMU boot through initramfs discovery, SquashFS mount, OverlayFS setup and OpenRC console startup. Xorg/Openbox startup, Crocus acceleration in the virtual display and physical D630 validation remain pending.
+
+Direct three-file boot is implemented and preferred. OverlayFS changes disappear at reboot. ISO is a supported optional packaging target, but ISO-specific early userspace and persistent boot remain incomplete.
+
+## Layout
+
+Expected boot partition:
 
     /d630-gentoo/
     ├── kernel
     ├── initramfs
     └── squashfs
 
-Use the three-file GRUB entry in boot/grub/three-file.cfg. The kernel and external initramfs start early userspace; initramfs/init searches supported partitions for /d630-gentoo/squashfs, mounts the SquashFS read-only and creates a RAM-backed OverlayFS root before switching to Gentoo/OpenRC.
+- `initramfs/init`: early userspace and SquashFS discovery.
+- `boot/grub/three-file.cfg`: preferred direct-file GRUB entry.
+- `boot/grub/gui.cfg`: graphical boot entry.
+- `config/package-sets/`: console, desktop, Openbox and other runtime sets.
+- `scripts/`: runtime assembly and SquashFS builders.
+- `iso/`: optional ISO layout, loopback menu and persistence-image helper.
 
-Persistence: the current direct-folder live mode uses a temporary RAM upper layer. System changes and home-directory changes disappear at reboot. The optional ISO design supports a separate writable ext4 persistence-image concept; its ISO-specific early userspace and end-to-end workflow still need implementation and testing.
+## Requirements
 
-## Runtime profiles
+Use kernel profile 40, which builds in the block-device, filesystem, loop, SquashFS-Zstd and OverlayFS support needed before the Gentoo root is mounted. The host filesystem containing `/d630-gentoo/squashfs` must be supported by early userspace. Shared Portage settings are in repository-root `config/portage/`.
 
-The runtime builder supports small console and larger graphical profiles, including Openbox. The current Openbox runtime uses Gentoo/OpenRC, Xorg, Mesa Crocus for GM965, Openbox and CLI tools. The compressed SquashFS target is at most 300 MiB.
+## Use
 
-## Current published image
+Copy the matching `kernel`, `initramfs` and `squashfs` assets to `/d630-gentoo/` on a GRUB-readable partition. Configure GRUB with [three-file.cfg](boot/grub/three-file.cfg). Prefer loading the individual files; the ISO does not need to be selected as the boot device.
 
-Release: [d630-gentoo-openbox-2026.10.29](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29).
+Current direct-folder mode is volatile. The optional ext4 `gentoo-data.img` belongs beside the ISO on writable host storage, not inside the read-only ISO; it is not part of the tested direct-folder path.
 
-The release notes report a 198.43 MiB SquashFS, below the 300 MiB target. The three-file root was boot-tested in QEMU through initramfs discovery, SquashFS mount, OverlayFS and OpenRC console startup. This does not establish that Xorg/Openbox starts correctly, that Crocus accelerates the virtual display, or that the image has booted successfully on the physical D630.
+## Build
 
-## Kernel
+Canonical builder: [Build D630 Gentoo runtime SquashFS](https://github.com/AmrUser-48/d630-gentoo/actions/workflows/build-d630-runtime-squashfs.yml). It supports console and graphical profiles and writes staging outputs to repository-root `output/`.
 
-Use kernel profile 40, built-in D630 live/SFS. Its loop, SquashFS-Zstd, OverlayFS and host filesystem support must be built in because the external initramfs cannot load modules from the not-yet-mounted root partition. Profile 20 is for normal modular Gentoo; profile 30 is for D630 Tiny.
+The kernel workflow builds profile 40. Preserve the original restored build root and `/var/cache/binpkgs`; trim only a separate runtime staging root. Shared builder configuration lives in repository-root `config/` and `scripts/`.
 
-## Build and validate
+## Releases
 
-From repository root, runtime package sets are in config/package-sets/, early userspace in initramfs/init, runtime builder in scripts/build-runtime-squashfs.sh, shared Portage configuration in ../config/portage/, and the boot recipe in boot/grub/three-file.cfg.
+Current runtime: [d630-gentoo-openbox-2026.10.29](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-gentoo-openbox-2026.10.29). It includes `kernel`, `initramfs`, `squashfs` and checksums. The SquashFS is reported as 198.43 MiB. See the [release index](../docs/releases.md).
 
-The builder produces files in repository-root output/. Keep the original build root and /var/cache/binpkgs intact; trimming must operate on a separate runtime staging root. ISO packaging notes and GRUB loopback assets are in iso/. Prefer direct GRUB boot from /d630-gentoo/ files; ISO is an optional container/distribution format. See iso/README.md, the root README and kernel profile guide.
+## Validation
+
+Run `./scripts/validate-sources.sh`, `bash scripts/validate-kernel-profiles.sh` and `bash scripts/validate-kernel-config.sh` from the repository root.
+
+The release QEMU test covered console/OpenRC startup and the direct three-file root path. It does not prove graphical startup or physical D630 compatibility. ISO assembly and persistent boot are not end-to-end tested.
+
+## Related documentation
+
+- [ISO packaging](iso/README.md)
+- [Kernel profiles](../kernels/README.md)
+- [Hardware inventory](../docs/hardware-inventory.md)
+- [Known issues](../docs/known-issues.md)
+- [Repository overview](../README.md)
+- [Agent rules](AGENTS.md)
+- [Release index](../docs/releases.md)
