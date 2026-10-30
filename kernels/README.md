@@ -1,53 +1,60 @@
 # D630 kernel profiles
 
-These are three separate configurations for three jobs. They are snippets to merge over a kernel distribution/default config, not complete standalone configs. Never place all three in /etc/kernel/config.d/ together.
+## Overview
 
-## The three profiles
+This directory contains three mutually exclusive kernel configuration profiles for the Dell Latitude D630. They are overlays/fragments, not complete standalone `.config` files. Select one profile per target; never merge all three.
 
-| Profile | Intended system | Driver policy | Build status |
-|---|---|---|---|
-| 20-d630-base.config | Conventional installed Gentoo | Gentoo's broad distribution config; selected optional D630 drivers as modules | Config snippet prepared; not yet built/tested as a kernel |
-| 30-d630-live.config | d630-tiny standalone BusyBox initramfs | Tiny-required storage, i915, Wi-Fi and USB/RNDIS drivers built in; no SFS/loop/overlay | Config snippet prepared; dedicated kernel build/release pending |
-| 40-d630-builtin.config | d630-gentoo live SquashFS | Boot path and D630 hardware built in | Current D630 kernel workflow uses this profile; existing 6.18.56 bundle is the reference |
+## Status
 
-## 20 — full modular Gentoo
+| Profile | Target | Status |
+|---|---|---|
+| [20-d630-base.config](profiles/20-d630-base.config) | Conventional installed Gentoo | Prepared modular overlay; not yet built/validated as a complete installed-system kernel |
+| [30-d630-live.config](profiles/30-d630-live.config) | D630 Tiny | Prepared standalone Tiny profile; dedicated workflow/release pending |
+| [40-d630-builtin.config](profiles/40-d630-builtin.config) | Gentoo live SquashFS | Current kernel workflow target; published bundles exist |
 
-Use this with sys-kernel/gentoo-kernel on a normal installed Gentoo system. It preserves Gentoo's distribution defaults and adds D630 policy. SATA/AHCI, ATA_PIIX, SCSI disk and ext4 root support remain built in. Optional graphics, Wi-Fi, USB peripherals/tethering, HDA audio, Bluetooth transport and rescue filesystems are modules.
+## Layout
 
-Activate only this profile on the Gentoo host:
+- `profiles/20-d630-base.config`: modular hardware overlay for normal Gentoo.
+- `profiles/30-d630-live.config`: Tiny profile with required hardware built in; no SFS/OverlayFS/loop dependency.
+- `profiles/40-d630-builtin.config`: Gentoo live profile with built-in root-discovery, loop, SquashFS-Zstd, OverlayFS and D630 hardware support.
+- `NOTES-legacy.md`: historical hardware/build notes; this README and `docs/hardware-inventory.md` are current sources of truth.
 
-    sudo install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
-    sudo emerge --ask --buildpkg sys-kernel/gentoo-kernel
+## Requirements
 
-Remove other D630 profile snippets from /etc/kernel/config.d/ before switching. The Gentoo kernel ebuild merges these snippets over its own config and compiles/installs kernel and modules through Portage. For any root filesystem or boot controller not built in, make sure its modules are included in the initramfs.
+CPU: Intel Core 2 Duo T7250 (Merom). For 64-bit Linux kernel builds, preserve generic x86-64 ISA baseline and use `KCFLAGS=-mtune=core2`. Do not use `-march=core2` as kernel ISA baseline and do not add the nonexistent x86-64 `CONFIG_MCORE2`. Gentoo userland may use `-O2 -pipe -march=core2 -mtune=core2`.
 
-## 30 — Tiny standalone kernel
+## Use
 
-This is for d630-tiny: BusyBox and tools run from the external initramfs; there is no Gentoo root, SquashFS, loop mount or OverlayFS. The Tiny shell needs no kernel module tree for its target hardware: i915, Intel 3945ABG Wi-Fi, USB storage/RNDIS and laptop input are built in. The profile retains module infrastructure for kernel-build/eclass compatibility.
+- **Profile 20:** apply to Gentoo's normal distribution kernel configuration (for example `sys-kernel/gentoo-kernel`) using `/etc/kernel/config.d/`. Retain Gentoo's broad generic driver coverage.
+- **Profile 30:** use only for Tiny. Hardware required before mounting a root must be built in; do not depend on a module loader.
+- **Profile 40:** use for `/d630-gentoo/kernel` + `initramfs` + `squashfs`. Root-discovery dependencies must be built in because modules cannot be loaded from the not-yet-mounted SquashFS.
 
-The Tiny kernel does not require HDA audio, Bluetooth, Btrfs, SquashFS, loop or OverlayFS. It keeps ext4, NTFS3, exFAT and VFAT for local disk access.
+Do not install or merge all three profiles together.
 
-## 40 — full built-in Gentoo live/SFS kernel
+## Build
 
-This is the three-file live kernel for d630-gentoo: /d630-gentoo/kernel, /d630-gentoo/initramfs and /d630-gentoo/squashfs.
+Current workflow: [Build D630 Gentoo SFS built-in kernel and initramfs](https://github.com/AmrUser-48/d630-gentoo/actions/workflows/build-d630-kernel.yml). It merges profile 40 and publishes a kernel/initramfs bundle.
 
-It includes the built-in root-discovery path: loop, SquashFS Zstandard, OverlayFS, NTFS3, exFAT, VFAT, ext4 and Btrfs; plus D630 AHCI/ATA, USB, i915, 3945ABG, RNDIS, SigmaTel HDA, ACPI, zram and input. The external initramfs scans supported partitions for the SquashFS file and uses a volatile RAM overlay. Changes disappear on reboot.
-
-The earlier d630-base.fragment and d630-live.fragment were two halves of this one profile, not independent kernel variants. Their merged content is now in kernels/profiles/40-d630-builtin.config.
-
-## CPU tuning and Kconfig caveat
-
-The D630 uses a Core 2 Duo T7250 (Merom). Userland packages may use:
-
-    -O2 -pipe -march=core2 -mtune=core2
-
-For 64-bit Linux kernels, keep the generic x86-64 instruction baseline and use KCFLAGS=-mtune=core2. Linux x86-64 Kconfig does not provide the old CONFIG_MCORE2 processor-family selector; do not add CONFIG_MCORE2=y.
-
-## Configuration validation
-
-From repository root:
+Run from repository root:
 
     bash scripts/validate-kernel-profiles.sh
     bash scripts/validate-kernel-config.sh
 
-Static config validation is not a build or boot test. Validate each generated config, kernel image, matching modules/firmware, then QEMU and physical hardware separately.
+Profiles 20 and 30 still need dedicated complete build/boot workflows.
+
+## Releases
+
+Latest bundle: [d630-kernel-6.18.56-run-41134237939](https://github.com/AmrUser-48/d630-gentoo/releases/tag/d630-kernel-6.18.56-run-41134237939). Older bundles remain while workflows pin their exact tags; see the [release index](../docs/releases.md).
+
+## Validation
+
+Static profile validators inspect fragments and selected Kconfig requirements; they do not compile a kernel. For every release, verify manifest/checksums and matching modules/firmware, then test QEMU boot. Physical D630 testing is separate.
+
+## Related documentation
+
+- [Repository overview](../README.md)
+- [Hardware inventory](../docs/hardware-inventory.md)
+- [Known issues](../docs/known-issues.md)
+- [Legacy notes](NOTES-legacy.md)
+- [Release index](../docs/releases.md)
+- [Agent rules](AGENTS.md)
