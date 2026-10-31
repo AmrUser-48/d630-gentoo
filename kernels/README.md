@@ -32,6 +32,8 @@ The Gentoo `sys-kernel/gentoo-kernel-6.1.190` ebuild selects:
 
 Sources: [Gentoo 6.1.190 ebuild](https://github.com/gentoo/gentoo/blob/master/sys-kernel/gentoo-kernel/gentoo-kernel-6.1.190.ebuild), [Gentoo g19 base.config](https://github.com/gentoo/gentoo-kernel-config/blob/g19/base.config), [Gentoo g19 no-debug.config](https://github.com/gentoo/gentoo-kernel-config/blob/g19/no-debug.config), [Fedora 6.1.102 amd64 baseline](https://github.com/projg2/fedora-kernel-config-for-gentoo/tree/6.1.102-gentoo).
 
+For the current Gentoo `sys-kernel/gentoo-kernel-7.2.14` ebuild, the corresponding upstream Fedora baseline is `kernel-x86_64-fedora.config.7.2.10-gentoo`; it still uses the same Gentoo `gentoo-kernel-config-g19` common overlay. Thus the D630 fragment is layered onto the **7.2-specific** default when you build 7.2.14; it does not replace that default with a 6.1 full configuration. See the [Gentoo 7.2.14 ebuild](https://github.com/gentoo/gentoo/blob/master/sys-kernel/gentoo-kernel/gentoo-kernel-7.2.14.ebuild).
+
 The D630 file is deliberately a **single config.d overlay**, not a copied 228 KiB Fedora `.config` and not a `savedconfig` file. Portage still supplies the version-specific Gentoo baseline; Kconfig resolves this D630 overlay against the selected kernel version. This allows the same hardware policy to be tested against Gentoo-patched 6.1, 6.18 and 7.2 kernels without carrying a stale full `.config`.
 
 `CONFIG_EXPERT=y` is included in profile 20, so no separate expert fragment is needed. Keep the package's `debug` USE choice separate: it controls Gentoo's own debug/no-debug fragment and is not changed by this profile.
@@ -53,7 +55,8 @@ Do not install or merge all three profiles together. Gentoo's `/etc/kernel/confi
 For profile 20, install the one fragment and build with Portage:
 
 ```sh
-install -Dm0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
+curl -fsSL https://raw.githubusercontent.com/AmrUser-48/d630-gentoo/main/kernels/profiles/20-d630-base.config -o /etc/kernel/config.d/20-d630-base.config
+echo '=sys-kernel/gentoo-kernel-7.2.14 ~amd64' > /etc/portage/package.accept_keywords/d630-kernel-test
 emerge --ask --verbose --buildpkgonly =sys-kernel/gentoo-kernel-7.2.14
 ```
 
