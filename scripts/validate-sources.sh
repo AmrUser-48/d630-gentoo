@@ -93,7 +93,10 @@ grep -Fq 'sys-apps\/man-db$/d' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'c1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'NOPASSWD: ALL' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" d630-gentoo/scripts/install-runtime-dotfiles.sh
-grep -Fq '6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
