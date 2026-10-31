@@ -12,7 +12,7 @@ DESKTOP_SKEL="$SCRIPT_DIR/../config/desktop/skel"
 [[ -s "$DESKTOP_SKEL/.config/openbox/autostart" ]] || die "Openbox autostart template is missing"
 [[ -s "$DESKTOP_SKEL/.config/openbox/rc.xml" ]] || die "Openbox rc.xml template is missing"
 mkdir -p "$WORK" "$ROOT/etc/skel/.config"
-readonly DOTFILES_REF="6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298"
+readonly DOTFILES_REF="9685e6e6da9419ac5446814dd1fdd19e32073e88"
 ARCHIVE="$WORK/deb12dots-$DOTFILES_REF.tar.gz"
 SRC="$WORK/deb12dots-$DOTFILES_REF"
 SKEL="$ROOT/etc/skel"
@@ -91,6 +91,17 @@ find "$SKEL/.config/nvim" -type d \( -name __pycache__ \) -prune -exec rm -rf {}
 find "$SKEL/.config/nvim" -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.swp' -o -name '*.swo' \) -delete
 find "$SKEL/.config/nvim" -type f \( -name 'README' -o -name 'README.*' -o -name 'CONTRIBUTING*' -o -name 'CHANGELOG*' \) -delete
 find "$SKEL/.config/nvim" -type d \( -name doc -o -name docs \) -prune -exec rm -rf {} +
+
+# Refuse an obsolete or partially applied Neovim options table before packaging.
+NVIM_INIT="$SKEL/.config/nvim/init.lua"
+[[ -s "$NVIM_INIT" ]] || die "pinned dotfiles have no Neovim init.lua"
+grep -Fq 'for option, value in pairs(config_options) do' "$NVIM_INIT" ||
+  die "Neovim init.lua is missing the active options loop"
+grep -Fq 'vim.opt[option] = value' "$NVIM_INIT" ||
+  die "Neovim init.lua does not apply its options table"
+if grep -R -n -E '(^|[,{[:space:]])pastetoggle[[:space:]]*=' "$SKEL/.config/nvim"; then
+  die "Neovim config contains the removed pastetoggle option"
+fi
 
 # Default editors and opener are inherited by login shells through env-update.
 cat > "$ROOT/etc/env.d/99-runtime-user" <<'EOF'
