@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc"
+                xmlns:xi="http://www.w3.org/2001/XInclude">
+  <resistance>
+    <strength>10</strength>
+    <screen_edge_strength>20</screen_edge_strength>
+  </resistance>
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+    <focusLast>yes</focusLast>
+    <underMouse>no</underMouse>
+    <focusDelay>200</focusDelay>
+    <raiseOnFocus>no</raiseOnFocus>
+  </focus>
+  <placement>
+    <policy>Smart</policy>
+    <center>yes</center>
+    <monitor>Mouse</monitor>
+    <primaryMonitor>Mouse</primaryMonitor>
+  </placement>
+  <desktops>
+    <number>4</number>
+    <firstdesk>0</firstdesk>
+    <names>
+      <name>1</name>
+      <name>2</name>
+      <name>3</name>
+      <name>4</name>
+    </names>
+    <popupTime>0</popupTime>
+  </desktops>
+  <keyboard>
+    <!-- Workspaces -->
+    <keybind key="W-1"><action name="GoToDesktop"><to>1</to></action></keybind>
+    <keybind key="W-2"><action name="GoToDesktop"><to>2</to></action></keybind>
+    <keybind key="W-3"><action name="GoToDesktop"><to>3</to></action></keybind>
+    <keybind key="W-4"><action name="GoToDesktop"><to>4</to></action></keybind>
+    <keybind key="W-S-1"><action name="SendToDesktop"><desktop>1</desktop></action></keybind>
+    <keybind key="W-S-2"><action name="SendToDesktop"><desktop>2</desktop></action></keybind>
+    <keybind key="W-S-3"><action name="SendToDesktop"><desktop>3</desktop></action></keybind>
+    <keybind key="W-S-4"><action name="SendToDesktop"><desktop>4</desktop></action></keybind>
+
+    <!-- Window switching and placement -->
+    <keybind key="A-Tab">
+      <action name="NextWindow">
+        <allDesktops>no</allDesktops>
+        <raise>yes</raise>
+        <bar>no</bar>
+        <finalactions><action name="Focus"/><action name="Raise"/></finalactions>
+      </action>
+    </keybind>
+    <keybind key="W-Tab">
+      <action name="NextWindow">
+        <allDesktops>yes</allDesktops>
+        <raise>yes</raise>
+        <bar>no</bar>
+        <finalactions><action name="Focus"/><action name="Raise"/></finalactions>
+      </action>
+    </keybind>
+    <keybind key="W-Up"><action name="MaximizeFull"/></keybind>
+    <keybind key="W-Down"><action name="UnmaximizeFull"/></keybind>
+    <keybind key="W-Left">
+      <action name="UnmaximizeFull"/>
+      <action name="MoveResizeTo">
+        <x>0</x><y>0</y><width>50%</width><height>100%</height>
+      </action>
+    </keybind>
+    <keybind key="W-Right">
+      <action name="UnmaximizeFull"/>
+      <action name="MoveResizeTo">
+        <x>-0</x><y>0</y><width>50%</width><height>100%</height>
+      </action>
+    </keybind>
+
+    <!-- Applications present in the compact Openbox profile -->
+    <keybind key="W-Return">
+      <action name="Execute"><command>xterm</command></action>
+    </keybind>
+    <keybind key="W-o">
+      <action name="Execute"><command>xterm -e lf</command></action>
+    </keybind>
+    <keybind key="W-w">
+      <action name="Execute"><command>xterm -e links</command></action>
+    </keybind>
+    <keybind key="W-h">
+      <action name="Execute"><command>xterm -e htop</command></action>
+    </keybind>
+
+    <!-- Session management -->
+    <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="W-S-q"><action name="Exit"/></keybind>
+    <keybind key="W-S-r"><action name="Reconfigure"/></keybind>
+  </keyboard>
+</openbox_config>

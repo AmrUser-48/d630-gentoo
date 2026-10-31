@@ -1,0 +1,6 @@
+# Optional diagnostic override only. Xorg normally auto-selects modesetting.
+Section "Device"
+    Identifier "D630 Intel GM965 modesetting"
+    Driver "modesetting"
+    Option "AccelMethod" "glamor"
+EndSection

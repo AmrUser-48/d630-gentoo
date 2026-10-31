@@ -1,0 +1,9 @@
+# Optional A/B test only; do not enable together with the modesetting profile.
+# Requires Gentoo VIDEO_CARDS=i915 and x11-drivers/xf86-video-intel.
+Section "Device"
+    Identifier "D630 Intel GM965 legacy DDX"
+    Driver "intel"
+    Option "AccelMethod" "sna"
+    # Enable only when diagnosing tearing; it can increase memory use.
+    # Option "TearFree" "true"
+EndSection

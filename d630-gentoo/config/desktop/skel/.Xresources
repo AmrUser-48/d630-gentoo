@@ -1,0 +1,60 @@
+! D630 XTerm defaults.
+! Keep resources self-contained: no relative #include paths and no UXTerm-only names.
+! Fonts are Terminus PCF Unicode XLFDs supplied by media-fonts/terminus-font.
+
+Xft.dpi: 96
+Xft.antialias: true
+Xft.hinting: true
+Xft.hintstyle: hintfull
+Xft.rgba: rgb
+
+Xcursor.size: 16
+
+XTerm.termName: xterm-256color
+XTerm*loginShell: true
+XTerm*utf8: true
+XTerm*locale: true
+XTerm*renderFont: false
+XTerm*forceBoxChars: false
+XTerm*saveLines: 32000
+XTerm*scrollKey: true
+XTerm*scrollTtyOutput: false
+XTerm*jumpScroll: true
+XTerm*fastScroll: true
+XTerm*highlightSelection: true
+XTerm*trimSelection: true
+XTerm*selectToClipboard: false
+XTerm*metaSendsEscape: true
+XTerm*cursorBlink: false
+
+XTerm*VT100.font: -xos4-terminus-medium-r-normal--14-140-72-72-c-80-iso10646-1
+XTerm*VT100.boldFont: -xos4-terminus-bold-r-normal--14-140-72-72-c-80-iso10646-1
+XTerm*VT100.font1: -xos4-terminus-medium-r-normal--12-120-72-72-c-60-iso10646-1
+XTerm*VT100.font2: -xos4-terminus-medium-r-normal--14-140-72-72-c-80-iso10646-1
+XTerm*VT100.font3: -xos4-terminus-medium-r-normal--16-160-72-72-c-80-iso10646-1
+XTerm*VT100.font4: -xos4-terminus-medium-r-normal--18-180-72-72-c-100-iso10646-1
+XTerm*VT100.font5: -xos4-terminus-medium-r-normal--24-240-72-72-c-120-iso10646-1
+XTerm*VT100.font6: -xos4-terminus-medium-r-normal--28-280-72-72-c-140-iso10646-1
+XTerm*VT100.font7: -xos4-terminus-medium-r-normal--32-320-72-72-c-160-iso10646-1
+
+! Gruvbox Dark palette, adapted from deb12dots/.config/Xresources/colors/gruvbox-dark.xterm.
+XTerm*background: #282828
+XTerm*foreground: #ebdbb2
+XTerm*cursorColor: #ebdbb2
+XTerm*pointerColor: #ebdbb2
+XTerm*color0:  #282828
+XTerm*color8:  #928374
+XTerm*color1:  #cc241d
+XTerm*color9:  #fb4934
+XTerm*color2:  #98971a
+XTerm*color10: #b8bb26
+XTerm*color3:  #d79921
+XTerm*color11: #fabd2f
+XTerm*color4:  #458588
+XTerm*color12: #83a598
+XTerm*color5:  #b16286
+XTerm*color13: #d3869b
+XTerm*color6:  #689d6a
+XTerm*color14: #8ec07c
+XTerm*color7:  #a89984
+XTerm*color15: #ebdbb2

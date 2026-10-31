@@ -23,6 +23,8 @@ Expected boot partition:
 - `boot/grub/three-file.cfg`: preferred direct-file GRUB entry.
 - `boot/grub/gui.cfg`: graphical boot entry.
 - `config/package-sets/`: console, desktop, Openbox and other runtime sets.
+- `config/desktop/`: curated Xresources and Openbox user skeleton.
+- `config/xorg/`: D630 input configuration and optional graphics-driver test profiles.
 - `scripts/`: runtime assembly and SquashFS builders.
 - `iso/`: optional ISO layout, loopback menu and persistence-image helper.
 
@@ -54,6 +56,8 @@ The release QEMU test covered console/OpenRC startup and the direct three-file r
 
 ## Related documentation
 
+- [Desktop configuration skeleton](config/desktop/README.md)
+- [Xorg configuration and driver profiles](config/xorg/README.md)
 - [ISO packaging](iso/README.md)
 - [Kernel profiles](../kernels/README.md)
 - [Hardware inventory](../docs/hardware-inventory.md)

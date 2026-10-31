@@ -5,7 +5,12 @@ die() { echo "d630-dotfiles: ERROR: $*" >&2; exit 2; }
 [[ $# -eq 2 ]] || die "usage: $0 <runtime-root> <work-directory>"
 ROOT="$(realpath "$1")"
 WORK="$(realpath -m "$2")"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DESKTOP_SKEL="$SCRIPT_DIR/../config/desktop/skel"
 [[ -d "$ROOT/etc" ]] || die "runtime root is not a root filesystem: $ROOT"
+[[ -s "$DESKTOP_SKEL/.Xresources" ]] || die "D630 Xresources template is missing"
+[[ -s "$DESKTOP_SKEL/.config/openbox/autostart" ]] || die "Openbox autostart template is missing"
+[[ -s "$DESKTOP_SKEL/.config/openbox/rc.xml" ]] || die "Openbox rc.xml template is missing"
 mkdir -p "$WORK" "$ROOT/etc/skel/.config"
 readonly DOTFILES_REF="6da2f0e0e8b90d61ac3f37e9c3b832edaddf7298"
 ARCHIVE="$WORK/deb12dots-$DOTFILES_REF.tar.gz"
@@ -28,6 +33,15 @@ for name in lf nvim Xresources; do
   [[ -d "$SRC/.config/$name" ]] || die "required configuration directory is missing: .config/$name"
   cp -a "$SRC/.config/$name" "$SKEL/.config/"
 done
+
+# Replace the Debian-oriented XTerm/UXTerm resources with the D630's self-contained
+# XTerm configuration. Install the curated Openbox skeleton without Debian-only
+# launchers, themes or machine-specific output names.
+install -m 0644 "$DESKTOP_SKEL/.Xresources" "$SKEL/.Xresources"
+install -d -m 0755 "$SKEL/.config/openbox"
+install -m 0755 "$DESKTOP_SKEL/.config/openbox/autostart" "$SKEL/.config/openbox/autostart"
+install -m 0644 "$DESKTOP_SKEL/.config/openbox/rc.xml" "$SKEL/.config/openbox/rc.xml"
+
 mkdir -p "$SKEL/.trash"
 
 # Debian-specific aliases and optional media/clipboard applications are not part
@@ -57,10 +71,10 @@ sed -i \
 # Make lf work with the installed XDG opener, fix the config path typo, and
 # remove a misspelled option which lf would otherwise reject.
 sed -i \
-  -e 's/map o \&mimeopen \$f/map o \&xdg-open $f/' \
-  -e 's/map O \$mimeopen --ask \$f/map O $xdg-open $f/' \
-  -e 's/\$OPENER \$f/xdg-open "$f"/g' \
-  -e 's/"\$HOME\.config\/lf\/lfrc"/"\$HOME\/.config\/lf\/lfrc"/g' \
+  -e 's/map o \\&mimeopen \\$f/map o \\&xdg-open $f/' \
+  -e 's/map O \\$mimeopen --ask \\$f/map O $xdg-open $f/' \
+  -e 's/\\$OPENER \\$f/xdg-open "$f"/g' \
+  -e 's/"\\$HOME\\.config\\/lf\\/lfrc"/"\\$HOME\\/\\.config\\/lf\\/lfrc"/g' \
   -e '/^set prewiew!/d' \
   "$SKEL/.config/lf/lfrc"
 
@@ -91,4 +105,4 @@ EOF
 # a usage message; eval'ing that text breaks every interactive Bash login.
 sed -i '/command -v lesspipe/,+2d' "$SKEL/.aaliases"
 
-echo "Installed dotfiles into /etc/skel; Neovim and lf configs are self-contained."
+echo "Installed dotfiles and D630 desktop skeleton into /etc/skel; Neovim and lf configs are self-contained."

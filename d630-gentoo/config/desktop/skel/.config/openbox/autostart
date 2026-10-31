@@ -1,0 +1,18 @@
+#!/bin/sh
+# D630 Openbox session startup.
+# Load the self-contained XTerm resources before Openbox shortcuts can start xterm.
+if command -v xrdb >/dev/null 2>&1 && [ -r "$HOME/.Xresources" ]; then
+    xrdb -merge "$HOME/.Xresources"
+fi
+
+# Keep the keyboard repeat rate consistent with the deb12dots setup.
+if command -v xset >/dev/null 2>&1; then
+    xset r rate 240 30
+fi
+
+# Optional screen-edge shortcuts retained from deb12dots.
+# Top-left: launch a terminal. Top-right: cycle windows (Super+Tab).
+if command -v xdotool >/dev/null 2>&1; then
+    xdotool behave_screen_edge top-left exec xterm >/dev/null 2>&1 &
+    xdotool behave_screen_edge top-right key --clearmodifiers Super+Tab >/dev/null 2>&1 &
+fi
