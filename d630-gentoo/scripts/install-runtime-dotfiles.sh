@@ -71,10 +71,10 @@ sed -i \
 # Make lf work with the installed XDG opener, fix the config path typo, and
 # remove a misspelled option which lf would otherwise reject.
 sed -i \
-  -e 's/map o \\&mimeopen \\$f/map o \\&xdg-open $f/' \
-  -e 's/map O \\$mimeopen --ask \\$f/map O $xdg-open $f/' \
-  -e 's/\\$OPENER \\$f/xdg-open "$f"/g' \
-  -e 's/"\\$HOME\\.config\\/lf\\/lfrc"/"\\$HOME\\/\\.config\\/lf\\/lfrc"/g' \
+  -e 's/map o \&mimeopen \$f/map o \&xdg-open $f/' \
+  -e 's/map O \$mimeopen --ask \$f/map O $xdg-open $f/' \
+  -e 's/\$OPENER \$f/xdg-open "$f"/g' \
+  -e 's/"\$HOME\.config\/lf\/lfrc"/"\$HOME\/\.config\/lf\/lfrc"/g' \
   -e '/^set prewiew!/d' \
   "$SKEL/.config/lf/lfrc"
 

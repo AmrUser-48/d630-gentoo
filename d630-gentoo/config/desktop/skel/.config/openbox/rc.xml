@@ -62,15 +62,15 @@
     <keybind key="W-Down"><action name="UnmaximizeFull"/></keybind>
     <keybind key="W-Left">
       <action name="UnmaximizeFull"/>
-      <action name="MoveResizeTo">
-        <x>0</x><y>0</y><width>50%</width><height>100%</height>
-      </action>
+      <action name="MaximizeVert"/>
+      <action name="MoveResizeTo"><width>49%</width></action>
+      <action name="MoveToEdgeWest"/>
     </keybind>
     <keybind key="W-Right">
       <action name="UnmaximizeFull"/>
-      <action name="MoveResizeTo">
-        <x>-0</x><y>0</y><width>50%</width><height>100%</height>
-      </action>
+      <action name="MaximizeVert"/>
+      <action name="MoveResizeTo"><width>49%</width></action>
+      <action name="MoveToEdgeEast"/>
     </keybind>
 
     <!-- Applications present in the compact Openbox profile -->
