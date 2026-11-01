@@ -274,7 +274,7 @@ jobs:
     env:
       RUNTIME_PROFILE: openbox
       BINPKG_RUN_IDS: ${{ needs.publish-binpkgs.outputs.binpkg_run_ids }}
-      SOURCE_FALLBACK: "true"
+      SOURCE_FALLBACK: "false"
       KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-40922514538
       GH_TOKEN: ${{ github.token }}
 
