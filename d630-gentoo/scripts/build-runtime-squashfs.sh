@@ -598,9 +598,9 @@ AGETTY_BIN="$(chroot "$ROOT" /bin/bash -lc 'command -v agetty' | tail -n 1)"
 [[ "$AGETTY_BIN" == /* && -x "$ROOT$AGETTY_BIN" ]] || die "util-linux agetty executable is missing from the runtime root"
 for runlevel_dir in "$ROOT"/etc/runlevels/*; do
   [[ -d "$runlevel_dir" ]] || continue
-  rm -f "$runlevel_dir/agetty.tty1"
+  rm -f "$runlevel_dir"/agetty.tty* "$runlevel_dir"/getty.tty*
 done
-rm -f "$ROOT/etc/init.d/agetty.tty1"
+rm -f "$ROOT"/etc/init.d/agetty.tty* "$ROOT"/etc/init.d/getty.tty*
 [[ -f "$ROOT/etc/inittab" ]] || die "Stage 3 has no /etc/inittab; cannot configure tty1 autologin"
 python3 - "$ROOT/etc/inittab" "$AGETTY_BIN" <<'PY'
 import re
@@ -637,8 +637,8 @@ PY
   die "unexpected tty7 or serial getty respawn entry remains"
 grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$ROOT/etc/inittab" ||
   die "tty1 autologin entry was not written to /etc/inittab"
-if find "$ROOT/etc/runlevels" -type l -name agetty.tty1 -print -quit | grep -q .; then
-  die "OpenRC still has an agetty.tty1 runlevel alias"
+if find "$ROOT/etc/runlevels" -type l \( -name 'agetty.tty*' -o -name 'getty.tty*' \) -print -quit | grep -q .; then
+  die "OpenRC still has a local getty runlevel alias"
 fi
 if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
   chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
