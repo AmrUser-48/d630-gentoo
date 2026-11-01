@@ -216,6 +216,7 @@ Style rules:
 
 - Exactly one H1 title. Use the nine H2 sections above, in order; do not rename, reorder, omit or add top-level H2 sections in active README files. H3 subsections are allowed only when they improve navigation.
 - Write for a person using or maintaining the project, not for an AI model. Use direct, concrete language and short paragraphs.
+- Documentation is project documentation, not a conversation with the repository owner or an assistant response. Never include direct replies to the user, chat references, personal messages, profanity, rhetorical reactions, assistant meta-commentary, or raw scratch notes/placeholders such as `!TODO` and `!DOTO`. Convert verified requirements into neutral technical statements and usable instructions. Track unfinished work in issues or a dedicated roadmap, not as ad hoc conversational blocks in a README. Normal imperative usage instructions are allowed.
 - Keep the root README an index: concise project overview, status table, repository map, essential boot/build pointers and links. Do not put lengthy procedures, historical research, raw logs, full configuration files or repeated technical policy in it.
 - Keep component READMEs focused on that component. Put step-by-step procedures in user guides; hardware research in hardware/technical guides; historical detail in archive or technical references.
 - Use one consistent vocabulary: “D630 Tiny”, “D630 Gentoo”, “kernel profile”, “SquashFS”, “OverlayFS”, “Core 2”, “GM965/GMA X3100”. Explain uncommon acronyms once when needed.
