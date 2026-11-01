@@ -101,7 +101,7 @@ FFLAGS="${COMMON_FLAGS}"
 FCFLAGS="${COMMON_FLAGS}"
 ~~~
 
-Use `-O2` as the global baseline for correctness and broad package coverage. Use `-O3` only for package-scoped builds where representative runtime benchmarks show a benefit; `-O3` is not automatically faster for every workload. The currently scoped profile is `config/portage/env/custom-opt.conf`, mapped by `config/portage/package.env` to MC, SoX and LAME:
+Use `-O2` as the global baseline for correctness and broad package coverage. Use `-O3` only for package-scoped builds where representative runtime benchmarks show a benefit; `-O3` is not automatically faster for every workload. The current package-scoped profile is `config/portage/env/custom-opt.conf`, mapped by `config/portage/package.env` to MC, SoX and LAME. Validate the benefit for each package independently; the mapping itself is not proof of a runtime-speed gain:
 
 ~~~bash
 CFLAGS="-O3 -march=core2 -mtune=core2 -fomit-frame-pointer"
@@ -122,7 +122,7 @@ RUSTFLAGS="-C target-cpu=core2"
 
 For release builds, use `opt-level=3` as the speed-oriented optimization level. Thin LTO and one codegen unit are runtime-performance candidates; retain them when target-runtime benchmarks justify them. Their longer compile/link time is irrelevant to this decision. Do not switch to `opt-level="s"` or `"z"` merely to shrink the executable.
 
-For a project-controlled manifest, the starting release profile is:
+For a project-controlled manifest, use this as a performance-build candidate and compare its runtime against the same application built without LTO and with the normal codegen-unit count:
 
 ~~~toml
 [profile.release]
