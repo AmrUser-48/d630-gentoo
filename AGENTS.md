@@ -69,29 +69,60 @@ For full DRI/Mesa/VA-API/XvMC history and diagnostics, use d630-gentoo/gma-readm
 
 ## 4. Compiler and CPU tuning policy
 
-The CI runner CPU is not the target CPU. Never derive target flags from -march=native, host lscpu, or runner cpuid2cpuflags.
+### Objective
 
-### Gentoo userland defaults
+Compiler optimization is for **runtime execution speed on the Dell Latitude D630 (Core 2 Duo T7250 / Merom)**. It is not for faster compilation, shorter CI jobs, or smaller executables.
 
-Canonical C/C++/Fortran target:
+Priority order:
+
+1. Maximize measured application execution performance on the target CPU while preserving correctness and the required feature set.
+2. When runtime performance is equivalent, prefer the smaller executable/package.
+3. Ignore compiler/build duration when choosing code-generation options. A slower build is acceptable when it produces measurably faster code.
+
+Never trade a measured runtime regression for a smaller binary. Do not select `-Os`, `-Oz`, Rust `opt-level="s"` or `opt-level="z"` as defaults. Size-oriented options may be evaluated only when they do not reduce target runtime performance. Packaging compression and removal of debug metadata are separate distribution steps, not runtime compiler optimizations.
+
+Do not use build-pipeline options as execution optimizations. In particular, omit `-pipe`: it changes how compiler output is passed between processes and does not make the generated program run faster. Build parallelism settings such as MAKEOPTS/NINJAOPTS also control build throughput, not executable performance.
+
+### Target CPU and benchmark discipline
+
+The CI runner CPU is not the target CPU. Never derive target flags from `-march=native`, runner `lscpu`, or runner `cpuid2cpuflags`. Compile for the known Merom/Core 2 target explicitly.
+
+Judge optimization changes using correctness tests and representative runtime benchmarks on the physical D630 whenever possible. A GitHub runner can verify compilation and correctness, but its runtime benchmark is not evidence of performance on Merom. Keep benchmark inputs, output, software versions and test conditions comparable. Report runtime results first; report executable/package size as a secondary result. Do not use build duration as a reason to reject a faster runtime build.
+
+### Gentoo C, C++, and Fortran defaults
+
+The shared GCC/Clang-compatible baseline is:
 
 ~~~bash
-COMMON_FLAGS="-O2 -pipe -march=core2 -mtune=core2"
+COMMON_FLAGS="-O2 -march=core2 -mtune=core2"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
 FFLAGS="${COMMON_FLAGS}"
 FCFLAGS="${COMMON_FLAGS}"
 ~~~
 
-Rust target:
+Use `-O2` as the global baseline for correctness and broad package coverage. Use `-O3` only for package-scoped builds where representative runtime benchmarks show a benefit; `-O3` is not automatically faster for every workload. The currently scoped profile is `config/portage/env/custom-opt.conf`, mapped by `config/portage/package.env` to MC, SoX and LAME:
+
+~~~bash
+CFLAGS="-O3 -march=core2 -mtune=core2 -fomit-frame-pointer"
+CXXFLAGS="${CFLAGS}"
+FFLAGS="${CFLAGS}"
+FCFLAGS="${CFLAGS}"
+~~~
+
+Preserve that package scope. Do not promote `-O3` or `-fomit-frame-pointer` globally without target-runtime evidence and correctness checks. Do not use `-Ofast`, `-ffast-math`, `-fno-stack-protector`, or other semantics/security-changing flags as generic speed switches; require a package-specific technical justification and tests.
+
+### Rust and Cargo
+
+Rust must target Merom explicitly:
 
 ~~~bash
 RUSTFLAGS="-C target-cpu=core2"
 ~~~
 
-### Cargo release builds and ABI compatibility
+For release builds, use `opt-level=3` as the speed-oriented optimization level. Thin LTO and one codegen unit are runtime-performance candidates; retain them when target-runtime benchmarks justify them. Their longer compile/link time is irrelevant to this decision. Do not switch to `opt-level="s"` or `"z"` merely to shrink the executable.
 
-For standalone Rust applications built with Cargo, use a release profile and keep CPU tuning explicit. A project-controlled Cargo.toml should start with:
+For a project-controlled manifest, the starting release profile is:
 
 ~~~toml
 [profile.release]
@@ -103,33 +134,27 @@ codegen-units = 1
 incremental = false
 ~~~
 
-If the upstream manifest cannot be changed, apply equivalent Cargo profile settings through the build environment:
+Treat `lto = "thin"` and `codegen-units = 1` as performance candidates to validate on the target, not guaranteed wins for every application. `debug = 0` and `strip = "debuginfo"` reduce release artifact size; they are distribution choices and must not be described as execution-speed optimizations. Do not set `panic = "abort"` globally because it changes panic/unwind behavior.
+
+If the upstream manifest cannot be changed, apply profile settings through Cargo's environment overrides without rewriting upstream files:
 
 ~~~bash
 RUSTFLAGS="-C target-cpu=core2" \
+CARGO_PROFILE_RELEASE_OPT_LEVEL=3 \
 CARGO_PROFILE_RELEASE_DEBUG=0 \
 CARGO_PROFILE_RELEASE_STRIP=debuginfo \
 CARGO_PROFILE_RELEASE_LTO=thin \
 CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-CARGO_INCREMENTAL=0 \
 cargo build --release --target x86_64-unknown-linux-gnu
 ~~~
 
-Use `--locked` when the project commits a Cargo.lock. Do not overwrite an upstream Cargo.toml or .cargo/config.toml merely to inject local tuning; use build-environment overrides or a maintained downstream patch.
+Use `--locked` when the project commits a Cargo.lock. The target CPU and target libc ABI are separate constraints. For binaries intended to run on Debian 12, build in a Bookworm environment/sysroot (glibc 2.36) rather than linking against a newer Ubuntu runner's glibc. `--target x86_64-unknown-linux-gnu` and `target-cpu=core2` do not pin the glibc baseline. Inspect ELF version requirements with `readelf -W --version-info` and test on the oldest supported runtime. Distinguish weak from strong symbol-version requirements; do not treat every weak-version warning as a fatal dependency without testing execution.
 
-Thin LTO is a benchmark candidate, not a universal requirement. Compare release builds with and without LTO for executable size, startup/runtime performance, peak linker memory and build time. For size-sensitive utilities, compare `opt-level="s"` or `"z"` against `opt-level=3`; retain the variant that meets the actual size/performance target. Do not apply `panic="abort"` globally because it changes panic/unwind behavior. `strip="debuginfo"` removes DWARF debug information; it is not a license to disable arbitrary package functionality or feature-gated code.
+### Linux kernel compiler policy
 
-The target CPU and the target libc ABI are separate constraints. For binaries intended to run on Debian 12, build in a Bookworm environment/sysroot (glibc 2.36) rather than linking against a newer Ubuntu runner's glibc. `--target x86_64-unknown-linux-gnu` and `target-cpu=core2` do not pin the glibc baseline. Inspect ELF version requirements with `readelf -W --version-info` and test on the oldest supported runtime. Distinguish weak from strong symbol-version requirements; do not treat every weak-version warning as a fatal dependency without testing execution.
+For 64-bit Linux kernels, retain the generic x86-64 ISA baseline and use `KCFLAGS=-mtune=core2` when the workflow calls for tuning. Do not use `-march=core2` as the kernel ISA baseline and do not add `CONFIG_MCORE2`; there is no such x86-64 kernel processor selector.
 
-The explicit CPU_FLAGS_X86 baseline is MMX, SSE, SSE2, SSE3 and SSSE3. Do not enable SSE4, AVX, AVX2, AVX-512 or newer instructions absent from Merom.
-
-Do not change global optimization to -O3, -Ofast, -flto, -march=native, or add aggressive flags such as -fno-stack-protector without package-specific correctness/performance evidence. The project intentionally avoids global LTO. config/portage/env/custom-opt.conf contains a scoped -O3 -fomit-frame-pointer profile; config/portage/package.env maps it to selected packages (currently MC, SoX and LAME). Preserve that scope; do not promote it to global flags.
-
-### Kernel builds
-
-For 64-bit Linux kernels, retain the generic x86-64 ISA baseline and use KCFLAGS=-mtune=core2 when the workflow calls for tuning. Do not use -march=core2 as the kernel ISA baseline and do not add CONFIG_MCORE2; there is no such x86-64 kernel processor selector.
-
-Keep this policy consistent in kernel workflows, profile documentation and diagnostics. Distinguish compiler optimization from Kconfig architecture selection.
+The userspace `-march=core2` policy must not be copied into kernel builds. Keep this policy consistent in kernel workflows, profile documentation and diagnostics. Distinguish compiler optimization from Kconfig architecture selection.
 
 ## 5. Portage configuration — canonical paths and responsibilities
 
