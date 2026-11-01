@@ -52,4 +52,3 @@ The published workflow verifies hashes and initramfs contents, then boots the ac
 - [Kernel profiles](../kernels/README.md)
 - [Known issues](../docs/known-issues.md)
 - [Release index](../docs/releases.md)
-- [Agent rules](AGENTS.md)
