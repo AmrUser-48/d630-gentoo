@@ -33,7 +33,7 @@ jobs:
       BINPKG_RUN_IDS: "39507549274"
       LOCAL_RELEASE_ASSETS_DIR: ""
       SOURCE_FALLBACK: "true"
-      KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-40922514538
+      KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-41134237939
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +58,12 @@ jobs:
           name: d630-openbox-runtime-run-${{ github.run_number }}
           path: |
             output/squashfs
+            output/kernel
+            output/initramfs
+            output/KERNELRELEASE.txt
+            output/KERNEL-BUILD-MANIFEST.txt
+            output/INITTAB-PROBE.txt
+            output/scrcpy-manifest.log
             output/SQUASHFS-SHA256.txt
             output/SHA256SUMS
             output/RUNTIME-MANIFEST.txt
