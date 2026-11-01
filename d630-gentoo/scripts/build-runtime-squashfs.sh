@@ -337,6 +337,28 @@ if [[ "$SOURCE_FALLBACK" == true ]]; then
 else
   chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
+
+# glxgears is optional: use it only when its already-built binary package was
+# imported. Never start a new source build merely to add this diagnostic tool.
+GLXGEARS_STATUS="omitted: no imported x11-apps/mesa-progs binary package"
+MESA_PROGS_BINPKG="$(find "$ROOT/var/cache/binpkgs/x11-apps/mesa-progs" -maxdepth 1 -type f \
+  \( -name 'mesa-progs-*.gpkg.tar' -o -name 'mesa-progs-*.tbz2' \) -print -quit 2>/dev/null || true)"
+if [[ -n "$MESA_PROGS_BINPKG" ]]; then
+  if chroot "$ROOT" /bin/bash -lc \
+      'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly x11-apps/mesa-progs' \
+      |& tee "$OUT/mesa-progs-binpkg.log"; then
+    GLXGEARS_STATUS="installed from existing binary package"
+  else
+    GLXGEARS_STATUS="omitted: imported mesa-progs binary package had unresolved dependencies"
+  fi
+fi
+if [[ -x "$ROOT/usr/bin/glxgears" ]]; then
+  GLXGEARS_STATUS="included: /usr/bin/glxgears"
+else
+  GLXGEARS_STATUS="omitted: glxgears was not successfully installed"
+fi
+printf '%s\n' "$GLXGEARS_STATUS" > "$OUT/GLXGEARS-STATUS.txt"
+
 chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v useradd && command -v groupadd && command -v usermod && command -v openssl && command -v visudo'
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --ask=n --verbose --depclean --with-bdeps=n' |& tee "$OUT/depclean.log"
 if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
