@@ -107,7 +107,6 @@ grep -Fq 'grep -vx '\''sys-apps/man-db'\''' d630-gentoo/scripts/build-runtime-sq
 grep -Fq 'sys-apps\/man-db$/d' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'c1:12345:respawn:%s --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'command -v agetty' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'expected exactly one tty1 agetty respawn entry' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'wifi.nmconnection' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'chmod 0600' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'key="W-s"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
@@ -132,14 +131,20 @@ grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
 ! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'expected exactly one tty1 getty respawn entry' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'tty7|ttyS0' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'pam_elogind\.so' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'exec "$xorg" -nolisten tcp "$@" "vt$vt" -keeptty' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'required-atoms.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'BINPKG-OPTIONAL-SKIPPED.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'TOOL-AVAILABILITY.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+! grep -Fq 's0:12345:respawn' d630-gentoo/scripts/build-runtime-squashfs.sh
+! grep -Fq 'Xorg server is not installed setuid-root' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'usr/bin/alsamixer' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -150,7 +155,6 @@ grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/bu
 grep -Fq 'command -v usermod && command -v openssl && command -v visudo' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'useradd -M -U -u 1000 -s /bin/bash gentoo' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'awk -F: '\''$1 != "gentoo" { print $1 }'\'' /etc/group | paste -sd, -' d630-gentoo/config/runtime/d630-firstboot
-grep -Fq 's0:12345:respawn:%s -L 115200 ttyS0 vt100' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "rc-update del netmount default" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'find "$stage" -xdev -uid 1000 -exec chown -h 0 {} +' d630-gentoo/scripts/build-squashfs.sh
@@ -343,11 +347,7 @@ grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
 ! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -361,7 +361,6 @@ grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/bu
 grep -Fq 'command -v usermod && command -v openssl && command -v visudo' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'useradd -M -U -u 1000 -s /bin/bash gentoo' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'awk -F: '\''$1 != "gentoo" { print $1 }'\'' /etc/group | paste -sd, -' d630-gentoo/config/runtime/d630-firstboot
-grep -Fq 's0:12345:respawn:%s -L 115200 ttyS0 vt100' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "rc-update del netmount default" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'find "$stage" -xdev -uid 1000 -exec chown -h 0 {} +' d630-gentoo/scripts/build-squashfs.sh
