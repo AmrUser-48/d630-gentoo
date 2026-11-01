@@ -212,7 +212,7 @@ jobs:
           }
           echo "Restored PKGDIR contains $count binary package files."
           find "$pkgdir" -type f \( -name '*.gpkg.tar' -o -name '*.tbz2' \) \
-            -printf '%T@ %TY-%Tm-%Td %TH:%TM %p\n' | sort -nr | head -n 30 \
+            -printf '%T@ %TY-%Tm-%Td %TH:%TM %p\n' | sort -nr | sed -n '1,30p' \
             | tee "$RUNNER_TEMP/latest-binpkgs.txt"
 
           bash scripts/package-binpkgs-release.sh "$pkgdir" "$release_dir" 1500000000
