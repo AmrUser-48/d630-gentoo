@@ -334,7 +334,7 @@ done
 bash -n scripts/prune-obsolete-releases.sh
 bash -n scripts/update-release-index.sh
 bash scripts/prune-obsolete-releases.sh --dry-run
- d630-gentoo/config/package-sets/multimedia.list
+test -s d630-gentoo/config/wifi/wifi.nmconnection.example
 test -s d630-gentoo/config/wifi/wifi.nmconnection.example
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
@@ -344,7 +344,7 @@ grep -Fq 'Removing manuals, documentation trees, locale sources, and unused tran
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/ncmpcpp' d630-gentoo/scripts/build-squashfs.sh
+! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-squashfs.sh
