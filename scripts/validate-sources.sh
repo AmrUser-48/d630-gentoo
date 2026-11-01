@@ -96,6 +96,9 @@ test -s d630-gentoo/scripts/build-runtime-squashfs.sh
 test -s d630-gentoo/scripts/install-runtime-dotfiles.sh
 bash -n d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
+grep -Fq 'sys-apps/msr-tools' d630-gentoo/config/package-sets/cli.list
+grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/config/package-sets/multimedia.list
+grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
 grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
@@ -111,6 +114,9 @@ grep -Fq 'key="W-s"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 grep -Fq 'key="W-m"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 grep -Fq 'command -v pipewire' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'media-video/pipewire' config/portage/package.use/10-d630-hardware
+grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'NOPASSWD: ALL' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-runtime-dotfiles.sh
@@ -126,6 +132,9 @@ grep -Fq 'Required runtime application is absent from the final SquashFS' d630-g
 grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/ncmpcpp' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
