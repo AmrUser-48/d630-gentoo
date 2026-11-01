@@ -14,5 +14,13 @@ d630.squashfs=/d630-gentoo/squashfs
 # Three-file mode uses a temporary RAM OverlayFS upper/work. Changes vanish
 # at reboot; persistent overlay support is a separate later task.
 #
+# Optional: copy the compressed SquashFS into tmpfs before mounting it.
+# This releases the source partition after the copy; allow at least the image
+# size plus 256 MiB of available RAM. Requires the rebuilt initramfs.
+toram
+#
+# Not applicable to this x86-64 target: ppc=1 is not a D630 kernel option.
+#
+#
 # Verbose early-boot diagnostics:
 d630.debug=1 loglevel=7 ignore_loglevel
