@@ -87,6 +87,17 @@ done
 [ -n "$found_rootfs" ] ||
     fail "cannot find $squash_arg; checked NTFS3, exFAT, VFAT, ext4 and Btrfs partitions"
 
+# Import the optional host-side Wi-Fi keyfile into RAM before root switch.
+# This also keeps the profile available when toram unmounts the source partition.
+wifi_source=/run/d630/probe/d630-gentoo/wifi.nmconnection
+if [ -s "$wifi_source" ]; then
+    cp "$wifi_source" /run/d630/wifi.nmconnection ||
+        fail "cannot stage the optional Wi-Fi profile in RAM"
+    chmod 0600 /run/d630/wifi.nmconnection ||
+        fail "cannot secure the staged Wi-Fi profile"
+    log "Staged external Wi-Fi profile in RAM"
+fi
+
 if [ "$toram" = true ]; then
     # Keep enough headroom for the live system after copying the compressed root.
     source_bytes="$(wc -c < "$found_rootfs")" || fail "cannot determine SquashFS size for toram"
