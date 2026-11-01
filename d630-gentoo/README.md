@@ -64,5 +64,4 @@ The release QEMU test covered console/OpenRC startup and the direct three-file r
 - [Hardware inventory](../docs/hardware-inventory.md)
 - [Known issues](../docs/known-issues.md)
 - [Repository overview](../README.md)
-- [Agent rules](AGENTS.md)
 - [Release index](../docs/releases.md)
