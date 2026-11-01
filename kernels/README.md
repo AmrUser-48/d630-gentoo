@@ -86,4 +86,3 @@ Static profile validators inspect fragments and selected Kconfig requirements; t
 - [Known issues](../docs/known-issues.md)
 - [Legacy notes](NOTES-legacy.md)
 - [Release index](../docs/releases.md)
-- [Agent rules](AGENTS.md)
