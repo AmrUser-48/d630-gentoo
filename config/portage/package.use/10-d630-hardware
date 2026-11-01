@@ -39,9 +39,7 @@ media-sound/pulseaudio -daemon
 
 # D630 multimedia: ALSA, Opus/MP3 codecs and PipeWire output.
 media-sound/sox alsa opus flac ogg mad sndfile -ffmpeg
-media-sound/mpd opus lame pipewire
 media-video/ffmpeg mp3 opus
-media-video/mpv pipewire
 # Pinned scrcpy 3.3.4 D630 fork: SDL2/X11 only, no Wayland.
 app-mobilephone/scrcpy X -wayland
 
