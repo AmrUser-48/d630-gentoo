@@ -458,7 +458,8 @@ case "$vt" in
     exit 1
     ;;
 esac
-exec /usr/bin/Xorg -nolisten tcp "$@" "vt$vt" -keeptty
+if [ -x /usr/bin/Xorg ]; then xorg=/usr/bin/Xorg; else xorg=/usr/libexec/Xorg; fi
+exec "$xorg" -nolisten tcp "$@" "vt$vt" -keeptty
 EOF
   chmod 0755 "$ROOT/etc/X11/xinit/xserverrc"
   sh -n "$ROOT/etc/X11/xinit/xserverrc"
@@ -692,6 +693,8 @@ Source fallback: $SOURCE_FALLBACK
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
+TTY: one tty1 autologin respawn; no tty7 or serial getty.
+Xorg: rootless elogind session uses the active login VT.
 $(if [[ "$RUNTIME_PROFILE" == openbox ]]; then echo "Minimal runtime: Python 3 and its installed runtime modules retained; no Portage, package database, Perl, development tools, or compiler binaries. Only libgcc_s/libstdc++/libatomic GCC runtime libraries retained."; fi)
 $(cat "$OUT/KERNEL-MODULES.txt")
 EOF
@@ -763,11 +766,15 @@ else
   unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
   unsquashfs -cat "$OUT/squashfs" etc/inittab > "$OUT/INITTAB-PROBE.txt" || die "final SquashFS has no readable /etc/inittab"
   grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$OUT/INITTAB-PROBE.txt" || die "final SquashFS lost the tty1 autologin respawn entry"
+  [[ "$(grep -Ec '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*tty1([[:space:]]|$)' "$OUT/INITTAB-PROBE.txt")" == 1 ]] || die "final SquashFS has duplicate or missing tty1 getty respawns"
+  ! grep -Eq '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*ttyS0([[:space:]]|$)' "$OUT/INITTAB-PROBE.txt" || die "final SquashFS unexpectedly has a serial getty respawn"
+  unsquashfs -cat "$OUT/squashfs" etc/X11/xinit/xserverrc > "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS has no rootless-Xorg xserverrc"
+  grep -Fq '"vt$vt" -keeptty' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not bind Xorg to the active login VT"
   unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS is missing scrcpy-server"
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
-  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt required-binpkg-plan.log)
 fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
   [[ ! -f "$OUT/$optional" ]] || sum_files+=("$optional")
