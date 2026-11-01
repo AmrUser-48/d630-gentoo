@@ -12,6 +12,11 @@ case " $cmdline " in
     *" d630.debug=1 "*) set -x ;;
 esac
 
+toram=false
+case " $cmdline " in
+    *" toram "*) toram=true ;;
+esac
+
 getarg() {
     key=$1
     for word in $cmdline; do
@@ -81,6 +86,31 @@ done
 
 [ -n "$found_rootfs" ] ||
     fail "cannot find $squash_arg; checked NTFS3, exFAT, VFAT, ext4 and Btrfs partitions"
+
+if [ "$toram" = true ]; then
+    # Keep enough headroom for the live system after copying the compressed root.
+    source_bytes="$(wc -c < "$found_rootfs")" || fail "cannot determine SquashFS size for toram"
+    source_kib=$(( (source_bytes + 1023) / 1024 ))
+    mem_available_kib=""
+    while read -r key value unit; do
+        if [ "$key" = MemAvailable: ]; then
+            mem_available_kib=$value
+            break
+        fi
+    done < /proc/meminfo
+    if [ -n "$mem_available_kib" ] ] && [ "$mem_available_kib" -lt "$((source_kib + 262144))" ]; then
+        fail "toram needs at least SquashFS size plus 256 MiB available RAM"
+    fi
+
+    log "Copying SquashFS into RAM (toram)"
+    ram_rootfs=/run/d630/squashfs
+    cp "$found_rootfs" "$ram_rootfs" || fail "cannot copy SquashFS into RAM; disable toram or free memory"
+    ram_bytes="$(wc -c < "$ram_rootfs")" || fail "cannot verify RAM copy size"
+    [ "$ram_bytes" -eq "$source_bytes" ] || fail "RAM copy of SquashFS is incomplete"
+    umount /run/d630/probe || fail "cannot unmount the source partition after toram copy"
+    found_rootfs=$ram_rootfs
+    log "SquashFS is in RAM; the source partition has been released"
+fi
 
 log "Mounting read-only SquashFS root: $found_rootfs"
 mount -t squashfs -o loop,ro "$found_rootfs" /run/d630/lower ||
