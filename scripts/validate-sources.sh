@@ -144,7 +144,7 @@ grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop |
 grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq -- '--getbinpkg --usepkgonly --onlydeps' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--usepkgonly --onlydeps' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--getbinpkg=n --usepkgonly' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'command -v usermod && command -v openssl && command -v visudo' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -254,7 +254,7 @@ grep -Fq 'LLVM/Clang package records are present in the input root' d630-gentoo/
 grep -Fq 'dev-build/|dev-lang/perl-|dev-perl/|dev-util/|perl-core/' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'LOCAL_BINPKG_ARCHIVE' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'OUTPUT_DIR' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq -- "--getbinpkg --usepkgonly" d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- "--usepkgonly" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "net-wireless/wireless-regdb" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
 grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
