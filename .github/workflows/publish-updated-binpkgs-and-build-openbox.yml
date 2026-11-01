@@ -347,6 +347,8 @@ jobs:
             output/PREPARED-ASSET-CHECK.log
             output/SHA256SUMS
             output/SQUASHFS-SHA256.txt
+            output/GLXGEARS-STATUS.txt
+            output/mesa-progs-binpkg.log
             output/RUNTIME-MANIFEST.txt
             output/RELEASE-NOTES.md
             output/PACKAGES.txt
