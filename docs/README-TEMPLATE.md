@@ -38,4 +38,4 @@ List the exact checks that apply and what they prove. Never label static validat
 
 ## Related documentation
 
-Link authoritative adjacent guides, hardware notes, known issues, release index and component-specific agent rules.
+Link authoritative adjacent user guides, technical references, hardware notes, known issues and the release index.
