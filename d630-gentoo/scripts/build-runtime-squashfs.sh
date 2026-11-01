@@ -139,6 +139,26 @@ EOF
   git clone --depth 1 https://github.com/gentoo-mirror/guru.git "$ROOT/var/db/repos/guru"
 fi
 
+log "Install the pinned SDL2 scrcpy 3.3.4 local ebuild"
+LOCAL_REPO="$ROOT/var/db/repos/d630-local"
+mkdir -p "$LOCAL_REPO/metadata" "$LOCAL_REPO/app-mobilephone/scrcpy"
+cat > "$LOCAL_REPO/metadata/layout.conf" <<'EOF'
+repo-name = d630-local
+masters = gentoo
+thin-manifests = true
+EOF
+cat > "$ROOT/etc/portage/repos.conf/d630-local.conf" <<'EOF'
+[d630-local]
+location = /var/db/repos/d630-local
+priority = 1000
+auto-sync = no
+EOF
+install -m 0644 "$GITHUB_WORKSPACE/config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild" \
+  "$LOCAL_REPO/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
+chroot "$ROOT" /bin/bash -lc \
+  'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest' \
+  |& tee "$OUT/scrcpy-manifest.log"
+
 log "Import binary package assets"
 if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
   log "Verify recovered publisher artifact and import package shards"
@@ -244,6 +264,7 @@ EOF
     openbox)
       cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
       grep -vx 'sys-apps/man-db' "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt"
+      cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"
       ;;
     desktop) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
     daily-driver) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
@@ -327,11 +348,14 @@ fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
-    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/tldr /usr/bin/htop \
-    /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux \
+    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/grep /usr/bin/tldr \
+    /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux \
+    /usr/bin/scrcpy /usr/bin/sox /usr/bin/lame /usr/bin/mpv /usr/bin/mpd /usr/bin/ncmpcpp \
+    /usr/bin/nmcli /usr/bin/nmtui /usr/bin/pipewire /usr/bin/wireplumber \
     /usr/bin/aplay /usr/bin/arecord /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
+  [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "Openbox runtime is missing the matching scrcpy-server"
   mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
   [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Openbox runtime has no installed Mesa package metadata"
   if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
@@ -436,22 +460,32 @@ chroot "$ROOT" /bin/bash -lc 'rc-update add d630-zram boot'
 # Create the live user during sysinit, before init starts the tty1 login.
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 
-# Do not overwrite /etc/init.d/agetty.tty1: in Gentoo Stage 3 it may be a
-# symlink to the generic agetty service. Use init's inittab entry directly so
-# the --autologin argument cannot be lost through OpenRC service defaults.
+# One inittab respawn entry owns tty1. Remove OpenRC aliases from all runlevels.
+AGETTY_BIN="$(chroot "$ROOT" /bin/bash -lc 'command -v agetty' | tail -n 1)"
+[[ "$AGETTY_BIN" == /* && -x "$ROOT$AGETTY_BIN" ]] || die "util-linux agetty executable is missing from the runtime root"
 chroot "$ROOT" /bin/bash -lc 'rc-update del agetty.tty1 default' >/dev/null 2>&1 || true
+for runlevel_dir in "$ROOT"/etc/runlevels/*; do
+  [[ -d "$runlevel_dir" ]] || continue
+  rm -f "$runlevel_dir/agetty.tty1"
+done
 rm -f "$ROOT/etc/init.d/agetty.tty1"
 [[ -f "$ROOT/etc/inittab" ]] || die "Stage 3 has no /etc/inittab; cannot configure tty1 autologin"
-sed -i -E '/^[[:space:]]*[^:]+:[^:]*:respawn:.*agetty.*tty1/d' "$ROOT/etc/inittab"
-printf '\nc1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux\n' >> "$ROOT/etc/inittab"
-grep -Fq 'c1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux' "$ROOT/etc/inittab" ||
+sed -i -E '/^[[:space:]]*[^:]+:[^:]*:respawn:.*agetty.*(tty1|ttyS0)/d' "$ROOT/etc/inittab"
+printf '\nc1:12345:respawn:%s --autologin gentoo --noclear tty1 linux\n' "$AGETTY_BIN" >> "$ROOT/etc/inittab"
+printf 's0:12345:respawn:%s -L 115200 ttyS0 vt100\n' "$AGETTY_BIN" >> "$ROOT/etc/inittab"
+[[ "$(grep -Ec '^[^:]+:[^:]*:respawn:.*agetty.*tty1' "$ROOT/etc/inittab")" == 1 ]] ||
+  die "expected exactly one tty1 agetty respawn entry"
+[[ "$(grep -Ec '^[^:]+:[^:]*:respawn:.*agetty.*ttyS0' "$ROOT/etc/inittab")" == 1 ]] ||
+  die "expected exactly one serial agetty respawn entry"
+grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$ROOT/etc/inittab" ||
   die "tty1 autologin entry was not written to /etc/inittab"
+if find "$ROOT/etc/runlevels" -type l -name agetty.tty1 -print -quit | grep -q .; then
+  die "OpenRC still has an agetty.tty1 runlevel alias"
+fi
 if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
   chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
 fi
-if ! grep -Eq '^s0:12345:respawn:.*ttyS0' "$ROOT/etc/inittab"; then
-  printf '\ns0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100\n' >> "$ROOT/etc/inittab"
-fi
+grep -E '^[^#].*respawn:.*(tty1|ttyS0)' "$ROOT/etc/inittab" > "$OUT/INITTAB-PROBE.txt"
 if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
   [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
   chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
@@ -639,6 +673,8 @@ else
     bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
   fi
   unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
+  unsquashfs -cat "$OUT/squashfs" etc/inittab > "$OUT/INITTAB-PROBE.txt" || die "final SquashFS has no readable /etc/inittab"
+  grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$OUT/INITTAB-PROBE.txt" || die "final SquashFS lost the tty1 autologin respawn entry"
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
