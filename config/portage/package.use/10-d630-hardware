@@ -27,9 +27,9 @@ app-admin/sudo pam
 app-misc/mc gpm
 app-i18n/fbterm gpm
 
-# D630 audio: PipeWire + WirePlumber on OpenRC, ALSA compatibility, and Bluetooth audio.
+# D630 audio: PipeWire + WirePlumber on OpenRC and ALSA compatibility; no Bluetooth stack.
 # Use Gentoo's prebuilt PipeWire man pages (-man) instead of building them with Doxygen.
-media-video/pipewire bluetooth sound-server pipewire-alsa dbus elogind -man -systemd -system-service -doc -test
+media-video/pipewire -bluetooth sound-server pipewire-alsa dbus elogind -man -systemd -system-service -doc -test
 media-video/wireplumber elogind -systemd -system-service -doc -test
 media-sound/pulseaudio -daemon
 
