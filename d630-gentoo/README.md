@@ -55,6 +55,8 @@ Credentials stay outside the SquashFS and are not committed to Git. The host-sid
 
 For the normal direct boot path, GRUB loads the kernel and initramfs. The initramfs scans block devices for the SquashFS path. The kernel, initramfs and SquashFS may reside on different GRUB/Linux-readable partitions. The SquashFS host filesystem must be one of NTFS3, exFAT, VFAT, ext4 or Btrfs.
 
+For the Openbox profile, start X from the local login session with `startx` or `xinit`. Rootless Xorg uses the active login VT through elogind; the configuration does not reserve or assume `tty7`. A graphical test must provide a real virtual terminal (for example, QEMU with a VGA display), not serial-only mode.
+
 ### Kernel command-line options
 
 These are the options relevant to this D630 image, not an exhaustive list of every Linux kernel parameter.
