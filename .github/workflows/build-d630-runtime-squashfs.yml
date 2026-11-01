@@ -81,7 +81,7 @@ jobs:
         shell: bash
         env:
           PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-          BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids }}
+          BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274' || inputs.binpkg_run_ids || '' }}
         run: |
           set -Eeuo pipefail
           [[ -n "$PREPARED_ASSETS_RUN_ID" || -n "$BINPKG_RUN_IDS" ]] || {
