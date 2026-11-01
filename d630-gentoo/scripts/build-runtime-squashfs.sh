@@ -279,7 +279,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
 fi
 sed -i 's/#.*$//; /^[[:space:]]*$/d' "$WORK/atoms.txt"
 sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
-if grep -Evq '^(=|>=|<=|>|<|~)?[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(-[0-9][A-Za-z0-9+_.-]*)?(:[A-Za-z0-9+_.-]+)?
+if grep -Evq '^(=|>=|<=|>|<|~)?[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(-[0-9][A-Za-z0-9+_.-]*)?(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   # Mandatory desktop and device services must resolve from imported Core 2 binpkgs.
