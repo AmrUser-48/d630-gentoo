@@ -29,7 +29,7 @@ on:
         type: string
         default: ""
       source_fallback:
-        description: "Allow source builds for missing packages. Openbox always builds missing CLI apps and still requires Mesa from a binary package."
+        description: "Allow source builds for missing packages. Keep false for strict binpkg-only assembly; missing or mismatched binpkgs then fail fast."
         required: true
         type: boolean
         default: false
@@ -56,7 +56,7 @@ jobs:
       RUNTIME_PROFILE: ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
       BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274' || inputs.binpkg_run_ids || '' }}
-      SOURCE_FALLBACK: ${{ github.event_name == 'push' || inputs.runtime_profile == 'openbox' || inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
+      SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
 
