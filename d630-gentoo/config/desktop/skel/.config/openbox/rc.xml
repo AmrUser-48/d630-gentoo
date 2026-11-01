@@ -87,6 +87,13 @@
       <action name="Execute"><command>xterm -e htop</command></action>
     </keybind>
 
+    <keybind key="W-n"><action name="Execute"><command>xterm -e nvim</command></action></keybind>
+    <keybind key="W-s"><action name="Execute"><command>scrcpy</command></action></keybind>
+    <keybind key="W-m"><action name="Execute"><command>xterm -e ncmpcpp</command></action></keybind>
+    <keybind key="W-a"><action name="Execute"><command>xterm -e alsamixer</command></action></keybind>
+    <keybind key="W-i"><action name="Execute"><command>xterm -e nmtui</command></action></keybind>
+    <keybind key="W-v"><action name="Execute"><command>mpv</command></action></keybind>
+
     <!-- Session management -->
     <keybind key="A-F4"><action name="Close"/></keybind>
     <keybind key="W-S-q"><action name="Exit"/></keybind>
