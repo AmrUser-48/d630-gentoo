@@ -6,3 +6,4 @@ media-sound/lame
 media-sound/alsa-utils
 media-libs/opus
 media-sound/sox
+app-mobilephone/scrcpy
