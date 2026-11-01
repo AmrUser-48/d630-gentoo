@@ -260,7 +260,6 @@ net-misc/networkmanager
 net-wireless/iw
 net-wireless/wpa_supplicant
 net-wireless/wireless-regdb
-net-wireless/bluez
 EOF
   case "$RUNTIME_PROFILE" in
     console) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
@@ -505,7 +504,7 @@ if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; the
   [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
   chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
 fi
-for SERVICE in dbus NetworkManager bluetooth; do
+for SERVICE in dbus NetworkManager; do
   [[ -x "$ROOT/etc/init.d/$SERVICE" ]] && chroot "$ROOT" /bin/bash -lc "rc-update add '$SERVICE' default" || true
 done
 if [[ "$RUNTIME_PROFILE" == gui-initram && -x "$ROOT/etc/init.d/dhcpcd" ]]; then
