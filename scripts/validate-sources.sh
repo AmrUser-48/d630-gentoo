@@ -122,8 +122,219 @@ grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'NOPASSWD: ALL' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-runtime-dotfiles.sh
-grep -Fq 'mpd.conf' d630-gentoo/scripts/install-runtime-dotfiles.sh
-test -s d630-gentoo/config/desktop/skel/.config/mpd/mpd.conf
+! grep -Fq 'mpd.conf' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
+! grep -Eq '^(media-sound/(mpd|ncmpcpp)|media-video/mpv)test -s d630-gentoo/config/wifi/wifi.nmconnection.example
+grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
+grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
+! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--usepkgonly --onlydeps' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--getbinpkg=n --usepkgonly' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'command -v usermod && command -v openssl && command -v visudo' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'useradd -M -U -u 1000 -s /bin/bash gentoo' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 'awk -F: '\''$1 != "gentoo" { print $1 }'\'' /etc/group | paste -sd, -' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 's0:12345:respawn:%s -L 115200 ttyS0 vt100' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq "rc-update del netmount default" d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'find "$stage" -xdev -uid 1000 -exec chown -h 0 {} +' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'chown 0:0 "$stage/var"' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'chroot "$ROOT" chmod 4755 /usr/bin/sudo' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'chmod 0755 "$ROOT/etc/sudoers.d"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'chown -R gentoo:gentoo /home/gentoo' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 'openssl passwd -6 gentoo' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 'find "$ROOT" -xdev -uid 1000 -exec chown -h 0 {} +' d630-gentoo/scripts/build-state-squashfs.sh
+grep -Fq 'umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq '\${FEATURES} -userpriv' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'the installed Mesa binpkg has USE=llvm' d630-gentoo/scripts/build-runtime-squashfs.sh
+
+test -s d630-gentoo/scripts/build-runtime-squashfs-local.sh
+test -s .github/workflows/build-d630-runtime-squashfs.yml
+grep -Fq 'contents: write' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'softprops/action-gh-release@v3' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'eselect repository enable guru' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'emaint sync -r guru' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"' .github/workflows/gentoo-interactive-build.yml
+grep -Fq 'uses: actions/upload-artifact@v4' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'name: Prepare existing Gentoo assets for SquashFS build' .github/workflows/publish-gentoo-binpkgs.yml
+grep -Fq 'name: Download recovered Gentoo assets artifact' .github/workflows/build-d630-runtime-squashfs.yml
+grep -Fq 'LOCAL_RELEASE_ASSETS_DIR' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'LOCAL_BINPKG_ARCHIVE' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'Archive format: gpg-aes256-encrypted-zstd-tar' scripts/save-runner-state-encrypted.sh
+grep -Fq 'save-gentoo-state --resume' scripts/save-runner-state-encrypted.sh
+grep -Fq 'Remote release tag does not match the local snapshot.' scripts/save-runner-state-encrypted.sh
+grep -Fq 'Remote release assets do not exactly match this snapshot.' scripts/save-runner-state-encrypted.sh
+grep -Fq 'STATE_ENCRYPTION_PASSPHRASE' .github/workflows/restore-gentoo-runner-state.yml
+grep -Fq 'gpg --batch --yes --pinentry-mode loopback' .github/workflows/restore-gentoo-runner-state.yml
+! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
+! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/build-d630-runtime-squashfs.yml
+
+grep -Fq 'COMMON_FLAGS="-O2 -march=core2 -mtune=core2"' config/make.conf
+grep -Fq 'COMMON_FLAGS="-O2 -march=core2 -mtune=core2"' config/portage/make.conf
+grep -Fq 'CFLAGS="-O3 -march=core2 -mtune=core2 -fomit-frame-pointer"' config/portage/env/custom-opt.conf
+! grep -Fq -- '-pipe' config/make.conf
+! grep -Fq -- '-pipe' config/portage/make.conf
+! grep -Fq -- '-pipe' config/portage/env/custom-opt.conf
+grep -q 'CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-core2-cpu
+! grep -Eq 'CPU_FLAGS_X86:.*(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
+! grep -Eq 'cpu_flags_x86_(sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
+grep -q 'x11-base/xorg-server' d630-gentoo/config/package.list
+grep -q 'x11-wm/openbox' d630-gentoo/config/package.list
+grep -qi 'squashfs' kernels/README.md
+grep -Fxq 'CONFIG_OVERLAY_FS=y' kernels/profiles/40-d630-builtin.config
+grep -Fxq 'CONFIG_BLK_DEV_LOOP=y' kernels/profiles/40-d630-builtin.config
+grep -q 'd630.persistence=auto' d630-gentoo/iso/boot/grub/loopback.cfg
+grep -q 'd630.persistence=volatile' d630-gentoo/iso/boot/grub/loopback.cfg
+sh -n d630-gentoo/initramfs/init
+grep -Fq 'toram=true' d630-gentoo/initramfs/init
+grep -Fq 'umount /run/d630/probe' d630-gentoo/initramfs/init
+grep -Fq 'applets=(sh mount find mkdir sleep switch_root umount cat cp wc)' .github/workflows/build-d630-kernel.yml
+grep -Fq 'toram' d630-gentoo/config/kernel-cmdline.txt
+grep -Fq 'cp "$wifi_source" /run/d630/wifi.nmconnection' d630-gentoo/initramfs/init
+grep -Fq 'wifi_source=/run/d630/wifi.nmconnection' d630-gentoo/config/runtime/d630-firstboot
+sh -n d630-gentoo/iso/scripts/create-persistence-image.sh
+sh -n d630-tiny/init
+sh -n d630-tiny/wifi-connect
+sh -n d630-tiny/lf-preview
+sh -n d630-tiny/udhcpc-default.script
+bash -n d630-tiny/export-wifi-profile.sh
+bash -n d630-tiny/build-setup-tools.sh
+bash -n d630-tiny/build-initramfs.sh
+bash -n d630-tiny/build-network-tools.sh
+bash -n d630-tiny/rebuild-initramfs.sh
+bash -n d630-tiny/gentoo-chroot
+bash -n scripts/gentoo-build-set
+bash -n scripts/package-binpkgs-release.sh
+bash -n scripts/install-binpkgs-release.sh
+bash -n scripts/snapshot-gentoo-session.sh
+bash -n scripts/save-runner-state-encrypted.sh
+
+# bash -n does not parse Python embedded in quoted heredocs. Compile those
+# snippets too, so malformed embedded Python in the single state-save script is caught.
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+for filename in ("scripts/save-runner-state-encrypted.sh",):
+    source = Path(filename).read_text(encoding="utf-8")
+    snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
+    if not snippets:
+        raise SystemExit(f"No embedded Python heredocs found in {filename}")
+    for index, snippet in enumerate(snippets, start=1):
+        compile(snippet, f"{filename}:python-heredoc-{index}", "exec")
+print("embedded Python syntax: passed")
+PY
+bash -n d630-gentoo/scripts/build-squashfs.sh
+bash -n d630-gentoo/scripts/build-runtime-squashfs.sh
+bash -n d630-gentoo/scripts/build-runtime-squashfs-local.sh
+grep -Fq 'du -shx "$src" "$output"' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/init($| ->)' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq "MINIMAL_RUNTIME=true bash" d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- "--exclude='/var/cache/***'" d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'Removing Portage, language runtimes, development tools, and compiler binaries.' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'remove_package_payload sys-devel/gcc true' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'import bz2, json, lzma, sqlite3, ssl, sys' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'libgcc_s.so.[0-9]*|libstdc++.so.[0-9]*|libatomic.so.[0-9]*)' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'rm -f "$stage/usr/share/hwdata/oui.txt"' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'dev-lang/python' d630-gentoo/config/package-sets/gui-initram.list
+grep -Fq '"$stage/var/db/pkg"' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'rm -f "$stage/usr/bin"/{g-ir-*,eu-*,sqlite3,perl*}' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'ln -s ../usr/lib/netifrc "$stage/lib/netifrc"' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'LLVM/Clang package records are present in the input root' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'dev-build/|dev-lang/perl-|dev-perl/|dev-util/|perl-core/' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'LOCAL_BINPKG_ARCHIVE' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'OUTPUT_DIR' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- "--usepkgonly" d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq "net-wireless/wireless-regdb" d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--ignore-default-opts --ask=n --verbose' scripts/gentoo-build-set
+grep -Fq "emerge --ignore-default-opts --sync --quiet" .github/workflows/gentoo-interactive-build.yml
+grep -q 'rootfs.squashfs' d630-gentoo/iso/boot/grub/loopback.cfg
+grep -q 'gentoo-data.img' d630-gentoo/iso/boot/grub/loopback.cfg
+! grep -q '@SHELL@' d630-gentoo/config/package-sets/daily-driver.list
+
+test -s d630-gentoo/boot/grub/three-file.cfg
+grep -Fq 'd630-gentoo/kernel' d630-gentoo/boot/grub/three-file.cfg
+grep -Fq 'd630-gentoo/initramfs' d630-gentoo/boot/grub/three-file.cfg
+! grep -Fq 'd630.boot_uuid=$d630_boot_uuid' d630-gentoo/boot/grub/three-file.cfg
+grep -Fq '/d630-gentoo/squashfs' d630-gentoo/initramfs/init
+! grep -Fq '$(blkid' d630-gentoo/initramfs/init
+
+test -s kernels/profiles/20-d630-base.config
+test -s kernels/profiles/30-d630-live.config
+test -s kernels/profiles/40-d630-builtin.config
+grep -Fxq 'CONFIG_MODULES=y' kernels/profiles/20-d630-base.config
+grep -Fxq 'CONFIG_DRM_I915=m' kernels/profiles/20-d630-base.config
+grep -Fxq 'CONFIG_IWL3945=m' kernels/profiles/20-d630-base.config
+grep -Fxq 'CONFIG_BLK_DEV_INITRD=y' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_DRM_I915=y' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_IWL3945=y' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_SQUASHFS=n' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_OVERLAY_FS=n' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_BLK_DEV_LOOP=n' kernels/profiles/30-d630-live.config
+grep -Fxq 'CONFIG_SQUASHFS_ZSTD=y' kernels/profiles/40-d630-builtin.config
+grep -Fxq 'CONFIG_IWL3945=y' kernels/profiles/40-d630-builtin.config
+grep -Fxq 'CONFIG_USB_NET_RNDIS_HOST=y' kernels/profiles/40-d630-builtin.config
+bash scripts/validate-kernel-profiles.sh
+
+test -s scripts/validate-kernel-config.sh
+bash scripts/validate-kernel-config.sh
+echo "D630 Tiny + Gentoo OS sources and all three kernel profiles: validation passed"
+
+
+# Standard documentation and AI-agent entry points.
+test -s AGENTS.md
+test -s llms.txt
+test -s .github/copilot-instructions.md
+test -s docs/README-TEMPLATE.md
+grep -Fq 'CARGO_PROFILE_RELEASE_STRIP=debuginfo' AGENTS.md
+grep -Fq 'CARGO_PROFILE_RELEASE_LTO=thin' AGENTS.md
+grep -Fq 'BINPKG_COMPRESS_FLAGS="-9"' AGENTS.md
+grep -Fq '[AI agent rules](AGENTS.md)' README.md
+! grep -Fq 'AGENTS.md' d630-tiny/README.md
+! grep -Fq 'AGENTS.md' d630-gentoo/README.md
+! grep -Fq 'AGENTS.md' kernels/README.md
+! grep -Fq 'AGENTS.md' llms.txt
+! grep -Fq 'AGENTS.md' docs/README-TEMPLATE.md
+test -s docs/releases.md
+test -s scripts/prune-obsolete-releases.sh
+test -s scripts/update-release-index.sh
+test -s d630-tiny/AGENTS.md
+test -s d630-gentoo/AGENTS.md
+test -s kernels/AGENTS.md
+test -s d630-tiny/docs/USER-GUIDE.md
+test -s docs/archive/legacy-iso-design.md
+! test -e d630-gentoo/docs/legacy-iso-design.md
+grep -Fq 'cp d630-tiny/docs/USER-GUIDE.md output/README-D630-Tiny.md' .github/workflows/build-d630-tiny-initramfs.yml
+
+expected_sections="$(printf '%s\n' Overview Status Layout Requirements Use Build Releases Validation 'Related documentation')"
+for readme in README.md d630-tiny/README.md d630-gentoo/README.md d630-gentoo/iso/README.md kernels/README.md docs/archive/README.md; do
+    actual_sections="$(grep '^## ' "$readme" | sed 's/^## //')"
+    if [ "$actual_sections" != "$expected_sections" ]; then
+        echo "README section order does not match docs/README-TEMPLATE.md: $readme" >&2
+        exit 1
+    fi
+done
+
+bash -n scripts/prune-obsolete-releases.sh
+bash -n scripts/update-release-index.sh
+bash scripts/prune-obsolete-releases.sh --dry-run
+ d630-gentoo/config/package-sets/multimedia.list
 test -s d630-gentoo/config/wifi/wifi.nmconnection.example
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
