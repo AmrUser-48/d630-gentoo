@@ -1,63 +1,204 @@
-# AGENTS.md — D630 Linux repository
+# AGENTS.md — D630 Linux repository rules
 
-Operational instructions for AI coding agents. Human-facing documentation is in component READMEs and user guides; concise project context is in [llms.txt](llms.txt).
+Canonical instructions for AI coding agents working in this repository. Read this file before editing. Component-level AGENTS.md files may add local constraints, but this file owns shared policy and hardware/build facts.
 
-## Required reading
+## 1. Read order and authority
 
-Before editing, read `llms.txt`, this file, the root [README](README.md), the nearest component `README.md` and `AGENTS.md`, and [known issues](docs/known-issues.md). Before changing or deleting release assets, also read [the release index](docs/releases.md).
+Before changing files:
 
-## Architecture invariants
+1. Read this file, the root README.md, llms.txt, and the nearest component README.md and AGENTS.md.
+2. Read docs/known-issues.md and the relevant technical guide. For graphics work, include d630-gentoo/gma-readme.md and docs/hardware-inventory.md.
+3. Inspect the exact workflow, script, manifest, package list, kernel profile, or configuration that will be changed.
+4. Before release/tag/asset/state operations, read docs/releases.md and the cleanup script.
+
+Use this precedence: explicit user request; this root policy; component-specific agent rules; implementation details in workflows/scripts; human-facing documentation. Never silently change an invariant to make a build pass. Update the relevant documentation when a verified project fact changes.
+
+.github/copilot-instructions.md is only an AI-tool entry point to this file. Do not create a second set of Copilot-only engineering rules.
+
+## 2. Repository architecture — do not merge these targets
 
 There are two separate operating systems:
 
-- `d630-tiny/`: standalone BusyBox shell and external initramfs; no Gentoo root or Portage; runtime changes are RAM-only.
-- `d630-gentoo/`: Gentoo/OpenRC live OS; read-only SquashFS and volatile RAM OverlayFS.
+- d630-tiny/: standalone BusyBox shell and external initramfs. No Gentoo root or Portage; runtime changes are RAM-only.
+- d630-gentoo/: Gentoo/OpenRC live OS. Read-only SquashFS root with a volatile RAM OverlayFS upper layer.
 
-There are three mutually exclusive kernel profiles:
+There are three mutually exclusive kernel configuration fragments:
 
-- `20-d630-base.config`: modular overlay for conventional installed Gentoo.
-- `30-d630-live.config`: standalone Tiny kernel.
-- `40-d630-builtin.config`: built-in Gentoo live/SquashFS kernel and current kernel workflow target.
+- kernels/profiles/20-d630-base.config: modular overlay for conventional installed Gentoo.
+- kernels/profiles/30-d630-live.config: standalone Tiny kernel.
+- kernels/profiles/40-d630-builtin.config: built-in Gentoo live/SquashFS kernel and current kernel-workflow target.
 
-These are configuration fragments, not three complete `.config` files. Never combine them. Do not imply profiles 20/30 have dedicated built and tested releases until those builds exist.
+These are fragments/overlays, not interchangeable full .config files. Never merge all profiles or imply that profiles 20/30 have dedicated tested releases until their build and boot workflows exist.
 
-## Hardware and compiler policy
+Preferred Gentoo boot is direct GRUB loading of the matching kernel, external initramfs and SquashFS from a normal GRUB-readable partition. ISO packaging remains optional; ISO-specific early userspace and persistent boot are not yet proven end to end. Keep writable gentoo-data.img beside the ISO on writable host storage, never inside the read-only ISO.
 
-Target: Dell Latitude D630, Core 2 Duo T7250, Intel GM965/GMA X3100, Intel PRO/Wireless 3945ABG, HDA/SigmaTel, AHCI/ATA_PIIX, USB 2.0 and legacy BIOS/GRUB.
+Preserve the original Gentoo build root and /var/cache/binpkgs. Runtime image trimming must operate on a separate staging root, never the restored build root.
 
-Gentoo userland: `-O2 -pipe -march=core2 -mtune=core2`. 64-bit Linux kernel: generic x86-64 ISA baseline with `KCFLAGS=-mtune=core2`. Do not set `CONFIG_MCORE2` or use `-march=native` in CI.
+## 3. Physical target and hardware facts
 
-## Change discipline
+Primary target: Dell Latitude D630, legacy BIOS, Intel Core 2 Duo T7250 (Merom), 64-bit x86.
 
-- Inspect active workflows, manifests and release-tag references before changing build inputs.
-- Keep the direct-folder Gentoo boot path as the current tested method. ISO remains an optional packaging/distribution target; ISO-specific early userspace and end-to-end boot/persistence testing are unfinished.
-- Keep writable `gentoo-data.img` beside the ISO on a writable host filesystem, never inside the read-only ISO.
-- Preserve the original Gentoo runner root and `/var/cache/binpkgs`; trim only a separate runtime staging root.
-- Treat repository-root `output/` as historical CI staging, not automatically the newest release.
-- Never delete a release, tag, asset or saved runner snapshot by age alone. Follow the explicit cleanup policy and dry-run in `scripts/prune-obsolete-releases.sh`; preserve all currently pinned kernel bundles and the newest two encrypted runner states.
-- Do not reveal/log `STATE_ENCRYPTION_PASSPHRASE`, GitHub credentials or decrypted runner-state contents.
-- Do not silently replace pinned artifacts with newer ones: kernel configurations, module archives and firmware may differ.
-- Report source validation, package/kernel build, artifact checksums, QEMU boot, graphical startup and physical D630 tests as separate results.
+| Device | Confirmed hardware | Linux driver / policy |
+|---|---|---|
+| CPU | Core 2 Duo T7250, family 6/model 15, two cores | Core2 userland tuning; generic x86-64 kernel ISA |
+| GPU | GM965 / GMA X3100, VGA 8086:2a02, secondary function 8086:2a03, Dell subsystem 1028:01f9 | Kernel i915; Mesa Crocus is the current Gen4+ Gallium path; legacy Intel DDX is optional A/B only |
+| Wi-Fi | Intel PRO/Wireless 3945ABG, 8086:4222 | iwl3945; include matching firmware |
+| Audio | HDA controller 8086:284b, SigmaTel/IDT STAC9205 codec | HDA and SigmaTel codec support |
+| SATA | AHCI 8086:2829; IDE/ATAPI 8086:2850 | ahci, ata_piix, optical-drive support when required |
+| USB | ICH8 UHCI/EHCI; USB 2.0 | UHCI/EHCI, HID, mass storage, USB networking |
+| Android tethering | ADB/fastboot and USB RNDIS are required project use cases | Keep USB host, usbnet and RNDIS host support |
+| Input | i8042 keyboard, Alps DualPoint touchpad/TrackPoint, USB HID | evdev/libinput and optional Synaptics profile |
 
-## Canonical checks
+Do not invent device IDs, firmware requirements, peripherals, or physical test results. Use lspci -nnk, lsusb, dmesg and the hardware inventory to resolve unknown devices. Treat the hardware inventory and component-specific technical guides as the detailed record.
 
-From repository root:
+### Graphics policy
 
-- `./scripts/validate-sources.sh`
-- `bash scripts/validate-kernel-profiles.sh`
-- `bash scripts/validate-kernel-config.sh`
+Keep graphics layers distinct:
 
-Read each workflow before dispatch. Expensive kernel and restored-runner workflows are not documentation-validation tools.
+- Kernel i915 = DRM/KMS kernel driver.
+- Xorg modesetting or legacy intel = DDX.
+- Mesa crocus or classic i965 = OpenGL DRI driver.
+- DRI2/DRI3 = X server/client buffer-sharing protocols, not codec drivers.
+- i965_dri.so = classic Mesa OpenGL driver; i965_drv_video.so = Intel VA-API driver.
 
-## Documentation policy
+Gentoo default: Xorg built-in modesetting DDX with Mesa Crocus. The xf86-video-intel DDX with SNA/UXA is a separate A/B test; never enable both DDX Device sections at once. Existing Xorg profiles are under d630-gentoo/config/xorg/; keep the active Synaptics input configuration separate from optional graphics profiles.
 
-Every project `README.md` follows [docs/README-TEMPLATE.md](docs/README-TEMPLATE.md), with the same section order. Detailed runbooks belong in dedicated guides.
+GM965 is Gen4, not GM45/Gen4.5. Do not claim H.264 fixed-function decoding or working VA-API on this GPU. The Intel legacy VA-API driver's documented platform list does not include GM965. Software H.264 decoding can coexist with hardware OpenGL compositing/rasterization. XvMC is a legacy MPEG-1/2-era interface; its initialization does not prove browser video acceleration.
 
-Keep these audiences separate:
+For full DRI/Mesa/VA-API/XvMC history and diagnostics, use d630-gentoo/gma-readme.md; do not duplicate its technical history in general README files.
 
-- `README.md`: human-facing purpose, status and navigation.
-- `AGENTS.md`: operational instructions and repository invariants for coding agents.
-- `llms.txt`: compact project context and authoritative document map.
-- `.github/copilot-instructions.md`: pointer to the canonical agent instructions.
+## 4. Compiler and CPU tuning policy
 
-Avoid maintaining conflicting duplicated rules. Nested `AGENTS.md` files may add component-specific constraints, but must not override root architecture rules.
+The CI runner CPU is not the target CPU. Never derive target flags from -march=native, host lscpu, or runner cpuid2cpuflags.
+
+### Gentoo userland defaults
+
+Canonical C/C++/Fortran target:
+
+~~~bash
+COMMON_FLAGS="-O2 -pipe -march=core2 -mtune=core2"
+CFLAGS="${COMMON_FLAGS}"
+CXXFLAGS="${COMMON_FLAGS}"
+FFLAGS="${COMMON_FLAGS}"
+FCFLAGS="${COMMON_FLAGS}"
+~~~
+
+Rust target:
+
+~~~bash
+RUSTFLAGS="-C target-cpu=core2"
+~~~
+
+The explicit CPU_FLAGS_X86 baseline is MMX, SSE, SSE2, SSE3 and SSSE3. Do not enable SSE4, AVX, AVX2, AVX-512 or newer instructions absent from Merom.
+
+Do not change global optimization to -O3, -Ofast, -flto, -march=native, or add aggressive flags such as -fno-stack-protector without package-specific correctness/performance evidence. The project intentionally avoids global LTO. config/portage/env/custom-opt.conf contains a scoped -O3 -fomit-frame-pointer profile; config/portage/package.env maps it to selected packages (currently MC, SoX and LAME). Preserve that scope; do not promote it to global flags.
+
+### Kernel builds
+
+For 64-bit Linux kernels, retain the generic x86-64 ISA baseline and use KCFLAGS=-mtune=core2 when the workflow calls for tuning. Do not use -march=core2 as the kernel ISA baseline and do not add CONFIG_MCORE2; there is no such x86-64 kernel processor selector.
+
+Keep this policy consistent in kernel workflows, profile documentation and diagnostics. Distinguish compiler optimization from Kconfig architecture selection.
+
+## 5. Portage configuration — canonical paths and responsibilities
+
+The configuration tree under config/portage/ is the source used by the active Gentoo chroot/build workflows. The builders copy these files into the build root's /etc/portage/; inspect the workflow before assuming a file is installed.
+
+| Path | Responsibility |
+|---|---|
+| config/portage/make.conf | Canonical Gentoo Portage defaults: stable amd64, Core2 C/C++/Fortran flags, Rust target, jobs defaults, binpkg/log directories, global USE and VIDEO_CARDS=intel |
+| config/portage/package.use/00-core2-cpu | Explicit Merom-safe CPU_FLAGS_X86 values |
+| config/portage/package.use/10-d630-hardware | Mesa/Xorg/GPU, input, OpenRC/audio and D630-specific USE policy |
+| config/portage/package.use/20-repositories | Overlay/repository integration flags |
+| config/portage/package.accept_keywords/20-guru | Narrow per-package ~amd64 exceptions; base remains stable-only |
+| config/portage/package.env + env/custom-opt.conf | Per-package compiler override mapping |
+| config/portage/binrepos.conf/gentoobinhost.conf | Signed official Gentoo binary repository |
+| config/portage/profile/package.use.force | Deliberate LLVM target-force override; keep only after validating LLVM/Mesa build requirements |
+
+Important current settings:
+
+- ACCEPT_KEYWORDS="amd64"; do not switch the entire tree to ~amd64. Add narrowly scoped exceptions only when required and documented.
+- Global USE is OpenRC/X11-oriented and excludes systemd/Wayland. Per-package files narrow Mesa to Intel/Crocus and exclude Vulkan/LLVM USE for Mesa while retaining only the LLVM helper targets required by the current Mesa build.
+- LLVM/Clang build targets are restricted to X86 and SPIRV by package-specific configuration. Do not broaden the target list without a dependency/build reason.
+- FEATURES="parallel-fetch buildpkg getbinpkg", PKGDIR=/var/cache/binpkgs, and the signed binhost settings are intentional. Preserve reusable binary packages.
+- EMERGE_DEFAULT_OPTS is interactive by default (--ask). Non-interactive scripts/workflows must explicitly use --ask=n or --ignore-default-opts where appropriate.
+- Base MAKEOPTS/NINJAOPTS are defaults. CI workflows may recalculate them from available CPU/RAM and append runtime values; do not hard-code a runner-specific job count into shared build scripts.
+- The current Mesa/runtime workflows enforce an x86_64-only ABI in their build-root setup when required. Do not change ABI policy globally without checking all consumers.
+
+config/make.conf is a separate compatibility/validation file retained by the repository. Active Gentoo chroot builders install config/portage/make.conf. Do not assume the root-level file is the effective chroot configuration; preserve the overlap explicitly checked by scripts/validate-sources.sh and inspect actual workflow references before editing either file.
+
+Before changing Portage settings:
+
+1. Read the relevant configuration file and all package-specific overrides that can affect it.
+2. Check workflow install/copy logic and environment overrides.
+3. Inspect effective values with portageq envvar inside the actual Gentoo root.
+4. Resolve changes with emerge --pretend --verbose --tree before building.
+5. Keep package USE, keyword, env and profile-force overrides scoped to the smallest necessary package set.
+
+Do not assume a USE flag exists. Verify the selected ebuild's metadata and the actual Portage version. Never solve a dependency conflict by deleting the Portage cache or replacing the restored build root.
+
+## 6. README and human documentation style
+
+All active project READMEs use one human-readable Markdown format. The canonical section order is enforced by scripts/validate-sources.sh and defined in docs/README-TEMPLATE.md.
+
+Required order, with these exact H2 headings:
+
+1. Overview
+2. Status
+3. Layout
+4. Requirements
+5. Use
+6. Build
+7. Releases
+8. Validation
+9. Related documentation
+
+Style rules:
+
+- Exactly one H1 title. Use the nine H2 sections above, in order; do not rename, reorder, omit or add top-level H2 sections in active README files. H3 subsections are allowed only when they improve navigation.
+- Write for a person using or maintaining the project, not for an AI model. Use direct, concrete language and short paragraphs.
+- Keep the root README an index: concise project overview, status table, repository map, essential boot/build pointers and links. Do not put lengthy procedures, historical research, raw logs, full configuration files or repeated technical policy in it.
+- Keep component READMEs focused on that component. Put step-by-step procedures in user guides; hardware research in hardware/technical guides; historical detail in archive or technical references.
+- Use one consistent vocabulary: “D630 Tiny”, “D630 Gentoo”, “kernel profile”, “SquashFS”, “OverlayFS”, “Core 2”, “GM965/GMA X3100”. Explain uncommon acronyms once when needed.
+- Use Markdown tables for compact status/matrix data, bullets for short parallel items, and fenced code blocks with a language tag for commands/configuration. Do not use screenshots or decorative ASCII art as a substitute for instructions.
+- Prefer relative links inside the repository. Use exact release tags/asset names when known; do not write ambiguous “latest” links when a pinned release is required.
+- State what is implemented and what is not. Distinguish source validation, package/kernel build, checksum verification, QEMU boot, graphical startup and physical D630 validation. Never turn a plan or an untested hypothesis into a “working” claim.
+- Avoid badges, oversized banners, duplicate summaries, changelog dumps, verbose AI-generated filler and duplicated content maintained in several READMEs.
+- Keep the section headings even when a section is short; use “Not applicable” only when it is genuinely relevant.
+- Update related READMEs and the README template when changing the required format. The root README is the only human-facing README that links to this file.
+
+The authoritative template is docs/README-TEMPLATE.md. Do not introduce an alternative README structure in a component directory.
+
+## 7. Source, workflow and release discipline
+
+- Inspect the active workflow and its scripts before changing build inputs, runner restoration, caches, artifact names or release behavior.
+- Preserve the original Gentoo runner root and /var/cache/binpkgs; runtime pruning operates only on a separate staging copy.
+- Treat repository-root output/ as CI staging, not automatically the newest release.
+- Do not silently replace pinned kernel bundles, module archives, firmware or binpkg sets. Their exact tags, manifests and checksums are part of the build input.
+- Never delete a release, tag, asset or saved runner snapshot by age alone. Follow scripts/prune-obsolete-releases.sh, inspect its dry-run, retain all pinned kernel bundles and preserve the newest two encrypted runner states.
+- Never expose or log STATE_ENCRYPTION_PASSPHRASE, GitHub credentials, private keys or decrypted runner-state contents.
+- Do not trigger expensive kernel, full Gentoo or restored-runner workflows merely to validate documentation. Use the light source-validation workflow for static checks.
+- Use readable workflow/job/step names. Record runner resources, selected target flags, package/config inputs and artifact checksums in build diagnostics.
+- Keep Tiny and Gentoo artifacts, boot entries and release tags separate.
+
+## 8. Validation and reporting
+
+From repository root, run the relevant checks:
+
+~~~bash
+./scripts/validate-sources.sh
+bash scripts/validate-kernel-profiles.sh
+bash scripts/validate-kernel-config.sh
+~~~
+
+Read the validator before changing files it checks. Do not weaken or remove assertions just to make an edit pass; update checks when a deliberate design change requires it.
+
+Report results as separate facts:
+
+- Source/layout validation passed or failed.
+- Package/kernel compilation completed or did not.
+- Artifact contents and checksums verified or not.
+- QEMU boot path tested or not.
+- Xorg/Openbox startup tested or not.
+- Physical D630 devices and graphics tested or not.
+
+A green static-validation job is not proof of compilation, boot, graphics acceleration, media decoding or physical hardware support.
