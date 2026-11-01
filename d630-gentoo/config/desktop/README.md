@@ -1,34 +1,20 @@
 # D630 desktop configuration skeleton
 
-These are curated starter configs for the Gentoo/Openbox runtime. They are adapted from
-[`AmrUser-48/deb12dots`](https://github.com/AmrUser-48/deb12dots), current source commit
-`3797941932fab66eee98df364dc830c9559b0832`. They are not a wholesale copy of the Debian
-configuration.
+These files provide the curated XTerm and Openbox defaults installed into the Gentoo live runtime. They are adapted from the pinned `AmrUser-48/deb12dots` configuration, with Debian-only services and unavailable applications excluded.
 
 ## Files
 
-- `skel/.Xresources`: self-contained XTerm resources using the Gruvbox Dark palette and
-  Terminus PCF XLFD fonts. It deliberately avoids UXTerm-only resource names and relative
-  `#include` paths.
-- `skel/.config/openbox/rc.xml`: a small Openbox keybinding and workspace baseline.
-- `skel/.config/openbox/autostart`: loads Xresources, sets keyboard repeat, starts PipeWire/WirePlumber and per-user MPD, and optionally enables the two xdotool screen-edge actions.
-- `skel/.config/mpd/mpd.conf`: local MPD database/playlist paths and PipeWire output.
+- `skel/.Xresources`: self-contained XTerm resources with the Gruvbox Dark palette and Terminus font names.
+- `skel/.config/openbox/rc.xml`: Openbox workspace, window-management and application shortcuts.
+- `skel/.config/openbox/autostart`: loads X resources when available, sets keyboard repeat, starts optional xdotool screen-edge actions, and starts PipeWire/WirePlumber.
 
-The runtime dotfiles installer copies these templates into `/etc/skel`. They are therefore
-defaults for a newly initialized live user, not an automatic overwrite of an existing home
-directory.
+The runtime installer copies these defaults into `/etc/skel` for the live user. Openbox application shortcuts for optional tools are removed during image assembly when the corresponding executable is absent from the imported binary-package set.
 
 ## Runtime dependencies
 
-The templates assume the Openbox profile has:
+The Openbox profile requires Xorg, Openbox, XTerm, scrcpy, NetworkManager, nmtui, PipeWire, WirePlumber and ALSA utilities. The CLI shortcuts for `lf`, `links`, `htop`, `nvim` and `mc` are retained only when their binaries are present. The xdotool screen-edge actions and X resource loading are also conditional.
 
-- `x11-wm/openbox`, `x11-terms/xterm`, `x11-apps/xrdb`, `x11-apps/xset`;
-- `x11-misc/xdotool` for the optional screen-edge actions;
-- `app-misc/lf`, `www-client/links` and `sys-process/htop` for the terminal shortcuts;
-- `media-fonts/terminus-font` with PCF Unicode fonts enabled;
-- `media-video/pipewire`, `media-video/wireplumber`, `media-sound/mpd` and `media-sound/ncmpcpp` for audio.
-
-The Openbox configuration does not launch Thunar, XFCE, Rofi, Polybar or Feh. Super+N opens Neovim, Super+S starts scrcpy, Super+M opens ncmpcpp, Super+A opens alsamixer, Super+I opens nmtui, and Super+V launches mpv. MPD runs as the logged-in user and listens only on localhost.
+Audio uses PipeWire/WirePlumber with direct ALSA utilities. No MPD server, ncmpcpp client or mpv player is configured.
 
 ## Xresources checks
 
@@ -40,11 +26,6 @@ xlsfonts '*terminus*'
 xterm
 ```
 
-The file uses a single XTerm resource namespace because the runtime starts `xterm`, not
-`uxterm`. The font menu contains several sizes; the base font is 14-pixel Terminus.
-
 ## Scope
 
-This is a conservative configuration baseline, not proof of graphical operation. Xorg,
-Openbox, font matching, touchpad behavior and Crocus acceleration still require runtime
-validation in QEMU and on the physical D630.
+This is a configuration baseline, not proof of graphical operation. Xorg, Openbox, fonts, input and Crocus acceleration still require a graphical QEMU test and validation on the physical D630.
