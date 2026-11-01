@@ -20,7 +20,7 @@ start() {
     if [ ! -e /home/gentoo/.bashrc ]; then
         cp -a /etc/skel/. /home/gentoo/ || return 1
     fi
-    mkdir -p /home/gentoo/Music /home/gentoo/.config/mpd/playlists || return 1
+    mkdir -p /home/gentoo/Music || return 1
     chown -R gentoo:gentoo /home/gentoo || return 1
     chmod 0700 /home/gentoo || return 1
     # Copy the optional Wi-Fi profile from the host partition; credentials stay outside the SFS.
