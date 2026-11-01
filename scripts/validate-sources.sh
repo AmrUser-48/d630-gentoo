@@ -44,6 +44,11 @@ test -s config/portage/package.accept_keywords/20-guru
 test -s d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'app-eselect/eselect-repository git' config/portage/package.use/20-repositories
 grep -Fq 'app-misc/lf ~amd64' config/portage/package.accept_keywords/20-guru
+grep -Fq 'sys-apps/sd ~amd64' config/portage/package.accept_keywords/20-guru
+grep -Fq 'app-mobilephone/scrcpy ~amd64' config/portage/package.accept_keywords/20-guru
+test -s config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
+grep -Fq 'bd32f66b224e5fcac9fed3da98700f4e6c523e84' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
+grep -Fq 'prebuilt_server' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 grep -Fq 'dev-util/mesa_clc LLVM_SLOT: -* 22' config/portage/package.use/10-d630-hardware
@@ -91,19 +96,39 @@ test -s d630-gentoo/scripts/build-runtime-squashfs.sh
 test -s d630-gentoo/scripts/install-runtime-dotfiles.sh
 bash -n d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
+grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
 grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-process/htop' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'grep -vx '\''sys-apps/man-db'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'sys-apps\/man-db$/d' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'c1:12345:respawn:/sbin/agetty --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'c1:12345:respawn:%s --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'command -v agetty' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'expected exactly one tty1 agetty respawn entry' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'wifi.nmconnection' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 'chmod 0600' d630-gentoo/config/runtime/d630-firstboot
+grep -Fq 'key="W-s"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
+grep -Fq 'key="W-m"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
+grep -Fq 'command -v pipewire' d630-gentoo/config/desktop/skel/.config/openbox/autostart
+grep -Fq 'media-video/pipewire' config/portage/package.use/10-d630-hardware
 grep -Fq 'NOPASSWD: ALL' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-runtime-dotfiles.sh
+grep -Fq 'mpd.conf' d630-gentoo/scripts/install-runtime-dotfiles.sh
+test -s d630-gentoo/config/desktop/skel/.config/mpd/mpd.conf
+test -s d630-gentoo/config/wifi/wifi.nmconnection.example
+grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/sox' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'usr/bin/ncmpcpp' d630-gentoo/scripts/build-squashfs.sh
+grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -114,7 +139,7 @@ grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/bu
 grep -Fq 'command -v usermod && command -v openssl && command -v visudo' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'useradd -M -U -u 1000 -s /bin/bash gentoo' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'awk -F: '\''$1 != "gentoo" { print $1 }'\'' /etc/group | paste -sd, -' d630-gentoo/config/runtime/d630-firstboot
-grep -Fq 's0:12345:respawn:/sbin/agetty -L 115200 ttyS0 vt100' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 's0:12345:respawn:%s -L 115200 ttyS0 vt100' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq "rc-update del netmount default" d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'find "$stage" -xdev -uid 1000 -exec chown -h 0 {} +' d630-gentoo/scripts/build-squashfs.sh
