@@ -295,7 +295,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   mesa_atom="=media-libs/mesa-$mesa_version"
   log "Install Mesa runtime dependencies from binary packages"
   chroot "$ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly --onlydeps '$mesa_atom'" \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkgonly --onlydeps '$mesa_atom'" \
     |& tee "$OUT/mesa-binpkg.log"
   log "Install Mesa from an imported binary package only"
   chroot "$ROOT" /bin/bash -lc \
@@ -338,9 +338,9 @@ fi
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
-  chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 else
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
 
 # glxgears is optional: use it only when its already-built binary package was
