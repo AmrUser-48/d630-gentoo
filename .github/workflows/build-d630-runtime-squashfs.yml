@@ -2,6 +2,17 @@ name: Build D630 Gentoo runtime SquashFS
 run-name: "D630 rootfs • ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }} • run ${{ github.run_number }}"
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-d630-runtime-squashfs.yml"
+      - "d630-gentoo/scripts/build-runtime-squashfs.sh"
+      - "d630-gentoo/scripts/build-squashfs.sh"
+      - "d630-gentoo/config/package-sets/**"
+      - "d630-gentoo/config/runtime/d630-firstboot"
+      - "d630-gentoo/config/desktop/**"
+      - "config/portage/package.use/10-d630-hardware"
+      - "scripts/validate-sources.sh"
   workflow_dispatch:
     inputs:
       runtime_profile:
@@ -21,20 +32,20 @@ on:
         type: string
         default: ""
       binpkg_run_ids:
-        description: "Binpkg release run IDs, separated by commas or spaces; for openbox, use the release containing Mesa (39507549274 has Mesa/Xorg/xterm/Openbox)"
+        description: "Binpkg release run IDs, separated by commas or spaces; the default pair contains the Mesa baseline and latest Core 2 package set"
         required: false
         type: string
-        default: ""
+        default: "39507549274,41307968832"
       source_fallback:
         description: "Allow source builds for missing packages. Keep false for strict binpkg-only assembly; missing or mismatched binpkgs then fail fast."
         required: true
         type: boolean
         default: false
       kernel_bundle_tag:
-        description: "Optional release tag containing matching modules-*.tar.zst and d630-firmware.tar.zst"
+        description: "Release tag containing the matching kernel, initramfs, modules and firmware bundle"
         required: false
         type: string
-        default: ""
+        default: "d630-kernel-6.18.56-run-41317026490"
 
 permissions:
   actions: read
@@ -50,11 +61,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
-      PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-      BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
-      SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
-      KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
+      RUNTIME_PROFILE: ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}
+      PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id || '' }}
+      BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307968832' || inputs.binpkg_run_ids || '' }}
+      SOURCE_FALLBACK: ${{ github.event_name == 'push' && 'false' || (inputs.source_fallback && 'true' || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '' && 'true') || 'false') }}
+      KERNEL_BUNDLE_TAG: ${{ github.event_name == 'push' && 'd630-kernel-6.18.56-run-41317026490' || inputs.kernel_bundle_tag || '' }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
@@ -74,11 +85,11 @@ jobs:
           }
 
       - name: Require Mesa binpkg input for Openbox SquashFS
-        if: inputs.runtime_profile == 'openbox'
+        if: inputs.runtime_profile == 'openbox' || github.event_name == 'push'
         shell: bash
         env:
-          PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-          BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307096065' || inputs.binpkg_run_ids || '' }}
+          PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id || '' }}
+          BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307968832' || inputs.binpkg_run_ids || '' }}
         run: |
           set -Eeuo pipefail
           [[ -n "$PREPARED_ASSETS_RUN_ID" || -n "$BINPKG_RUN_IDS" ]] || {
@@ -134,6 +145,11 @@ jobs:
             output/SHA256SUMS
             output/SQUASHFS-SHA256.txt
             output/GLXGEARS-STATUS.txt
+            output/BINPKG-OPTIONAL-SKIPPED.txt
+            output/TOOL-AVAILABILITY.txt
+            output/required-binpkg-plan.log
+            output/INITTAB-PROBE.txt
+            output/XSERVERRC-PROBE.txt
             output/RUNTIME-MANIFEST.txt
             output/RELEASE-NOTES.md
             output/PACKAGES.txt
@@ -160,7 +176,7 @@ jobs:
           {
             echo "### D630 Gentoo boot bundle is ready"
             echo
-            echo "Download Actions artifact d630-squashfs-${{ inputs.runtime_profile }}-run-${{ github.run_number }} from this workflow run."
+            echo "Download Actions artifact d630-squashfs-${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}-run-${{ github.run_number }} from this workflow run."
             echo "It contains kernel, initramfs, and squashfs, plus checksums and build manifests."
             echo
             echo "No GitHub Release API is used; delivery uses Actions artifacts."
