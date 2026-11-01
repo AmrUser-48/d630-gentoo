@@ -298,7 +298,6 @@ sys-auth/pambase
 net-misc/dhcpcd
 net-misc/networkmanager
 net-wireless/wpa_supplicant
-net-wireless/wireless-regdb
 dev-lang/python
 media-libs/mesa
 media-libs/alsa-lib
