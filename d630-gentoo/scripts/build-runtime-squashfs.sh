@@ -488,7 +488,7 @@ config_path, root, report_path = sys.argv[1:]
 with open(config_path, encoding="utf-8") as stream:
     source = stream.read()
 
-pattern = re.compile(r"(?m)^[ \\t]*<keybind\\b.*?</keybind>[ \\t]*(?:\\r?\\n)?", re.S)
+pattern = re.compile(r"(?m)^[ \t]*<keybind\b.*?</keybind>[ \t]*(?:\r?\n)?", re.S)
 matches = list(pattern.finditer(source))
 report = []
 
@@ -539,7 +539,7 @@ for match in reversed(matches):
 with open(config_path, "w", encoding="utf-8") as stream:
     stream.write(source)
 with open(report_path, "w", encoding="utf-8") as stream:
-    stream.write("\\n".join(reversed(report)) + ("\\n" if report else ""))
+    stream.write("\n".join(reversed(report)) + ("\n" if report else ""))
 PY
 fi
 chroot "$ROOT" /bin/bash -lc 'env-update'
