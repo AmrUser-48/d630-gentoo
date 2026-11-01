@@ -124,7 +124,7 @@ grep -Fq "sed -i '/command -v lesspipe/,+2d' \"\$SKEL/.aaliases\"" d630-gentoo/s
 grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-runtime-dotfiles.sh
 ! grep -Fq 'mpd.conf' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
-! grep -Eq '^(media-sound/(mpd|ncmpcpp)|media-video/mpv)test -s d630-gentoo/config/wifi/wifi.nmconnection.example
+! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/package-sets/multimedia.list
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.sh
