@@ -521,23 +521,49 @@ chroot "$ROOT" /bin/bash -lc 'rc-update add d630-zram boot'
 # Create the live user during sysinit, before init starts the tty1 login.
 chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
 
-# One inittab respawn entry owns tty1. Remove OpenRC aliases from all runlevels.
+# tty1 is the only local login respawn. Do not create a serial getty on ttyS0;
+# the D630 boot path may not expose a UART, and Xorg must take the active login VT.
 AGETTY_BIN="$(chroot "$ROOT" /bin/bash -lc 'command -v agetty' | tail -n 1)"
 [[ "$AGETTY_BIN" == /* && -x "$ROOT$AGETTY_BIN" ]] || die "util-linux agetty executable is missing from the runtime root"
-chroot "$ROOT" /bin/bash -lc 'rc-update del agetty.tty1 default' >/dev/null 2>&1 || true
 for runlevel_dir in "$ROOT"/etc/runlevels/*; do
   [[ -d "$runlevel_dir" ]] || continue
   rm -f "$runlevel_dir/agetty.tty1"
 done
 rm -f "$ROOT/etc/init.d/agetty.tty1"
 [[ -f "$ROOT/etc/inittab" ]] || die "Stage 3 has no /etc/inittab; cannot configure tty1 autologin"
-sed -i -E '/^[[:space:]]*[^:]+:[^:]*:respawn:.*agetty.*(tty1|ttyS0)/d' "$ROOT/etc/inittab"
-printf '\nc1:12345:respawn:%s --autologin gentoo --noclear tty1 linux\n' "$AGETTY_BIN" >> "$ROOT/etc/inittab"
-printf 's0:12345:respawn:%s -L 115200 ttyS0 vt100\n' "$AGETTY_BIN" >> "$ROOT/etc/inittab"
-[[ "$(grep -Ec '^[^:]+:[^:]*:respawn:.*agetty.*tty1' "$ROOT/etc/inittab")" == 1 ]] ||
-  die "expected exactly one tty1 agetty respawn entry"
-[[ "$(grep -Ec '^[^:]+:[^:]*:respawn:.*agetty.*ttyS0' "$ROOT/etc/inittab")" == 1 ]] ||
-  die "expected exactly one serial agetty respawn entry"
+python3 - "$ROOT/etc/inittab" "$AGETTY_BIN" <<'PY'
+import re
+import sys
+
+path, agetty = sys.argv[1:]
+with open(path, encoding="utf-8") as stream:
+    lines = stream.readlines()
+
+kept = []
+for line in lines:
+    if line.lstrip().startswith("#"):
+        kept.append(line)
+        continue
+    fields = line.rstrip("\n").split(":", 3)
+    if len(fields) == 4:
+        ident, _runlevels, action, command = fields
+        is_getty = re.search(r"\b(?:agetty|getty)\b", command)
+        owns_target_vt = re.search(r"\b(?:tty1|ttyS0)\b", command)
+        if ident in {"c1", "s0"} or (action == "respawn" and is_getty and owns_target_vt):
+            continue
+    kept.append(line)
+
+entry = f"c1:12345:respawn:{agetty} --autologin gentoo --noclear tty1 linux\n"
+with open(path, "w", encoding="utf-8") as stream:
+    stream.writelines(kept)
+    if kept and not kept[-1].endswith("\n"):
+        stream.write("\n")
+    stream.write(entry)
+PY
+[[ "$(grep -Ec '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*tty1([[:space:]]|$)' "$ROOT/etc/inittab")" == 1 ]] ||
+  die "expected exactly one tty1 getty respawn entry"
+! grep -Eq '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*ttyS0([[:space:]]|$)' "$ROOT/etc/inittab" ||
+  die "unexpected serial getty respawn entry remains"
 grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$ROOT/etc/inittab" ||
   die "tty1 autologin entry was not written to /etc/inittab"
 if find "$ROOT/etc/runlevels" -type l -name agetty.tty1 -print -quit | grep -q .; then
@@ -546,10 +572,11 @@ fi
 if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
   chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
 fi
-grep -E '^[^#].*respawn:.*(tty1|ttyS0)' "$ROOT/etc/inittab" > "$OUT/INITTAB-PROBE.txt"
+grep -E '^[^#].*respawn:.*tty1' "$ROOT/etc/inittab" > "$OUT/INITTAB-PROBE.txt"
 if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
   [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
   chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
+  grep -Rqs 'pam_elogind\.so' "$ROOT/etc/pam.d" || die "PAM login stack has no pam_elogind session hook"
 fi
 for SERVICE in dbus NetworkManager; do
   [[ -x "$ROOT/etc/init.d/$SERVICE" ]] && chroot "$ROOT" /bin/bash -lc "rc-update add '$SERVICE' default" || true
