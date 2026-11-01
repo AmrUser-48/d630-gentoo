@@ -4,7 +4,7 @@ run-name: "D630 rootfs • ${{ github.event_name == 'push' && 'openbox' || input
 on:
   push:
     branches:
-      - build/openbox-2026-11-01
+      - main
   workflow_dispatch:
     inputs:
       runtime_profile:
@@ -55,7 +55,7 @@ jobs:
     env:
       RUNTIME_PROFILE: ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-      BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274' || inputs.binpkg_run_ids || '' }}
+      BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307096065' || inputs.binpkg_run_ids || '' }}
       SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
@@ -81,7 +81,7 @@ jobs:
         shell: bash
         env:
           PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-          BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274' || inputs.binpkg_run_ids || '' }}
+          BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307096065' || inputs.binpkg_run_ids || '' }}
         run: |
           set -Eeuo pipefail
           [[ -n "$PREPARED_ASSETS_RUN_ID" || -n "$BINPKG_RUN_IDS" ]] || {
