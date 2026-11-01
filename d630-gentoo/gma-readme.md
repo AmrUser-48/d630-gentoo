@@ -131,11 +131,11 @@ Section "Device"
 EndSection
 ```
 
-This is an A/B test, not the Gentoo default. If Xorg fails to start or rendering regresses, remove the file or change the option back to `"2"`. The Intel DDX's `DRI` option selects a DRI protocol level; it is not the name of the Mesa driver. Do not put `Option "DRI" "crocus"` in this Intel DDX section.
+This is an A/B test, not the Gentoo default. If Xorg fails to start or rendering regresses, remove the test file or revert the changed option. The Intel DDX `DRI` option is overloaded: a boolean enables/disables direct rendering; a Mesa driver name (for example `crocus`) selects the DRI driver; a numeric value (`1`, `2` or `3`) sets the maximum DRI protocol level. These are different modes, not interchangeable settings. For the Gen4–Gen7.5 Crocus selection, Gentoo documents `Option "DRI" "crocus"`; for an explicit DRI3 protocol test use `Option "DRI" "3"`. Test only one variable at a time.
 
 A 2023 upstream change explicitly enabled DRI3 on Gen2/Gen3 SNA paths. GM965 is Gen4, so that particular Gen2/3 limitation is not the explanation for this machine. Debian Bookworm's `xf86-video-intel` source snapshot is from 2021 and predates that change, but the patch was specifically for Gen2/3.
 
-For the built-in `modesetting` DDX, do not copy the Intel DDX's numeric `Option "DRI"` setting. Let the Xorg/Mesa stack negotiate normally; use `LIBGL_DRI3_DISABLE=1` only as a temporary client-side A/B diagnostic.
+For the built-in `modesetting` DDX, let Xorg/Mesa negotiate normally first. If explicitly testing DRI3, the modesetting/glamor configuration can use `Option "DRI" "3"`; remove it again if it changes stability or breaks startup. Do not copy the Intel DDX-specific Mesa backend selector (`Option "DRI" "crocus"`) unless the active DDX documents and honors it. Use `LIBGL_DRI3_DISABLE=1` only as a temporary client-side A/B diagnostic.
 
 ### DRI3 test sequence
 
@@ -404,6 +404,8 @@ Do not call a test “GPU accelerated” based only on the presence of `/dev/dri
 - [Mesa 21.2 release notes: initial Crocus driver for gfx4–7](https://eric.pages.freedesktop.org/mesa/relnotes/21.2.0.html)
 - [Intel legacy VA-API driver and supported platforms/codecs](https://github.com/intel/intel-vaapi-driver)
 - [Intel VA-API platform capability table](https://www.intel.com/content/www/us/en/developer/articles/technical/linuxmedia-vaapi.html)
+- [Intel GM965 Express Chipset datasheet](https://www.intel.com/Assets/PDF/datasheet/316273.pdf) — Clear Video feature table lists MPEG-2 and WMV9 acceleration.
+- [Intel Blu-ray playback FAQ](https://www.intel.com/content/www/us/en/support/articles/000006968/graphics.html) — GM965 Blu-ray decode is software-accelerated; do not infer H.264 hardware decoding from the older Clear Video blocks.
 - [xf86-video-intel 2.8.0 release notes](https://cgit.freedesktop.org/xorg/driver/xf86-video-intel/tree/NEWS)
 - [xf86-video-intel man page](https://cgit.freedesktop.org/xorg/driver/xf86-video-intel/tree/man/intel.man)
 - [Debian historical xf86-video-intel source versions](https://sources.debian.org/src/xserver-xorg-video-intel/)
