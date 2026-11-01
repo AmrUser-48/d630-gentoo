@@ -114,6 +114,8 @@ grep -Fq 'key="W-s"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 grep -Fq 'key="W-m"' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 grep -Fq 'command -v pipewire' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'media-video/pipewire' config/portage/package.use/10-d630-hardware
+grep -Fq 'usr/bin/egrep' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'usr/bin/egrep' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'usr/bin/rdmsr' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'usr/bin/wrmsr' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'usr/bin/xdotool' d630-gentoo/scripts/build-runtime-squashfs.sh
