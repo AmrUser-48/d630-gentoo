@@ -259,6 +259,7 @@ sys-block/parted
 sys-boot/grub
 net-misc/dhcpcd
 net-misc/networkmanager
+net-wireless/iw
 net-wireless/wpa_supplicant
 net-wireless/wireless-regdb
 EOF
@@ -296,7 +297,6 @@ sys-auth/elogind
 sys-auth/pambase
 net-misc/dhcpcd
 net-misc/networkmanager
-net-wireless/iw
 net-wireless/wpa_supplicant
 net-wireless/wireless-regdb
 dev-lang/python
