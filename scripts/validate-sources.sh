@@ -149,8 +149,12 @@ grep -Fq 'gpg --batch --yes --pinentry-mode loopback' .github/workflows/restore-
 ! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/publish-gentoo-binpkgs.yml
 ! grep -Fq 'softprops/action-gh-release@v3' .github/workflows/build-d630-runtime-squashfs.yml
 
-grep -q 'march=core2' config/make.conf
-grep -q -- '-march=core2 -mtune=core2' config/portage/make.conf
+grep -Fq 'COMMON_FLAGS="-O2 -march=core2 -mtune=core2"' config/make.conf
+grep -Fq 'COMMON_FLAGS="-O2 -march=core2 -mtune=core2"' config/portage/make.conf
+grep -Fq 'CFLAGS="-O3 -march=core2 -mtune=core2 -fomit-frame-pointer"' config/portage/env/custom-opt.conf
+! grep -Fq -- '-pipe' config/make.conf
+! grep -Fq -- '-pipe' config/portage/make.conf
+! grep -Fq -- '-pipe' config/portage/env/custom-opt.conf
 grep -q 'CPU_FLAGS_X86: mmx sse sse2 sse3 ssse3' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'CPU_FLAGS_X86:.*(mmxext|sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
 ! grep -Eq 'cpu_flags_x86_(sse4_1|sse4_2|aes|avx|popcnt)' config/portage/package.use/00-core2-cpu
