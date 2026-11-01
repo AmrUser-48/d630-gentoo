@@ -528,8 +528,31 @@ case "$vt" in
     exit 1
     ;;
 esac
+
+# startx may already pass the active vtN; direct xinit often does not.
+# Accept a matching argument, reject a conflicting one, and add only if absent.
+has_vt=0
+for argument in "$@"; do
+  case "$argument" in
+    vt[0-9]*)
+      supplied_vt="${argument#vt}"
+      case "$supplied_vt" in
+        ''|*[!0-9]*|0)
+          echo "Invalid Xorg virtual-terminal argument: $argument" >&2
+          exit 1
+          ;;
+      esac
+      if [ "$supplied_vt" != "$vt" ]; then
+        echo "Xorg VT mismatch: login owns tty$vt but caller requested $argument." >&2
+        exit 1
+      fi
+      has_vt=1
+      ;;
+  esac
+done
+if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi
 if [ -x /usr/bin/Xorg ]; then xorg=/usr/bin/Xorg; else xorg=/usr/libexec/Xorg; fi
-exec "$xorg" -nolisten tcp "$@" "vt$vt" -keeptty
+exec "$xorg" -nolisten tcp "$@" -keeptty
 EOF
   chmod 0755 "$ROOT/etc/X11/xinit/xserverrc"
   sh -n "$ROOT/etc/X11/xinit/xserverrc"
