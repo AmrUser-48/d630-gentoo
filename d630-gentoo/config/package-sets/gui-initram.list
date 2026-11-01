@@ -5,6 +5,8 @@ media-libs/mesa
 # Direct ALSA fallback alongside PipeWire: library, device profiles, and CLI mixer/test tools.
 media-libs/alsa-lib
 media-libs/alsa-ucm-conf
+media-video/pipewire
+media-video/wireplumber
 media-sound/alsa-utils
 media-fonts/terminus-font
 sys-auth/elogind
