@@ -58,6 +58,7 @@ The release QEMU test covered console/OpenRC startup and the direct three-file r
 
 - [Desktop configuration skeleton](config/desktop/README.md)
 - [Xorg configuration and driver profiles](config/xorg/README.md)
+- [GM965/GMA X3100 graphics, Mesa, DRI and historical drivers](gma-readme.md)
 - [ISO packaging](iso/README.md)
 - [Kernel profiles](../kernels/README.md)
 - [Hardware inventory](../docs/hardware-inventory.md)
