@@ -137,7 +137,10 @@ grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'expected exactly one tty1 getty respawn entry' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'tty7|ttyS0' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'pam_elogind\.so' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'exec "$xorg" -nolisten tcp "$@" "vt$vt" -keeptty' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'has_vt=0' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'Xorg VT mismatch' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'exec "$xorg" -nolisten tcp "$@" -keeptty' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'required-atoms.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'BINPKG-OPTIONAL-SKIPPED.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'TOOL-AVAILABILITY.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
