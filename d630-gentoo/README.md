@@ -23,7 +23,8 @@ Expected boot partition:
 - `boot/grub/three-file.cfg`: preferred direct-file GRUB entry.
 - `boot/grub/gui.cfg`: graphical boot entry.
 - `config/package-sets/`: console, desktop, Openbox and other runtime sets.
-- `config/desktop/`: curated Xresources and Openbox user skeleton.
+- `config/desktop/`: curated Xresources, Openbox and MPD user skeletons.
+- `config/wifi/`: external NetworkManager profile template; credentials are not embedded in the image.
 - `config/xorg/`: D630 input configuration and optional graphics-driver test profiles.
 - `scripts/`: runtime assembly and SquashFS builders.
 - `iso/`: optional ISO layout, loopback menu and persistence-image helper.
@@ -37,6 +38,12 @@ Use kernel profile 40, which builds in the block-device, filesystem, loop, Squas
 Copy the matching `kernel`, `initramfs` and `squashfs` assets to `/d630-gentoo/` on a GRUB-readable partition. Configure GRUB with [three-file.cfg](boot/grub/three-file.cfg). Prefer loading the individual files; the ISO does not need to be selected as the boot device.
 
 Current direct-folder mode is volatile. The optional ext4 `gentoo-data.img` belongs beside the ISO on writable host storage, not inside the read-only ISO; it is not part of the tested direct-folder path.
+
+### Wi-Fi auto-connect
+
+The image contains no Wi-Fi credentials. Place a NetworkManager keyfile named `wifi.nmconnection` at `/d630-gentoo/wifi.nmconnection` on the **same host partition as the SquashFS**. Start from [wifi.nmconnection.example](config/wifi/wifi.nmconnection.example) and replace the SSID and key. The host partition remains mounted read-only by the initramfs; the first-boot service copies the file into the volatile root at `/etc/NetworkManager/system-connections/`, owned by root with mode `0600`, before NetworkManager starts.
+
+Credentials stay outside the SquashFS and are not committed to Git. The host-side keyfile is plaintext, so protect that partition. The import service enforces secure permissions on the Linux copy even when the host filesystem does not support Unix permissions. The example uses WPA2-PSK; provide the actual SSID, security type and key to generate the matching profile.
 
 ## Build
 
