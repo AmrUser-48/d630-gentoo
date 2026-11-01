@@ -19,7 +19,7 @@ This directory contains three mutually exclusive kernel configuration profiles f
 - `profiles/40-d630-builtin.config`: Gentoo live profile with built-in root-discovery, loop, SquashFS-Zstd, OverlayFS and D630 hardware support.
 - `NOTES-legacy.md`: historical hardware/build notes; this README and `docs/hardware-inventory.md` are current sources of truth.
 
-## Gentoo distribution-kernel baseline
+### Gentoo distribution-kernel baseline
 
 Profile 20 was prepared against Gentoo's 6.1 distribution-kernel configuration, not against `x86_64_defconfig`.
 
