@@ -351,11 +351,12 @@ fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
-    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/grep /usr/bin/tldr \
-    /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/zsh /usr/bin/nano /usr/bin/tmux \
-    /usr/bin/scrcpy /usr/bin/sox /usr/bin/lame /usr/bin/mpv /usr/bin/mpd /usr/bin/ncmpcpp \
-    /usr/bin/nmcli /usr/bin/nmtui /usr/bin/pipewire /usr/bin/wireplumber \
-    /usr/bin/aplay /usr/bin/arecord /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
+    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
+    /usr/bin/grep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
+    /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/scrcpy /usr/bin/sox /usr/bin/lame \
+    /usr/bin/mpv /usr/bin/mpd /usr/bin/ncmpcpp /usr/bin/nmcli /usr/bin/nmtui \
+    /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
+    /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
   [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "Openbox runtime is missing the matching scrcpy-server"
@@ -602,7 +603,7 @@ cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
 Project: AmrUser-48/d630-gentoo
 Profile: $RUNTIME_PROFILE
 Base: Gentoo amd64 glibc/OpenRC Stage 3
-Flags: -O2 -pipe -march=core2 -mtune=core2
+Flags: -O2 -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
