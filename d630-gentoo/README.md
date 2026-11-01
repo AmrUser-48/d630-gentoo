@@ -41,7 +41,7 @@ Current direct-folder mode is volatile. The optional ext4 `gentoo-data.img` belo
 
 ### Wi-Fi auto-connect
 
-Wi-Fi credentials remain outside the SquashFS. Place the NetworkManager keyfile at `/d630-gentoo/wifi.nmconnection` on the host partition; the first-boot service imports it with root ownership and mode `0600` only when NetworkManager is installed.
+Wi-Fi credentials remain outside the SquashFS. Start from [wifi.nmconnection.example](config/wifi/wifi.nmconnection.example) and place the completed NetworkManager keyfile at `/d630-gentoo/wifi.nmconnection` on the host partition; the first-boot service imports it with root ownership and mode `0600` only when NetworkManager is installed.
 
 The currently published Core 2 binpkg set does not contain a complete NetworkManager plus `wpa_supplicant` binary-package closure. Consequently, the binpkg-only Openbox image does not enable Wi-Fi auto-connect. The external profile remains available for a later image built after those packages are published. `dhcpcd` remains available for wired networking.
 ### Boot methods
