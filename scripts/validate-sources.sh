@@ -206,6 +206,8 @@ grep -Fq 'toram=true' d630-gentoo/initramfs/init
 grep -Fq 'umount /run/d630/probe' d630-gentoo/initramfs/init
 grep -Fq 'applets=(sh mount find mkdir sleep switch_root umount cat cp wc)' .github/workflows/build-d630-kernel.yml
 grep -Fq 'toram' d630-gentoo/config/kernel-cmdline.txt
+grep -Fq 'cp "$wifi_source" /run/d630/wifi.nmconnection' d630-gentoo/initramfs/init
+grep -Fq 'wifi_source=/run/d630/wifi.nmconnection' d630-gentoo/config/runtime/d630-firstboot
 sh -n d630-gentoo/iso/scripts/create-persistence-image.sh
 sh -n d630-tiny/init
 sh -n d630-tiny/wifi-connect
