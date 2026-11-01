@@ -1,7 +1,10 @@
 name: Build D630 Gentoo runtime SquashFS
-run-name: "D630 rootfs • ${{ inputs.runtime_profile }} • run ${{ github.run_number }}"
+run-name: "D630 rootfs • ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }} • run ${{ github.run_number }}"
 
 on:
+  push:
+    branches:
+      - build/openbox-2026-11-01
   workflow_dispatch:
     inputs:
       runtime_profile:
@@ -50,10 +53,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
+      RUNTIME_PROFILE: ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-      BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
-      SOURCE_FALLBACK: ${{ inputs.runtime_profile == 'openbox' || inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
+      BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274' || inputs.binpkg_run_ids || '' }}
+      SOURCE_FALLBACK: ${{ github.event_name == 'push' || inputs.runtime_profile == 'openbox' || inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
 
@@ -74,7 +77,7 @@ jobs:
           }
 
       - name: Require Mesa binpkg input for Openbox SquashFS
-        if: inputs.runtime_profile == 'openbox'
+        if: inputs.runtime_profile == 'openbox' || github.event_name == 'push'
         shell: bash
         env:
           PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
@@ -120,7 +123,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: d630-squashfs-${{ inputs.runtime_profile }}-run-${{ github.run_number }}
+          name: d630-squashfs-${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}-run-${{ github.run_number }}
           path: |
             output/squashfs
             output/kernel
@@ -133,6 +136,7 @@ jobs:
             output/PREPARED-ASSET-CHECK.log
             output/SHA256SUMS
             output/SQUASHFS-SHA256.txt
+            output/GLXGEARS-STATUS.txt
             output/RUNTIME-MANIFEST.txt
             output/RELEASE-NOTES.md
             output/PACKAGES.txt
