@@ -474,6 +474,74 @@ fi
 
 log "Install pinned deb12dots user configuration"
 bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/install-runtime-dotfiles.sh" "$ROOT" "$WORK/dotfiles"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  # The selected optional CLI packages depend on the imported binpkg cache.
+  # Keep Openbox shortcuts only for applications that actually survived selection.
+  python3 - "$ROOT/etc/skel/.config/openbox/rc.xml" "$ROOT" "$OUT/OPENBOX-OPTIONAL-KEYS.txt" <<'PY'
+import os
+import re
+import shlex
+import sys
+import xml.etree.ElementTree as ET
+
+config_path, root, report_path = sys.argv[1:]
+with open(config_path, encoding="utf-8") as stream:
+    source = stream.read()
+
+pattern = re.compile(r"(?m)^[ \\t]*<keybind\\b.*?</keybind>[ \\t]*(?:\\r?\\n)?", re.S)
+matches = list(pattern.finditer(source))
+report = []
+
+def command_exists(name):
+    if name.startswith("/"):
+        candidates = [os.path.join(root, name.lstrip("/"))]
+    else:
+        candidates = [
+            os.path.join(root, "usr/bin", name),
+            os.path.join(root, "usr/sbin", name),
+            os.path.join(root, "bin", name),
+            os.path.join(root, "sbin", name),
+            os.path.join(root, "usr/local/bin", name),
+        ]
+    return any(os.path.isfile(path) and os.access(path, os.X_OK) for path in candidates)
+
+for match in reversed(matches):
+    block = match.group(0)
+    element = ET.fromstring(block)
+    commands = [
+        (node.text or "").strip()
+        for node in element.iter()
+        if node.tag.rsplit("}", 1)[-1] == "command" and (node.text or "").strip()
+    ]
+    missing = None
+    for command in commands:
+        argv = shlex.split(command)
+        if not argv:
+            continue
+        target = argv[0]
+        if target == "xterm" and "-e" in argv:
+            index = argv.index("-e")
+            if index + 1 < len(argv):
+                target = argv[index + 1]
+        if not command_exists(argv[0]):
+            missing = argv[0]
+            break
+        if target != argv[0] and not command_exists(target):
+            missing = target
+            break
+    if missing:
+        source = source[:match.start()] + source[match.end():]
+        key = element.attrib.get("key", "(unnamed)")
+        report.append(f"omitted: {key} -> {missing} (not present in the selected binpkg set)")
+    elif commands:
+        report.append(f"included: {element.attrib.get('key', '(unnamed)')} -> {'; '.join(commands)}")
+
+with open(config_path, "w", encoding="utf-8") as stream:
+    stream.write(source)
+with open(report_path, "w", encoding="utf-8") as stream:
+    stream.write("\\n".join(reversed(report)) + ("\\n" if report else ""))
+PY
+fi
 chroot "$ROOT" /bin/bash -lc 'env-update'
 
 log "Configure console login, first-boot account creation, and OpenRC"
@@ -870,7 +938,7 @@ else
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
   sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt required-binpkg-plan.log)
+    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log)
   fi
 fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
