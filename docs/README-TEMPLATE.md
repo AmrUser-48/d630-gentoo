@@ -40,7 +40,7 @@ List the exact checks that apply and what they prove. Never label static validat
 
 Link authoritative adjacent user guides, technical references, hardware notes, known issues and the release index.
 
-## Style
+### Style
 
 - Use exactly one H1 title and the nine H2 sections above in the same order. H3 subsections are allowed inside a section; do not add another H2.
 - Write for human users: direct language, short paragraphs, consistent terminology and descriptive link labels.
