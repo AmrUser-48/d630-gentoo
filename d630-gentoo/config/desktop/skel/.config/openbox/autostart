@@ -16,3 +16,16 @@ if command -v xdotool >/dev/null 2>&1; then
     xdotool behave_screen_edge top-left exec xterm >/dev/null 2>&1 &
     xdotool behave_screen_edge top-right key --clearmodifiers Super+Tab >/dev/null 2>&1 &
 fi
+# Start per-user audio after elogind creates XDG_RUNTIME_DIR.
+if command -v pipewire >/dev/null 2>&1; then
+    pipewire >/tmp/pipewire.log 2>&1 &
+    sleep 1
+fi
+if command -v wireplumber >/dev/null 2>&1; then
+    wireplumber >/tmp/wireplumber.log 2>&1 &
+fi
+
+# Start the local per-user MPD instance for ncmpcpp.
+if command -v mpd >/dev/null 2>&1 && [ -s "$HOME/.config/mpd/mpd.conf" ]; then
+    mpd "$HOME/.config/mpd/mpd.conf" >/tmp/mpd.log 2>&1
+fi
