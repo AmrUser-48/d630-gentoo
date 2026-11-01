@@ -252,8 +252,7 @@ tmp_output=""
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
   tmp_filelist="$(mktemp "${TMPDIR:-/var/tmp}/d630-squashfs-list.XXXXXXXX")"
   unsquashfs -ll "$output" > "$tmp_filelist"
-  for path in usr/bin/python3 usr/bin/scrcpy usr/bin/nmcli usr/bin/nmtui \
-    usr/sbin/wpa_supplicant \
+  for path in usr/bin/python3 \
     usr/bin/pipewire usr/bin/wireplumber usr/bin/aplay usr/bin/arecord \
     usr/bin/amixer usr/bin/alsamixer usr/bin/speaker-test \
     usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do

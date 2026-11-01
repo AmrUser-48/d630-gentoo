@@ -145,6 +145,7 @@ jobs:
             output/GLXGEARS-STATUS.txt
             output/BINPKG-OPTIONAL-SKIPPED.txt
             output/TOOL-AVAILABILITY.txt
+            output/OPENBOX-OPTIONAL-KEYS.txt
             output/required-binpkg-plan.log
             output/INITTAB-PROBE.txt
             output/XSERVERRC-PROBE.txt

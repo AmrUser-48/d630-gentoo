@@ -41,10 +41,9 @@ Current direct-folder mode is volatile. The optional ext4 `gentoo-data.img` belo
 
 ### Wi-Fi auto-connect
 
-The image contains no Wi-Fi credentials. Place a NetworkManager keyfile named `wifi.nmconnection` at `/d630-gentoo/wifi.nmconnection` on the **same host partition as the SquashFS**. Start from [wifi.nmconnection.example](config/wifi/wifi.nmconnection.example) and replace the SSID and key. The host partition remains mounted read-only by the initramfs; the first-boot service copies the file into the volatile root at `/etc/NetworkManager/system-connections/`, owned by root with mode `0600`, before NetworkManager starts.
+Wi-Fi credentials remain outside the SquashFS. Place the NetworkManager keyfile at `/d630-gentoo/wifi.nmconnection` on the host partition; the first-boot service imports it with root ownership and mode `0600` only when NetworkManager is installed.
 
-Credentials stay outside the SquashFS and are not committed to Git. The host-side keyfile is plaintext, so protect that partition. The import service enforces secure permissions on the Linux copy even when the host filesystem does not support Unix permissions. The example uses WPA2-PSK; provide the actual SSID, security type and key to generate the matching profile.
-
+The currently published Core 2 binpkg set does not contain a complete NetworkManager plus `wpa_supplicant` binary-package closure. Consequently, the binpkg-only Openbox image does not enable Wi-Fi auto-connect. The external profile remains available for a later image built after those packages are published. `dhcpcd` remains available for wired networking.
 ### Boot methods
 
 | Method | Files and GRUB entry | Status |

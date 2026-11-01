@@ -296,8 +296,6 @@ sys-apps/dbus
 sys-auth/elogind
 sys-auth/pambase
 net-misc/dhcpcd
-net-misc/networkmanager
-net-wireless/wpa_supplicant
 dev-lang/python
 media-libs/mesa
 media-libs/alsa-lib
@@ -444,18 +442,22 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   [[ ! -u "$xorg_server" ]] || die "Xorg unexpectedly has the setuid bit; use the elogind-managed local VT"
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
-    /usr/bin/python3 /usr/bin/scrcpy /usr/bin/nmcli /usr/bin/nmtui \
-    /usr/sbin/wpa_supplicant \
-    /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
+    /usr/bin/python3 /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
     /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
-  [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "Openbox runtime is missing the matching scrcpy-server"
   : > "$OUT/TOOL-AVAILABILITY.txt"
+  if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
+    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "pinned scrcpy 3.3.4 binpkg is missing its matching scrcpy-server"
+    printf 'included: matching scrcpy-server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+  else
+    printf 'omitted: scrcpy 3.3.4 (no matching imported binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+  fi
   for executable in /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
     /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
     /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/sox /usr/bin/lame /usr/bin/ffmpeg /usr/bin/ffprobe \
     /usr/bin/xclip /usr/bin/xdg-open /usr/bin/xmodmap /usr/bin/xrdb /usr/sbin/iw \
+    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy \
     /usr/bin/ntfs-3g /usr/sbin/mount.ntfs-3g; do
     if [[ -x "$ROOT$executable" ]]; then
       printf 'included: %s\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
@@ -850,6 +852,8 @@ Profile: $RUNTIME_PROFILE
 Base: Gentoo amd64 glibc/OpenRC Stage 3
 Flags: -O2 -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
+$(if [[ -x "$ROOT/etc/init.d/NetworkManager" && -x "$ROOT/usr/sbin/wpa_supplicant" ]]; then echo "Wi-Fi: NetworkManager and wpa_supplicant are installed; external connection profile can be imported."; else echo "Wi-Fi: not included; no complete NetworkManager/wpa_supplicant binpkg closure is available."; fi)
+$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL2 3.3.4 binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL2 3.3.4 binpkg unavailable."; fi)
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
@@ -930,9 +934,11 @@ else
   ! grep -Eq '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*(tty7|ttyS0)([[:space:]]|$)' "$OUT/INITTAB-PROBE.txt" || die "final SquashFS unexpectedly has tty7 or serial getty respawn"
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     unsquashfs -cat "$OUT/squashfs" etc/X11/xinit/xserverrc > "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS has no rootless-Xorg xserverrc"
-    grep -Fq '"vt$vt" -keeptty' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not bind Xorg to the active login VT"
+    grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not supply the active VT when needed"
   fi
-  unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS is missing scrcpy-server"
+  if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy package is missing its matching server"
+  fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)

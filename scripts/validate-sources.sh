@@ -97,7 +97,7 @@ test -s d630-gentoo/scripts/install-runtime-dotfiles.sh
 bash -n d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-apps/msr-tools' d630-gentoo/config/package-sets/cli.list
-grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/config/package-sets/multimedia.list
+grep -Fxq '=app-mobilephone/scrcpy-3.3.4' d630-gentoo/config/package-sets/multimedia.list
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
@@ -123,13 +123,17 @@ grep -Fq '9685e6e6da9419ac5446814dd1fdd19e32073e88' d630-gentoo/scripts/install-
 ! grep -Fq 'mpd.conf' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/package-sets/multimedia.list
+! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
+! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/autostart
+grep -Fq 'OPENBOX-OPTIONAL-KEYS.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'omitted: scrcpy 3.3.4' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'omitted: %s (no compatible imported binpkg)' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
 ! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -237,7 +241,7 @@ python3 - <<'PY'
 from pathlib import Path
 import re
 
-for filename in ("scripts/save-runner-state-encrypted.sh",):
+for filename in ("scripts/save-runner-state-encrypted.sh", "d630-gentoo/scripts/build-runtime-squashfs.sh"):
     source = Path(filename).read_text(encoding="utf-8")
     snippets = re.findall(r"<<'PY'[ \t]*\r?\n(.*?)^[ \t]*PY[ \t]*$", source, re.S | re.M)
     if not snippets:
@@ -348,7 +352,6 @@ grep -Fq 'vim.opt[option] = value' d630-gentoo/scripts/install-runtime-dotfiles.
 grep -Fq 'pastetoggle[[:space:]]*=' d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'Removing manuals, documentation trees, locale sources, and unused translations.' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'Required runtime application is absent from the final SquashFS' d630-gentoo/scripts/build-squashfs.sh
-grep -Fq 'usr/bin/scrcpy' d630-gentoo/scripts/build-squashfs.sh
 ! grep -Eq 'usr/bin/(mpd|ncmpcpp|mpv)' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-server' d630-gentoo/scripts/build-runtime-squashfs.sh
