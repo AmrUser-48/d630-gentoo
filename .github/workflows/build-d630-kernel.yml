@@ -270,7 +270,7 @@ jobs:
           out="$GITHUB_WORKSPACE/output"
           firmware_root="$RUNNER_TEMP/d630-firmware"
           command -v busybox
-          applets=(sh mount find mkdir sleep switch_root umount cat cp)
+          applets=(sh mount find mkdir sleep switch_root umount cat cp wc)
           for applet in "${applets[@]}"; do
             if ! busybox --list | grep -Fxq "$applet"; then
               echo "Required BusyBox applet missing from busybox-static: $applet" >&2
