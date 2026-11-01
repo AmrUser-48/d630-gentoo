@@ -22,8 +22,13 @@ test -s config/portage/make.conf
 test -s config/portage/binrepos.conf/gentoobinhost.conf
 grep -Fq 'https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/' config/portage/binrepos.conf/gentoobinhost.conf
 grep -Fq 'verify-signature = true' config/portage/binrepos.conf/gentoobinhost.conf
-grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/portage/make.conf
-grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg"' config/make.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-dostrip binpkg-docompress -splitdebug"' config/portage/make.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-dostrip binpkg-docompress -splitdebug"' config/make.conf
+for portage_conf in config/portage/make.conf config/make.conf; do
+    grep -Fq 'BINPKG_COMPRESS="zstd"' "$portage_conf"
+    grep -Fq 'BINPKG_COMPRESS_FLAGS="-9"' "$portage_conf"
+done
+grep -Fq 'RUSTFLAGS="-C target-cpu=core2"' config/portage/make.conf
 grep -Fq -- '--with-bdeps=n' config/portage/make.conf
 grep -Fq 'NINJAOPTS="-j4"' config/portage/make.conf
 grep -Fq 'NINJAOPTS="-j4"' config/make.conf
@@ -251,6 +256,15 @@ test -s AGENTS.md
 test -s llms.txt
 test -s .github/copilot-instructions.md
 test -s docs/README-TEMPLATE.md
+grep -Fq 'CARGO_PROFILE_RELEASE_STRIP=debuginfo' AGENTS.md
+grep -Fq 'CARGO_PROFILE_RELEASE_LTO=thin' AGENTS.md
+grep -Fq 'BINPKG_COMPRESS_FLAGS="-9"' AGENTS.md
+grep -Fq '[AI agent rules](AGENTS.md)' README.md
+! grep -Fq 'AGENTS.md' d630-tiny/README.md
+! grep -Fq 'AGENTS.md' d630-gentoo/README.md
+! grep -Fq 'AGENTS.md' kernels/README.md
+! grep -Fq 'AGENTS.md' llms.txt
+! grep -Fq 'AGENTS.md' docs/README-TEMPLATE.md
 test -s docs/releases.md
 test -s scripts/prune-obsolete-releases.sh
 test -s scripts/update-release-index.sh
