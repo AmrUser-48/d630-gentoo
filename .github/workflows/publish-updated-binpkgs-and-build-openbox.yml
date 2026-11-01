@@ -193,6 +193,25 @@ jobs:
           echo "Restored and validated Gentoo root from $state_tag."
           df -h / | tee "$report/host-disk-after-restore.txt"
 
+      - name: Rebuild PipeWire without Bluetooth for the D630
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo install -D -m 0644 config/portage/package.use/10-d630-hardware \
+            "$GENTOO_ROOT/etc/portage/package.use/10-d630-hardware"
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
+            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --newuse --oneshot --buildpkg media-video/pipewire'
+          pipewire_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit)"
+          [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || {
+            echo "PipeWire package metadata is missing after rebuilding." >&2
+            exit 1
+          }
+          if grep -qw bluetooth "$pipewire_pkg/USE"; then
+            echo "PipeWire still has Bluetooth enabled; refusing to publish this binpkg set." >&2
+            exit 1
+          fi
+          echo "PipeWire rebuilt with Bluetooth disabled; publishing this binary package with the restored PKGDIR."
+
       - name: Package current PKGDIR and publish the updated binpkg release
         id: publish
         shell: bash
