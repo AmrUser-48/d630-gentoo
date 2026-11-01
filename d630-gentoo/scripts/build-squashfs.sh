@@ -252,11 +252,10 @@ tmp_output=""
 if [[ "$MINIMAL_RUNTIME" == true ]]; then
   tmp_filelist="$(mktemp "${TMPDIR:-/var/tmp}/d630-squashfs-list.XXXXXXXX")"
   unsquashfs -ll "$output" > "$tmp_filelist"
-  for path in usr/bin/python3 usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/sd usr/bin/rdmsr usr/bin/wrmsr usr/bin/msr-cpuid \
-    usr/bin/grep usr/bin/egrep usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg usr/bin/xdotool usr/bin/scrcpy \
-    usr/bin/sox usr/bin/lame usr/bin/ffmpeg usr/bin/ffprobe usr/bin/nmcli usr/bin/nmtui \
+  for path in usr/bin/python3 usr/bin/scrcpy usr/bin/nmcli usr/bin/nmtui \
     usr/sbin/iw usr/sbin/wpa_supplicant \
-    usr/bin/pipewire usr/bin/wireplumber usr/bin/zsh usr/bin/nano usr/bin/tmux \
+    usr/bin/pipewire usr/bin/wireplumber usr/bin/aplay usr/bin/arecord \
+    usr/bin/amixer usr/bin/alsamixer usr/bin/speaker-test \
     usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do
     grep -Eq "squashfs-root/${path}([[:space:]]|$)" "$tmp_filelist" || {
       echo "Required runtime application is absent from the final SquashFS: /${path}" >&2
