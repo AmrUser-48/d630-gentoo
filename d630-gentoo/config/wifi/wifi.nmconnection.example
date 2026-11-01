@@ -1,0 +1,20 @@
+[connection]
+id=D630 Wi-Fi
+uuid=6f2d8b7a-0f8c-4dd2-9e51-9a82e4e9d630
+type=wifi
+autoconnect=true
+autoconnect-priority=100
+
+[802-11-wireless]
+mode=infrastructure
+ssid=YOUR_WIFI_SSID
+
+[802-11-wireless-security]
+key-mgmt=wpa-psk
+psk=REPLACE_WITH_WIFI_KEY
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
