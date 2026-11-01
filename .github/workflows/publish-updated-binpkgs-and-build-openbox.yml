@@ -18,6 +18,23 @@ on:
         required: false
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      build_openbox:
+        description: "Build the strict binpkg-only Openbox SquashFS after publishing"
+        required: false
+        type: boolean
+        default: true
+      state_tag:
+        description: "Encrypted runner-state-* release to restore"
+        required: false
+        type: string
+        default: "runner-state-20261031T054241Z"
+      kernel_bundle_tag:
+        description: "Kernel bundle produced by the parent build workflow"
+        required: false
+        type: string
+        default: "d630-kernel-6.18.56-run-40922514538"
 
 permissions:
   actions: write
@@ -29,7 +46,7 @@ concurrency:
 
 jobs:
   publish-binpkgs:
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS') }}
     name: Restore saved Gentoo state and publish its current binpkgs
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -193,24 +210,117 @@ jobs:
           echo "Restored and validated Gentoo root from $state_tag."
           df -h / | tee "$report/host-disk-after-restore.txt"
 
-      - name: Rebuild PipeWire without Bluetooth for the D630
+      - name: Build missing D630 runtime packages as Core 2 binpkgs
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo install -D -m 0644 config/portage/package.use/10-d630-hardware \
-            "$GENTOO_ROOT/etc/portage/package.use/10-d630-hardware"
+
+          # Apply the exact D630 build policy used by the package cache.
+          sudo install -D -m 0644 config/portage/make.conf \
+            "$GENTOO_ROOT/etc/portage/make.conf"
+          sudo install -d -m 0755 \
+            "$GENTOO_ROOT/etc/portage/package.use" \
+            "$GENTOO_ROOT/etc/portage/package.accept_keywords" \
+            "$GENTOO_ROOT/etc/portage/env"
+          for file in config/portage/package.use/*; do
+            sudo install -m 0644 "$file" "$GENTOO_ROOT/etc/portage/package.use/$(basename "$file")"
+          done
+          for file in config/portage/package.accept_keywords/*; do
+            sudo install -m 0644 "$file" "$GENTOO_ROOT/etc/portage/package.accept_keywords/$(basename "$file")"
+          done
+          sudo install -D -m 0644 config/portage/package.env \
+            "$GENTOO_ROOT/etc/portage/package.env"
+          sudo install -m 0644 config/portage/env/custom-opt.conf \
+            "$GENTOO_ROOT/etc/portage/env/custom-opt.conf"
+
+          # Register the pinned SDL2-only scrcpy 3.3.4 fork as a local ebuild.
+          local_repo="$GENTOO_ROOT/var/db/repos/d630-local"
+          sudo install -d -m 0755 "$local_repo/metadata" "$local_repo/app-mobilephone/scrcpy"
+          sudo tee "$local_repo/metadata/layout.conf" >/dev/null <<'EOF'
+          repo-name = d630-local
+          masters = gentoo
+          thin-manifests = true
+          EOF
+          sudo tee "$GENTOO_ROOT/etc/portage/repos.conf/d630-local.conf" >/dev/null <<EOF
+          [d630-local]
+          location = $local_repo
+          priority = 1000
+          auto-sync = no
+          EOF
+          sudo install -m 0644 \
+            config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild \
+            "$local_repo/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
+
+          # The encrypted state archive intentionally contains no /dev device nodes.
+          # Bind the live runner's virtual filesystems before invoking Portage in chroot.
+          for mp in dev proc sys run; do
+            sudo mount --rbind "/$mp" "$GENTOO_ROOT/$mp"
+            sudo mount --make-rslave "$GENTOO_ROOT/$mp"
+          done
+          cleanup_chroot_mounts() {
+            for mp in run sys proc dev; do
+              sudo umount -R "$GENTOO_ROOT/$mp" 2>/dev/null || true
+            done
+          }
+          trap cleanup_chroot_mounts EXIT
+
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
-            'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkg --newuse --oneshot --buildpkg media-video/pipewire'
+            'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest'
+
+          # All missing runtime atoms are compiled here into reusable binpkgs.
+          # Dependencies may reuse existing Core 2 binpkgs; the remote generic binhost
+          # is disabled. The later SFS job uses --usepkgonly and never compiles.
+          build_atoms='media-libs/libsdl2 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-fs/ntfs3g sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xdg-utils x11-misc/xclip sys-apps/file sys-apps/less app-misc/mc sys-apps/ripgrep media-video/pipewire x11-base/xorg-server =app-mobilephone/scrcpy-3.3.4::d630-local'
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
+            "emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$build_atoms' --oneshot $build_atoms"
+
           pipewire_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit)"
           [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || {
-            echo "PipeWire package metadata is missing after rebuilding." >&2
+            echo "PipeWire package metadata is missing after the binpkg build." >&2
             exit 1
           }
           if grep -qw bluetooth "$pipewire_pkg/USE"; then
             echo "PipeWire still has Bluetooth enabled; refusing to publish this binpkg set." >&2
             exit 1
           fi
-          echo "PipeWire rebuilt with Bluetooth disabled; publishing this binary package with the restored PKGDIR."
+
+          xorg_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/x11-base" -mindepth 1 -maxdepth 1 -type d -name 'xorg-server-*' -print -quit)"
+          [[ -n "$xorg_pkg" && -s "$xorg_pkg/USE" ]] || {
+            echo "Xorg package metadata is missing after the binpkg build." >&2
+            exit 1
+          }
+          grep -qw elogind "$xorg_pkg/USE" || {
+            echo "Xorg binpkg lacks elogind VT/session support." >&2
+            exit 1
+          }
+          if grep -qw suid "$xorg_pkg/USE"; then
+            echo "Xorg binpkg must remain rootless (USE=-suid)." >&2
+            exit 1
+          fi
+
+          nm_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/net-misc" -mindepth 1 -maxdepth 1 -type d -name 'networkmanager-*' -print -quit)"
+          [[ -n "$nm_pkg" && -s "$nm_pkg/USE" ]] || {
+            echo "NetworkManager package metadata is missing after the binpkg build." >&2
+            exit 1
+          }
+          for flag in elogind tools wifi wext; do
+            grep -qw "$flag" "$nm_pkg/USE" || {
+              echo "NetworkManager binpkg is missing required USE=$flag." >&2
+              exit 1
+            }
+          done
+          grep -qw bluetooth "$nm_pkg/USE" && {
+            echo "NetworkManager unexpectedly includes Bluetooth support." >&2
+            exit 1
+          }
+
+          scrcpy_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-3.3.4*' -print -quit)"
+          [[ -n "$scrcpy_pkg" && -s "$scrcpy_pkg/USE" ]] || {
+            echo "Pinned SDL2 scrcpy 3.3.4 binpkg was not built." >&2
+            exit 1
+          }
+          echo "Verified Core 2 binpkgs: PipeWire (-bluetooth), rootless Xorg (elogind), NetworkManager (Wi-Fi/WEXT/tools), and SDL2 scrcpy 3.3.4."
+          echo "Additional runtime gaps were built into the same PKGDIR as binary packages."
 
       - name: Package current PKGDIR and publish the updated binpkg release
         id: publish
@@ -285,7 +395,7 @@ jobs:
           compression-level: 0
 
   build-openbox:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_openbox) || (github.event_name == 'push' && contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS')) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_openbox) || (github.event_name == 'workflow_call' && inputs.build_openbox) || (github.event_name == 'push' && contains(github.event.head_commit.message, 'run binpkg refresh and build Openbox SFS')) }}
     name: Build and verify Openbox SFS from refreshed packages
     needs: publish-binpkgs
     runs-on: ubuntu-24.04
@@ -294,7 +404,7 @@ jobs:
       RUNTIME_PROFILE: openbox
       BINPKG_RUN_IDS: ${{ needs.publish-binpkgs.outputs.binpkg_run_ids }}
       SOURCE_FALLBACK: "false"
-      KERNEL_BUNDLE_TAG: d630-kernel-6.18.56-run-40922514538
+      KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-40922514538' }}
       GH_TOKEN: ${{ github.token }}
 
     steps:

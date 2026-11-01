@@ -1,9 +1,6 @@
-media-video/mpv
+# Lightweight audio/video runtime; no MPD server, ncmpcpp, or mpv.
 media-video/ffmpeg
-media-sound/mpd
-media-sound/ncmpcpp
 media-sound/lame
-media-sound/alsa-utils
 media-libs/opus
 media-sound/sox
 app-mobilephone/scrcpy

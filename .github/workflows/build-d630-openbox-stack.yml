@@ -1,0 +1,50 @@
+name: Build current D630 Openbox boot stack
+run-name: "D630 Core 2 Openbox • kernel + binpkgs + SFS • #${{ github.run_number }}"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-d630-openbox-stack.yml"
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: Stable Linux 6.18.y LTS version
+        required: true
+        type: string
+        default: "6.18.56"
+      state_tag:
+        description: Encrypted Gentoo runner-state release to restore
+        required: true
+        type: string
+        default: "runner-state-20261031T054241Z"
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: d630-openbox-current-stack
+  cancel-in-progress: false
+
+jobs:
+  kernel:
+    name: Build current kernel, initramfs, modules and D630 firmware
+    uses: ./.github/workflows/build-d630-kernel.yml
+    with:
+      kernel_version: ${{ inputs.kernel_version || '6.18.56' }}
+    permissions:
+      contents: write
+
+  binpkgs-and-sfs:
+    name: Build missing Core 2 binpkgs, then assemble strict Openbox SFS
+    needs: kernel
+    uses: ./.github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+    with:
+      build_openbox: true
+      state_tag: ${{ inputs.state_tag || 'runner-state-20261031T054241Z' }}
+      kernel_bundle_tag: d630-kernel-${{ inputs.kernel_version || '6.18.56' }}-run-${{ github.run_id }}
+    secrets: inherit
+    permissions:
+      actions: write
+      contents: write

@@ -31,14 +31,15 @@ app-i18n/fbterm gpm
 # Use Gentoo's prebuilt PipeWire man pages (-man) instead of building them with Doxygen.
 media-video/pipewire -bluetooth sound-server pipewire-alsa dbus elogind -man -systemd -system-service -doc -test
 media-video/wireplumber elogind -systemd -system-service -doc -test
+# Intel 3945ABG: NetworkManager + wpa_supplicant; preserve legacy WEXT compatibility.
+net-misc/networkmanager elogind tools wifi wext -bluetooth -modemmanager -ppp -systemd
+net-wireless/wpa_supplicant dbus
 media-sound/pulseaudio -daemon
 
 
 # D630 multimedia: ALSA, Opus/MP3 codecs and PipeWire output.
 media-sound/sox alsa opus flac ogg mad sndfile -ffmpeg
-media-sound/mpd opus lame pipewire
 media-video/ffmpeg mp3 opus
-media-video/mpv pipewire
 # Pinned scrcpy 3.3.4 D630 fork: SDL2/X11 only, no Wayland.
 app-mobilephone/scrcpy X -wayland
 
