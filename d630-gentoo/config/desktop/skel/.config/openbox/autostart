@@ -25,7 +25,3 @@ if command -v wireplumber >/dev/null 2>&1; then
     wireplumber >/tmp/wireplumber.log 2>&1 &
 fi
 
-# Start the local per-user MPD instance for ncmpcpp.
-if command -v mpd >/dev/null 2>&1 && [ -s "$HOME/.config/mpd/mpd.conf" ]; then
-    mpd "$HOME/.config/mpd/mpd.conf" >/tmp/mpd.log 2>&1
-fi
