@@ -1,5 +1,9 @@
 #!/sbin/openrc-run
 description="Initialize the Gentoo live user"
+
+depend() {
+    before NetworkManager
+}
 start() {
     groups=
     groupadd -f netdev || return 1
