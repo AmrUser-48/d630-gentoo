@@ -940,7 +940,7 @@ else
     unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy package is missing its matching server"
   fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
-  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
+  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
   sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
@@ -955,7 +955,6 @@ done
 cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
 [[ ! -s "$OUT/SQUASHFS-SHA256.txt" ]] || cat "$OUT/SQUASHFS-SHA256.txt" | tee -a "$GITHUB_STEP_SUMMARY"
 log "Runtime image completed"
- "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   # Mandatory desktop and device services must resolve from imported Core 2 binpkgs.
@@ -1616,7 +1615,7 @@ else
     unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy package is missing its matching server"
   fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
-  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
+  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
   sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
