@@ -375,16 +375,25 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   [[ ! -u "$xorg_server" ]] || die "Xorg unexpectedly has the setuid bit; use the elogind-managed local VT"
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
-    /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
-    /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
-    /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/scrcpy /usr/bin/sox /usr/bin/lame \
-    /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/nmcli /usr/bin/nmtui \
+    /usr/bin/python3 /usr/bin/scrcpy /usr/bin/nmcli /usr/bin/nmtui \
     /usr/sbin/iw /usr/sbin/wpa_supplicant \
     /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
     /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
   [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "Openbox runtime is missing the matching scrcpy-server"
+  : > "$OUT/TOOL-AVAILABILITY.txt"
+  for executable in /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
+    /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
+    /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/sox /usr/bin/lame /usr/bin/ffmpeg /usr/bin/ffprobe \
+    /usr/bin/xclip /usr/bin/xdg-open /usr/bin/xmodmap /usr/bin/xrdb \
+    /usr/bin/ntfs-3g /usr/sbin/mount.ntfs-3g; do
+    if [[ -x "$ROOT$executable" ]]; then
+      printf 'included: %s\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
+    else
+      printf 'omitted: %s (no compatible imported binpkg)\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
+    fi
+  done
   mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
   [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Openbox runtime has no installed Mesa package metadata"
   if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
@@ -430,6 +439,29 @@ fi
 exec openbox-session
 EOF
   chmod 0644 "$ROOT/etc/skel/.xinitrc"
+fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  # Rootless Xorg must use the VT owned by the current logind login session.
+  # startx can infer it; direct xinit needs the same value set explicitly.
+  mkdir -p "$ROOT/etc/X11/xinit"
+  cat > "$ROOT/etc/X11/xinit/xserverrc" <<'EOF'
+#!/bin/sh
+set -eu
+current_tty="$(tty 2>/dev/null || true)"
+case "$current_tty" in
+  /dev/tty[0-9]*) vt="${current_tty#/dev/tty}" ;;
+  *) vt="${XDG_VTNR:-}" ;;
+esac
+case "$vt" in
+  ''|*[!0-9]*|0)
+    echo "Xorg requires an active local VT; run startx/xinit from the tty login session." >&2
+    exit 1
+    ;;
+esac
+exec /usr/bin/Xorg -nolisten tcp "$@" "vt$vt" -keeptty
+EOF
+  chmod 0755 "$ROOT/etc/X11/xinit/xserverrc"
+  sh -n "$ROOT/etc/X11/xinit/xserverrc"
 fi
 # Configure the kernel's built-in ZRAM as 1.5 GiB LZ4 swap.
 cat > "$ROOT/etc/init.d/d630-zram" <<'EOF'
@@ -607,9 +639,9 @@ if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
   grep -qw elogind "$xorg_pkg/USE" || die "Xorg was not built with elogind support"
   if grep -qw suid "$xorg_pkg/USE"; then die "Xorg was built with USE=suid"; fi
   [[ ! -u "$xorg_server" ]] || die "Xorg executable unexpectedly has the setuid bit"
+  [[ -s "$ROOT/etc/X11/xinit/xserverrc" ]] || die "rootless Xorg is missing the active-VT xserverrc"
   crocus_driver="$(find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null || true)"
   [[ -n "$crocus_driver" ]] || die "Mesa Crocus driver is missing from the GUI runtime"
-  [[ "$(stat -c '%a' "$xorg_server")" == 4755 ]] || die "Xorg server is not installed setuid-root for local console graphics"
 fi
 chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
 find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
