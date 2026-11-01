@@ -11,8 +11,8 @@ configuration.
   Terminus PCF XLFD fonts. It deliberately avoids UXTerm-only resource names and relative
   `#include` paths.
 - `skel/.config/openbox/rc.xml`: a small Openbox keybinding and workspace baseline.
-- `skel/.config/openbox/autostart`: loads Xresources, sets keyboard repeat and optionally
-  enables the two xdotool screen-edge actions.
+- `skel/.config/openbox/autostart`: loads Xresources, sets keyboard repeat, starts PipeWire/WirePlumber and per-user MPD, and optionally enables the two xdotool screen-edge actions.
+- `skel/.config/mpd/mpd.conf`: local MPD database/playlist paths and PipeWire output.
 
 The runtime dotfiles installer copies these templates into `/etc/skel`. They are therefore
 defaults for a newly initialized live user, not an automatic overwrite of an existing home
@@ -25,11 +25,10 @@ The templates assume the Openbox profile has:
 - `x11-wm/openbox`, `x11-terms/xterm`, `x11-apps/xrdb`, `x11-apps/xset`;
 - `x11-misc/xdotool` for the optional screen-edge actions;
 - `app-misc/lf`, `www-client/links` and `sys-process/htop` for the terminal shortcuts;
-- `media-fonts/terminus-font` with PCF Unicode fonts enabled.
+- `media-fonts/terminus-font` with PCF Unicode fonts enabled;
+- `media-video/pipewire`, `media-video/wireplumber`, `media-sound/mpd` and `media-sound/ncmpcpp` for audio.
 
-The Openbox configuration intentionally does not launch Thunar, XFCE, Rofi, Polybar, Feh,
-MPD helpers or local scripts that are not part of the minimal profile. Add those shortcuts
-only when the corresponding applications are included in a selected package set.
+The Openbox configuration does not launch Thunar, XFCE, Rofi, Polybar or Feh. Super+N opens Neovim, Super+S starts scrcpy, Super+M opens ncmpcpp, Super+A opens alsamixer, Super+I opens nmtui, and Super+V launches mpv. MPD runs as the logged-in user and listens only on localhost.
 
 ## Xresources checks
 
