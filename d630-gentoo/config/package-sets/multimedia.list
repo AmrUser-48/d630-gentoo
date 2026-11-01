@@ -4,3 +4,5 @@ media-sound/mpd
 media-sound/ncmpcpp
 media-sound/lame
 media-sound/alsa-utils
+media-libs/opus
+media-sound/sox
