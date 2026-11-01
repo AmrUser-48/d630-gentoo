@@ -105,7 +105,7 @@ grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-process/htop' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'grep -vx '\''sys-apps/man-db'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'sys-apps\/man-db$/d' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'c1:12345:respawn:%s --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'entry = f"c1:12345:respawn:{agetty} --autologin gentoo --noclear tty1 linux' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'command -v agetty' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'wifi.nmconnection' d630-gentoo/config/runtime/d630-firstboot
 grep -Fq 'chmod 0600' d630-gentoo/config/runtime/d630-firstboot
