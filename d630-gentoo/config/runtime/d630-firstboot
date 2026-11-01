@@ -16,6 +16,16 @@ start() {
     if [ ! -e /home/gentoo/.bashrc ]; then
         cp -a /etc/skel/. /home/gentoo/ || return 1
     fi
+    mkdir -p /home/gentoo/Music /home/gentoo/.config/mpd/playlists || return 1
     chown -R gentoo:gentoo /home/gentoo || return 1
     chmod 0700 /home/gentoo || return 1
+    # Copy the optional Wi-Fi profile from the host partition; credentials stay outside the SFS.
+    wifi_source=/run/d630/probe/d630-gentoo/wifi.nmconnection
+    wifi_target=/etc/NetworkManager/system-connections/d630-wifi.nmconnection
+    if [ -s "$wifi_source" ] && [ -d /etc/NetworkManager ]; then
+        mkdir -p /etc/NetworkManager/system-connections || return 1
+        cp -f "$wifi_source" "$wifi_target" || return 1
+        chown root:root "$wifi_target" || return 1
+        chmod 0600 "$wifi_target" || return 1
+    fi
 }
