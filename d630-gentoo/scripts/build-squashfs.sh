@@ -254,7 +254,8 @@ if [[ "$MINIMAL_RUNTIME" == true ]]; then
   unsquashfs -ll "$output" > "$tmp_filelist"
   for path in usr/bin/python3 usr/bin/nvim usr/bin/lf usr/bin/fd usr/bin/sd usr/bin/rdmsr usr/bin/wrmsr usr/bin/msr-cpuid \
     usr/bin/grep usr/bin/egrep usr/bin/tldr usr/bin/htop usr/bin/btop usr/bin/mc usr/bin/rg usr/bin/xdotool usr/bin/scrcpy \
-    usr/bin/sox usr/bin/lame usr/bin/mpv usr/bin/mpd usr/bin/ncmpcpp usr/bin/nmcli usr/bin/nmtui \
+    usr/bin/sox usr/bin/lame usr/bin/ffmpeg usr/bin/ffprobe usr/bin/nmcli usr/bin/nmtui \
+    usr/sbin/iw usr/sbin/wpa_supplicant \
     usr/bin/pipewire usr/bin/wireplumber usr/bin/zsh usr/bin/nano usr/bin/tmux \
     usr/bin/startx usr/bin/xterm usr/bin/openbox-session; do
     grep -Eq "squashfs-root/${path}([[:space:]]|$)" "$tmp_filelist" || {
