@@ -94,6 +94,9 @@ rm -rf "$ROOT/etc/portage/package.accept_keywords" "$ROOT/etc/portage/package.ke
 mkdir -p "$ROOT/etc/portage/package.accept_keywords"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.accept_keywords/." "$ROOT/etc/portage/package.accept_keywords/"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.use/." "$ROOT/etc/portage/package.use/"
+mkdir -p "$ROOT/etc/portage/env"
+install -m 0644 "$GITHUB_WORKSPACE/config/portage/package.env" "$ROOT/etc/portage/package.env"
+cp -a "$GITHUB_WORKSPACE/config/portage/env/." "$ROOT/etc/portage/env/"
 cp -a "$GITHUB_WORKSPACE/config/portage/binrepos.conf/." "$ROOT/etc/portage/binrepos.conf/"
 cp -a "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/." "$ROOT/etc/portage/package-sets/"
 install -m 0755 "$GITHUB_WORKSPACE/scripts/gentoo-build-set" "$ROOT/usr/local/sbin/gentoo-build-set"
@@ -675,6 +678,7 @@ else
   unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
   unsquashfs -cat "$OUT/squashfs" etc/inittab > "$OUT/INITTAB-PROBE.txt" || die "final SquashFS has no readable /etc/inittab"
   grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$OUT/INITTAB-PROBE.txt" || die "final SquashFS lost the tty1 autologin respawn entry"
+  unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS is missing scrcpy-server"
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
