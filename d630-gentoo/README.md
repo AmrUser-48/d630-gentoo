@@ -78,6 +78,15 @@ The direct initramfs does not use `root=`, `rootfstype=`, `d630.boot_uuid` or th
 
 `ppc=1` is not a valid D630/x86-64 kernel option. PowerPC-specific options are for a different CPU architecture; this machine uses Intel x86-64. Leave `ppc=1` out.
 
+!TODO
+WTF IS **ppc=1** and why here part of conversations in documentation!?
+HERE ppc:
+# intel_pstate=disable 
+# processor.ignore_ppc=1 
+# thermal.off=1 
+# pcie_aspm=off nuc op (Disables power saving on PCIe, sometimes helps stability on old boards)
+
+!DOTO
 For the full upstream parameter reference, see the [Linux kernel command-line documentation](https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html).
 
 ## Build
