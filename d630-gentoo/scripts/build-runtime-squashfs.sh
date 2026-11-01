@@ -294,7 +294,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   mesa_atom="=media-libs/mesa-$mesa_version"
   log "Install Mesa runtime dependencies from binary packages"
   chroot "$ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkgonly --onlydeps '$mesa_atom'" \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --onlydeps '$mesa_atom'" \
     |& tee "$OUT/mesa-binpkg.log"
   log "Install Mesa from an imported binary package only"
   chroot "$ROOT" /bin/bash -lc \
@@ -315,15 +315,15 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   log "Mesa is already installed from its verified binpkg; installing the remaining runtime atoms"
 fi
 
-# Binary-only mode may use both the imported Core 2 PKGDIR and the configured
-# signed Gentoo binhost. The emerge command below uses --getbinpkg --usepkgonly:
-# missing binaries fail immediately; source compilation is never permitted.
+# Strict runtime assembly reads only the imported Core 2 PKGDIR. The Gentoo
+# network binhost is disabled so an untracked generic package cannot slip in.
+# Missing binaries fail immediately; source compilation is never permitted.
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
   chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 else
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
 
 # glxgears is optional: use it only when its already-built binary package was
@@ -366,12 +366,21 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   if grep -qw bluetooth "$pipewire_pkg/USE"; then
     die "Openbox PipeWire was built with Bluetooth enabled; rebuild the binpkg with USE=-bluetooth"
   fi
+  xorg_server="$ROOT/usr/bin/Xorg"
+  [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
+  [[ -x "$xorg_server" ]] || die "Openbox runtime has no executable Xorg server"
+  xorg_pkg="$(find "$ROOT/var/db/pkg/x11-base" -mindepth 1 -maxdepth 1 -type d -name 'xorg-server-*' -print -quit)"
+  [[ -n "$xorg_pkg" && -s "$xorg_pkg/USE" ]] || die "Xorg package USE metadata is missing"
+  grep -qw elogind "$xorg_pkg/USE" || die "Xorg lacks elogind VT/session support"
+  if grep -qw suid "$xorg_pkg/USE"; then die "Xorg was built with USE=suid"; fi
+  [[ ! -u "$xorg_server" ]] || die "Xorg unexpectedly has the setuid bit; use the elogind-managed local VT"
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
     /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
     /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
     /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/scrcpy /usr/bin/sox /usr/bin/lame \
-    /usr/bin/mpv /usr/bin/mpd /usr/bin/ncmpcpp /usr/bin/nmcli /usr/bin/nmtui \
+    /usr/bin/ffmpeg /usr/bin/ffprobe /usr/bin/nmcli /usr/bin/nmtui \
+    /usr/sbin/iw /usr/sbin/wpa_supplicant \
     /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
     /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
