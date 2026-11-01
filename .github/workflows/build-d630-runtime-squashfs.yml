@@ -2,9 +2,6 @@ name: Build D630 Gentoo runtime SquashFS
 run-name: "D630 rootfs • ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }} • run ${{ github.run_number }}"
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       runtime_profile:
@@ -53,9 +50,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      RUNTIME_PROFILE: ${{ github.event_name == 'push' && 'openbox' || inputs.runtime_profile }}
+      RUNTIME_PROFILE: ${{ inputs.runtime_profile }}
       PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
-      BINPKG_RUN_IDS: ${{ github.event_name == 'push' && '39507549274,41307096065' || inputs.binpkg_run_ids || '' }}
+      BINPKG_RUN_IDS: ${{ inputs.binpkg_run_ids || '' }}
       SOURCE_FALLBACK: ${{ inputs.source_fallback || (inputs.runtime_profile == 'tiny-console' && inputs.prepared_assets_run_id == '' && inputs.binpkg_run_ids == '') }}
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag }}
       GH_TOKEN: ${{ github.token }}
@@ -77,7 +74,7 @@ jobs:
           }
 
       - name: Require Mesa binpkg input for Openbox SquashFS
-        if: inputs.runtime_profile == 'openbox' || github.event_name == 'push'
+        if: inputs.runtime_profile == 'openbox'
         shell: bash
         env:
           PREPARED_ASSETS_RUN_ID: ${{ inputs.prepared_assets_run_id }}
