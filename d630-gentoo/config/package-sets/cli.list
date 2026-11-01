@@ -8,6 +8,7 @@ sys-process/htop
 sys-process/btop
 sys-apps/fd
 sys-apps/sd
+sys-apps/msr-tools
 sys-apps/ripgrep
 sys-apps/grep
 sys-apps/man-db
