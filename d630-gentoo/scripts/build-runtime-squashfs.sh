@@ -322,6 +322,11 @@ if [[ "$RUNTIME_PROFILE" == gui-initram || ( "$RUNTIME_PROFILE" == openbox && "$
     atom="${atom%%#*}"
     atom="${atom//[[:space:]]/}"
     [[ -n "$atom" ]] || continue
+    # Stage 3 already supplies some selected runtime atoms (notably Python).
+    # Do not demand a duplicate binpkg when the matching atom is already installed.
+    if chroot "$ROOT" /usr/bin/portageq has_version / "$atom"; then
+      continue
+    fi
     category="${atom%%/*}"
     package="${atom#*/}"
     if ! find "$ROOT/var/cache/binpkgs/$category/$package" -maxdepth 1 -type f \
