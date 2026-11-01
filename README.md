@@ -30,7 +30,7 @@ Compiler settings target runtime performance on the D630, not faster builds or s
 | Compiler / target | Flags |
 |---|---|
 | GCC/Clang: C, C++ and Fortran userland | `-O2 -march=core2 -mtune=core2` |
-| Selected benchmarked Gentoo packages (MC, SoX, LAME) | `-O3 -march=core2 -mtune=core2 -fomit-frame-pointer` |
+| Current package-scoped overrides (MC, SoX, LAME; validate each independently) | `-O3 -march=core2 -mtune=core2 -fomit-frame-pointer` |
 | Rust applications | `RUSTFLAGS="-C target-cpu=core2"`; Cargo release `opt-level=3`. Thin LTO and `codegen-units=1` are retained only when target-runtime benchmarks support them. |
 | Linux kernel | Generic x86-64 ISA baseline; `KCFLAGS=-mtune=core2`. Do not use `-march=core2` for the kernel. |
 
