@@ -340,6 +340,7 @@ fi
 
 # glxgears is optional: use it only when its already-built binary package was
 # imported. Never start a new source build merely to add this diagnostic tool.
+# It is deliberately not part of the mandatory Openbox executable list.
 GLXGEARS_STATUS="omitted: no imported x11-apps/mesa-progs binary package"
 MESA_PROGS_BINPKG="$(find "$ROOT/var/cache/binpkgs/x11-apps/mesa-progs" -maxdepth 1 -type f \
   \( -name 'mesa-progs-*.gpkg.tar' -o -name 'mesa-progs-*.tbz2' \) -print -quit 2>/dev/null || true)"
