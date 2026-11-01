@@ -316,31 +316,15 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   log "Mesa is already installed from its verified binpkg; installing the remaining runtime atoms"
 fi
 
-if [[ "$RUNTIME_PROFILE" == gui-initram || ( "$RUNTIME_PROFILE" == openbox && "$SOURCE_FALLBACK" == false ) ]]; then
-  log "Require the GUI package atoms in the imported binary-package release"
-  while IFS= read -r atom || [[ -n "$atom" ]]; do
-    atom="${atom%%#*}"
-    atom="${atom//[[:space:]]/}"
-    [[ -n "$atom" ]] || continue
-    # Stage 3 already supplies some selected runtime atoms (notably Python).
-    # Do not demand a duplicate binpkg when the matching atom is already installed.
-    if chroot "$ROOT" /usr/bin/portageq has_version / "$atom"; then
-      continue
-    fi
-    category="${atom%%/*}"
-    package="${atom#*/}"
-    if ! find "$ROOT/var/cache/binpkgs/$category/$package" -maxdepth 1 -type f \
-      \( -name "$package-*.gpkg.tar" -o -name "$package-*.tbz2" \) -print -quit 2>/dev/null | grep -q .; then
-      die "pinned binpkg release does not contain a binary for required GUI atom $atom"
-    fi
-  done < "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list"
-fi
+# Binary-only mode may use both the imported Core 2 PKGDIR and the configured
+# signed Gentoo binhost. The emerge command below uses --getbinpkg --usepkgonly:
+# missing binaries fail immediately; source compilation is never permitted.
 
 log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
   chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 else
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
 
 # glxgears is optional: use it only when its already-built binary package was
