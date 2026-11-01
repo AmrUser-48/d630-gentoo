@@ -31,6 +31,9 @@ app-i18n/fbterm gpm
 # Use Gentoo's prebuilt PipeWire man pages (-man) instead of building them with Doxygen.
 media-video/pipewire -bluetooth sound-server pipewire-alsa dbus elogind -man -systemd -system-service -doc -test
 media-video/wireplumber elogind -systemd -system-service -doc -test
+# Intel 3945ABG: NetworkManager + wpa_supplicant; preserve legacy WEXT compatibility.
+net-misc/networkmanager elogind tools wifi wext -bluetooth -modemmanager -ppp -systemd
+net-wireless/wpa_supplicant dbus
 media-sound/pulseaudio -daemon
 
 
