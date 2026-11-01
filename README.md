@@ -23,9 +23,18 @@ A Core 2-targeted Linux project for the Dell Latitude D630. It maintains two sep
 
 ## Requirements
 
-Target: Core 2 Duo T7250, Intel GM965/GMA X3100, Intel 3945ABG Wi-Fi, HDA/SigmaTel, SATA AHCI/ATA_PIIX, USB 2.0 and legacy BIOS/GRUB.
+Target: Core 2 Duo T7250 (Merom), Intel GM965/GMA X3100, Intel 3945ABG Wi-Fi, HDA/SigmaTel, SATA AHCI/ATA_PIIX, USB 2.0 and legacy BIOS/GRUB.
 
-Gentoo userland targets Merom with -O2 -pipe -march=core2 -mtune=core2. Kernel builds retain a generic x86-64 ISA baseline and use -mtune=core2 only.
+Compiler settings target runtime performance on the D630, not faster builds or smaller code. Use smaller output only as a secondary preference when measured execution speed is unchanged.
+
+| Compiler / target | Flags |
+|---|---|
+| GCC/Clang: C, C++ and Fortran userland | `-O2 -march=core2 -mtune=core2` |
+| Selected benchmarked Gentoo packages (MC, SoX, LAME) | `-O3 -march=core2 -mtune=core2 -fomit-frame-pointer` |
+| Rust applications | `RUSTFLAGS="-C target-cpu=core2"`; Cargo release `opt-level=3`. Thin LTO and `codegen-units=1` are retained only when target-runtime benchmarks support them. |
+| Linux kernel | Generic x86-64 ISA baseline; `KCFLAGS=-mtune=core2`. Do not use `-march=core2` for the kernel. |
+
+The canonical Portage flags are in `config/portage/make.conf`; package-specific overrides are in `config/portage/package.env`. The full rationale and Cargo profile are in [AGENTS.md](AGENTS.md).
 
 ## Use
 
