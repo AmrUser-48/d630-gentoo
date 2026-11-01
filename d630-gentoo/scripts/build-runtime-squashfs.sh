@@ -359,6 +359,13 @@ if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; the
   done
 fi
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  bluez_pkg="$(find "$ROOT/var/db/pkg/net-wireless" -mindepth 1 -maxdepth 1 -type d -name 'bluez-*' -print -quit 2>/dev/null || true)"
+  [[ -z "$bluez_pkg" ]] || die "Openbox runtime unexpectedly contains BlueZ: ${bluez_pkg##*/}"
+  pipewire_pkg="$(find "$ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit 2>/dev/null || true)"
+  [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || die "Openbox runtime has no PipeWire package metadata"
+  if grep -qw bluetooth "$pipewire_pkg/USE"; then
+    die "Openbox PipeWire was built with Bluetooth enabled; rebuild the binpkg with USE=-bluetooth"
+  fi
   chroot "$ROOT" chmod 0755 /usr/bin/startx
   for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
     /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
