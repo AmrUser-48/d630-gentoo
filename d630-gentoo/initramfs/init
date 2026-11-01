@@ -98,7 +98,7 @@ if [ "$toram" = true ]; then
             break
         fi
     done < /proc/meminfo
-    if [ -n "$mem_available_kib" ] ] && [ "$mem_available_kib" -lt "$((source_kib + 262144))" ]; then
+    if [ -n "$mem_available_kib" ] && [ "$mem_available_kib" -lt "$((source_kib + 262144))" ]; then
         fail "toram needs at least SquashFS size plus 256 MiB available RAM"
     fi
 
