@@ -89,6 +89,38 @@ Rust target:
 RUSTFLAGS="-C target-cpu=core2"
 ~~~
 
+### Cargo release builds and ABI compatibility
+
+For standalone Rust applications built with Cargo, use a release profile and keep CPU tuning explicit. A project-controlled Cargo.toml should start with:
+
+~~~toml
+[profile.release]
+opt-level = 3
+debug = 0
+strip = "debuginfo"
+lto = "thin"
+codegen-units = 1
+incremental = false
+~~~
+
+If the upstream manifest cannot be changed, apply equivalent Cargo profile settings through the build environment:
+
+~~~bash
+RUSTFLAGS="-C target-cpu=core2" \
+CARGO_PROFILE_RELEASE_DEBUG=0 \
+CARGO_PROFILE_RELEASE_STRIP=debuginfo \
+CARGO_PROFILE_RELEASE_LTO=thin \
+CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+CARGO_INCREMENTAL=0 \
+cargo build --release --target x86_64-unknown-linux-gnu
+~~~
+
+Use `--locked` when the project commits a Cargo.lock. Do not overwrite an upstream Cargo.toml or .cargo/config.toml merely to inject local tuning; use build-environment overrides or a maintained downstream patch.
+
+Thin LTO is a benchmark candidate, not a universal requirement. Compare release builds with and without LTO for executable size, startup/runtime performance, peak linker memory and build time. For size-sensitive utilities, compare `opt-level="s"` or `"z"` against `opt-level=3`; retain the variant that meets the actual size/performance target. Do not apply `panic="abort"` globally because it changes panic/unwind behavior. `strip="debuginfo"` removes DWARF debug information; it is not a license to disable arbitrary package functionality or feature-gated code.
+
+The target CPU and the target libc ABI are separate constraints. For binaries intended to run on Debian 12, build in a Bookworm environment/sysroot (glibc 2.36) rather than linking against a newer Ubuntu runner's glibc. `--target x86_64-unknown-linux-gnu` and `target-cpu=core2` do not pin the glibc baseline. Inspect ELF version requirements with `readelf -W --version-info` and test on the oldest supported runtime. Distinguish weak from strong symbol-version requirements; do not treat every weak-version warning as a fatal dependency without testing execution.
+
 The explicit CPU_FLAGS_X86 baseline is MMX, SSE, SSE2, SSE3 and SSSE3. Do not enable SSE4, AVX, AVX2, AVX-512 or newer instructions absent from Merom.
 
 Do not change global optimization to -O3, -Ofast, -flto, -march=native, or add aggressive flags such as -fno-stack-protector without package-specific correctness/performance evidence. The project intentionally avoids global LTO. config/portage/env/custom-opt.conf contains a scoped -O3 -fomit-frame-pointer profile; config/portage/package.env maps it to selected packages (currently MC, SoX and LAME). Preserve that scope; do not promote it to global flags.
@@ -119,7 +151,10 @@ Important current settings:
 - ACCEPT_KEYWORDS="amd64"; do not switch the entire tree to ~amd64. Add narrowly scoped exceptions only when required and documented.
 - Global USE is OpenRC/X11-oriented and excludes systemd/Wayland. Per-package files narrow Mesa to Intel/Crocus and exclude Vulkan/LLVM USE for Mesa while retaining only the LLVM helper targets required by the current Mesa build.
 - LLVM/Clang build targets are restricted to X86 and SPIRV by package-specific configuration. Do not broaden the target list without a dependency/build reason.
-- FEATURES="parallel-fetch buildpkg getbinpkg", PKGDIR=/var/cache/binpkgs, and the signed binhost settings are intentional. Preserve reusable binary packages.
+- FEATURES includes `buildpkg` and `getbinpkg` to keep reusable binary packages. The canonical config explicitly enables `binpkg-dostrip` and `binpkg-docompress`, and disables `splitdebug` for compact release binpkgs. `binpkg-dostrip` strips executables before package creation; `binpkg-docompress` compresses controllable documentation before packaging. These features reduce shipped package size without changing the target CPU ABI.
+- Binary package compression is explicitly Zstandard with level 9 (`BINPKG_COMPRESS="zstd"`, `BINPKG_COMPRESS_FLAGS="-9"`). This trades additional build/packaging CPU time for smaller binpkgs. Benchmark package size and packaging time before increasing the level further. Keep the current GPKG format/default unless a compatibility requirement justifies changing it.
+- PKGDIR=/var/cache/binpkgs and the signed binhost settings are intentional. Preserve reusable binary packages. Do not disable stripping or enable splitdebug for ordinary release packages; when debug symbols are required, preserve them as separate diagnostic artifacts instead of adding them to every binpkg.
+- Do not confuse stripping DWARF/symbol data with Gentoo USE=`debug`, which can enable additional assertions, logging or debug code paths. Keep debug USE disabled by default; add package-specific exceptions only when required.
 - EMERGE_DEFAULT_OPTS is interactive by default (--ask). Non-interactive scripts/workflows must explicitly use --ask=n or --ignore-default-opts where appropriate.
 - Base MAKEOPTS/NINJAOPTS are defaults. CI workflows may recalculate them from available CPU/RAM and append runtime values; do not hard-code a runner-specific job count into shared build scripts.
 - The current Mesa/runtime workflows enforce an x86_64-only ABI in their build-root setup when required. Do not change ABI policy globally without checking all consumers.
