@@ -41,7 +41,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: d630-openbox-binpkgs-refresh
+  group: d630-openbox-binpkgs-refresh-v2
   cancel-in-progress: false
 
 jobs:
