@@ -106,3 +106,4 @@ The release QEMU test covered console/OpenRC startup and the direct three-file r
 - [Known issues](../docs/known-issues.md)
 - [Repository overview](../README.md)
 - [Release index](../docs/releases.md)
+- [Gentoo filesystem permission incident and recovery](permissions-recovery.md)
