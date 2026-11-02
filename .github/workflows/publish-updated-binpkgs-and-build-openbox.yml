@@ -251,8 +251,11 @@ jobs:
             config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild \
             "$local_repo/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
 
-          # The encrypted state archive intentionally contains no /dev device nodes.
-          # Bind the live runner's virtual filesystems before invoking Portage in chroot.
+          # The encrypted state archive intentionally contains no /dev device nodes
+          # and may omit the other transient mount points too.
+          # Recreate the targets before bind-mounting the runner's virtual filesystems.
+          sudo install -d -m 0755 "$GENTOO_ROOT/dev" "$GENTOO_ROOT/proc" \
+            "$GENTOO_ROOT/sys" "$GENTOO_ROOT/run"
           for mp in dev proc sys run; do
             sudo mount --rbind "/$mp" "$GENTOO_ROOT/$mp"
             sudo mount --make-rslave "$GENTOO_ROOT/$mp"
