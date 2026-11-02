@@ -56,10 +56,14 @@ jobs:
             exit 2
           }
           session="$SESSION_MINUTES"
-          [[ "$session" =~ ^[0-9]+$ ]] && (( session >= 1 && session <= 300 )) || {
+          if [[ ! "$session" =~ ^[0-9]+$ ]]; then
+            echo "session_minutes must be an integer." >&2
+            exit 2
+          fi
+          if (( session < 1 || session > 300 )); then
             echo "session_minutes must be between 1 and 300." >&2
             exit 2
-          }
+          fi
           profile="$GITHUB_WORKSPACE/kernels/profiles/$KERNEL_PROFILE.config"
           test -s "$profile" || { echo "Selected profile does not exist: $profile" >&2; exit 1; }
 
