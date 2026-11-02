@@ -34,7 +34,7 @@ on:
         description: "Kernel bundle produced by the parent build workflow"
         required: false
         type: string
-        default: "d630-kernel-6.18.56-run-40922514538"
+        default: "d630-kernel-6.18.56-run-41317026490"
 
 permissions:
   actions: write
@@ -274,6 +274,14 @@ jobs:
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
             "emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$build_atoms' --oneshot $build_atoms"
 
+          dbus_binpkg="$(sudo find "$GENTOO_ROOT/var/cache/binpkgs/sys-apps/dbus" -maxdepth 1 -type f \
+            \( -name 'dbus-*.gpkg.tar' -o -name 'dbus-*.tbz2' \) -print -quit 2>/dev/null)"
+          [[ -n "$dbus_binpkg" ]] || {
+            echo "The refresh did not produce a sys-apps/dbus binary package; refusing to publish an incomplete desktop binpkg set." >&2
+            exit 1
+          }
+          echo "Verified D-Bus binpkg: $dbus_binpkg"
+
           pipewire_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit)"
           [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || {
             echo "PipeWire package metadata is missing after the binpkg build." >&2
@@ -404,7 +412,7 @@ jobs:
       RUNTIME_PROFILE: openbox
       BINPKG_RUN_IDS: ${{ needs.publish-binpkgs.outputs.binpkg_run_ids }}
       SOURCE_FALLBACK: "false"
-      KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-40922514538' }}
+      KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-41317026490' }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
