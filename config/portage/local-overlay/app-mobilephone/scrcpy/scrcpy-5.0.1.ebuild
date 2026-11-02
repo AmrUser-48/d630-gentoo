@@ -37,9 +37,12 @@ src_unpack() {
   # GitHub archive root names vary with the archive ref. Normalize it so
   # Portage always builds from the stable ${S} path.
   local source_dir
-  source_dir="$(find "${WORKDIR}" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+  source_dir="$(find "${WORKDIR}" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-*' -print -quit)"
   [[ -n "${source_dir}" ]] || die "could not locate unpacked scrcpy source directory"
-  mv "${source_dir}" "${S}" || die "could not normalize scrcpy source directory"
+  if [[ "${source_dir}" != "${S}" ]]; then
+    [[ ! -e "${S}" ]] || die "target source directory already exists: ${S}"
+    mv "${source_dir}" "${S}" || die "could not normalize scrcpy source directory"
+  fi
 
   cp "${DISTDIR}/${P}-server" "${WORKDIR}/${P}-server" || die
 }
