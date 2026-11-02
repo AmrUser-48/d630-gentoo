@@ -140,7 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           root="$GENTOO_ROOT"
-          sudo mkdir -p "$root/etc/portage/package.use" "$root/etc/portage/package.accept_keywords" \
+          sudo mkdir -p "$root/etc/portage" "$root/etc/portage/package.accept_keywords" \
             "$root/etc/portage/repos.conf" "$root/etc/portage/binrepos.conf" \
             "$root/etc/portage/profile/package.use.force" "$root/etc/bash/bashrc.d" \
             "$root/etc/env.d" "$root/etc/profile.d" "$root/var/cache/binpkgs" \
