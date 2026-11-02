@@ -331,8 +331,8 @@ EOF
   if ! find "$ROOT/var/cache/binpkgs/sys-fs/ntfs3g" -maxdepth 1 -type f \
       \( -name 'ntfs3g-*.gpkg.tar' -o -name 'ntfs3g-*.tbz2' \) \
       -print -quit 2>/dev/null | grep -q .; then
-    sed -i '/^sys-fs\\/ntfs3g$/d' "$WORK/optional-atoms.txt"
-    printf '%s\\n' 'sys-fs/ntfs3g (no imported binary package)' >> "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+    sed -i '\|^sys-fs/ntfs3g$|d' "$WORK/optional-atoms.txt"
+    echo 'sys-fs/ntfs3g (no imported binary package)' >> "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
     log "Omitting sys-fs/ntfs3g: no imported binary package"
   fi
 
