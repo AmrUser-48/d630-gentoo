@@ -12,7 +12,7 @@ SRC_URI="
   https://github.com/AmrUser-48/scrcpy/archive/${D630_SCRCPY_COMMIT}.tar.gz -> ${P}.tar.gz
   https://github.com/Genymobile/scrcpy/releases/download/v${PV}/scrcpy-server-v${PV} -> ${P}-server
 "
-S="${WORKDIR}/${PN}-${D630_SCRCPY_COMMIT}"
+S="${WORKDIR}/${P}"
 
 LICENSE="Apache-2.0"
 SLOT="0"
@@ -33,6 +33,14 @@ DOCS=( README.md doc/. )
 
 src_unpack() {
   unpack "${P}.tar.gz"
+
+  # GitHub archive root names vary with the archive ref. Normalize it so
+  # Portage always builds from the stable ${S} path.
+  local source_dir
+  source_dir="$(find "${WORKDIR}" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+  [[ -n "${source_dir}" ]] || die "could not locate unpacked scrcpy source directory"
+  mv "${source_dir}" "${S}" || die "could not normalize scrcpy source directory"
+
   cp "${DISTDIR}/${P}-server" "${WORKDIR}/${P}-server" || die
 }
 
@@ -47,6 +55,7 @@ src_configure() {
 
   local emesonargs=(
     -Dprebuilt_server="${server_path}"
+    -Dv4l2=false
     -Dvaapi=false
   )
   meson_src_configure
