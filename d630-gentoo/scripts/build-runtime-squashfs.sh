@@ -310,8 +310,10 @@ x11-terms/xterm
 x11-wm/openbox
 
 EOF
+  sed -i '/^[[:space:]]*$/d' "$WORK/required-atoms.txt"
   sort -u "$WORK/required-atoms.txt" -o "$WORK/required-atoms.txt"
   while IFS= read -r atom; do
+    [[ -n "$atom" ]] || continue
     grep -Fqx "$atom" "$WORK/atoms.txt" || die "required Openbox atom is absent from runtime package sets: $atom"
   done < "$WORK/required-atoms.txt"
   grep -Fvx -f "$WORK/required-atoms.txt" "$WORK/atoms.txt" > "$WORK/optional-atoms.txt" || true
