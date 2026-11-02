@@ -253,8 +253,12 @@ jobs:
 
           # Recreate writable temporary paths omitted from the saved state archive.
           sudo install -d -m 1777 "$GENTOO_ROOT/tmp" "$GENTOO_ROOT/var/tmp"
-          sudo install -d -o portage -g portage -m 2775 \
+          sudo install -d -m 0755 \
             "$GENTOO_ROOT/var/tmp/portage" "$GENTOO_ROOT/var/cache/distfiles"
+          sudo chroot "$GENTOO_ROOT" chown portage:portage \
+            /var/tmp/portage /var/cache/distfiles
+          sudo chroot "$GENTOO_ROOT" chmod 2775 \
+            /var/tmp/portage /var/cache/distfiles
 
           # The encrypted state archive intentionally contains no /dev device nodes
           # and may omit the other transient mount points too.
