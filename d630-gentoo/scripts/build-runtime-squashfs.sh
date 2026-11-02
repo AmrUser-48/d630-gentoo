@@ -325,6 +325,17 @@ EOF
   : > "$WORK/selected-optional-atoms.txt"
   : > "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
   mkdir -p "$WORK/binpkg-probes"
+
+  # NTFS-3G is optional in this runtime. Do not leave it in the final emerge
+  # request when the imported Core 2 PKGDIR has no matching binary package.
+  if ! find "$ROOT/var/cache/binpkgs/sys-fs/ntfs3g" -maxdepth 1 -type f \
+      \( -name 'ntfs3g-*.gpkg.tar' -o -name 'ntfs3g-*.tbz2' \) \
+      -print -quit 2>/dev/null | grep -q .; then
+    sed -i '/^sys-fs\\/ntfs3g$/d' "$WORK/optional-atoms.txt"
+    printf '%s\\n' 'sys-fs/ntfs3g (no imported binary package)' >> "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+    log "Omitting sys-fs/ntfs3g: no imported binary package"
+  fi
+
   while IFS= read -r atom; do
     [[ -n "$atom" ]] || continue
     probe_name="$(printf '%s' "$atom" | tr '/:' '__')"
