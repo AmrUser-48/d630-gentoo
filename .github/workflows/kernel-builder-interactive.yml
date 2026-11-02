@@ -1,0 +1,361 @@
+name: D630 Kernel — Interactive Builder
+run-name: "Kernel builder • ${{ inputs.kernel_profile }} • ${{ inputs.session_minutes }} min"
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_profile:
+        description: "Select one D630 kernel profile. 20 = Gentoo modular; 30 = Tiny; 40 = Gentoo live SFS."
+        required: true
+        type: choice
+        options:
+          - 20-d630-base
+          - 30-d630-live
+          - 40-d630-builtin
+        default: 20-d630-base
+      session_minutes:
+        description: "SSH session duration (1–300 minutes)."
+        required: true
+        type: number
+        default: 240
+
+permissions:
+  contents: read
+
+# A unique group per dispatch allows multiple independent interactive runners.
+# No earlier runner is cancelled, and no state/archive import or export is used.
+concurrency:
+  group: kernel-builder-interactive-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  kernel-builder:
+    name: Fresh Gentoo Stage 3 with selected D630 kernel profile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GENTOO_ROOT: /opt/gentoo
+      KERNEL_PROFILE: ${{ inputs.kernel_profile }}
+      SESSION_MINUTES: ${{ inputs.session_minutes }}
+
+    steps:
+      - name: Check out D630 kernel profiles and Portage configuration
+        uses: actions/checkout@v4
+
+      - name: Validate runner secrets and inputs
+        shell: bash
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || { echo "Missing repository secret TAILSCALE_AUTHKEY." >&2; exit 1; }
+          [[ -n "${SSH_PUBLIC_KEY:-}" ]] || { echo "Missing repository secret SSH_PUBLIC_KEY." >&2; exit 1; }
+          [[ "$KERNEL_PROFILE" =~ ^(20-d630-base|30-d630-live|40-d630-builtin)$ ]] || {
+            echo "Unsupported kernel profile: $KERNEL_PROFILE" >&2
+            exit 2
+          }
+          session="$SESSION_MINUTES"
+          [[ "$session" =~ ^[0-9]+$ ]] && (( session >= 1 && session <= 300 )) || {
+            echo "session_minutes must be between 1 and 300." >&2
+            exit 2
+          }
+          profile="$GITHUB_WORKSPACE/kernels/profiles/$KERNEL_PROFILE.config"
+          test -s "$profile" || { echo "Selected profile does not exist: $profile" >&2; exit 1; }
+
+          key="${SSH_PUBLIC_KEY//$'\r'/}"
+          key="${key%$'\n'}"
+          [[ "$key" != *$'\n'* ]] || { echo "SSH_PUBLIC_KEY must contain exactly one key line." >&2; exit 1; }
+          printf '%s\n' "$key" > "$RUNNER_TEMP/ssh_public_key.pub"
+          ssh-keygen -lf "$RUNNER_TEMP/ssh_public_key.pub" >/dev/null || {
+            echo "SSH_PUBLIC_KEY is not a valid OpenSSH public key." >&2
+            exit 1
+          }
+
+          {
+            echo "Kernel profile: $KERNEL_PROFILE"
+            echo "Profile source: kernels/profiles/$KERNEL_PROFILE.config"
+            echo "Target: Dell Latitude D630 / Core 2 Duo Merom"
+            echo "Kernel ISA: generic x86-64; tuning: KCFLAGS=-mtune=core2"
+            echo "Session duration: $session minutes"
+            echo "Environment: fresh official Gentoo amd64 OpenRC Stage 3"
+            echo "Persistence: disabled; no prior state or binpkg archive is imported or saved."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Install host bootstrap and SSH utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl coreutils xz-utils zstd python3 tar rsync \
+            openssh-server iptables sudo
+          sudo apt-get clean
+          {
+            echo "Runner resources:"
+            nproc
+            free -h
+            df -h /
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Download and verify a fresh official Gentoo OpenRC Stage 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-openrc"
+          work="$RUNNER_TEMP/gentoo-stage3"
+          report="$RUNNER_TEMP/kernel-builder"
+          mkdir -p "$work" "$report"
+
+          curl -fsSL --retry 3 "$base/latest-stage3-amd64-openrc.txt" -o "$report/stage3-latest.txt"
+          line="$(grep -E '^stage3-amd64-openrc-[0-9]{8}T[0-9]{6}Z\.tar\.xz [0-9]+$' \
+            "$report/stage3-latest.txt" | head -n 1)"
+          [[ -n "$line" ]] || { echo "Could not parse the official Stage 3 manifest." >&2; exit 1; }
+          archive="${line%% *}"
+          expected_size="${line##* }"
+          curl -fL --retry 3 "$base/$archive" -o "$work/$archive"
+          [[ "$(stat -c '%s' "$work/$archive")" == "$expected_size" ]] || {
+            echo "Stage 3 archive size mismatch." >&2
+            exit 1
+          }
+
+          curl -fsSL --retry 3 "$base/$archive.sha256" -o "$work/$archive.sha256"
+          expected_sha="$(grep -Eo '[[:xdigit:]]{64}' "$work/$archive.sha256" | head -n 1)"
+          [[ "$expected_sha" =~ ^[[:xdigit:]]{64}$ ]] || {
+            echo "Could not read the Stage 3 SHA-256." >&2
+            exit 1
+          }
+          printf '%s  %s\n' "$expected_sha" "$work/$archive" | sha256sum --check -
+
+          sudo install -d -m 0755 "$GENTOO_ROOT"
+          sudo tar --extract --file "$work/$archive" --directory "$GENTOO_ROOT" \
+            --numeric-owner --xattrs --xattrs-include='*' --preserve-permissions
+          printf 'Stage 3 archive: %s\nSHA256: %s\n' "$archive" "$expected_sha" |
+            tee "$report/stage3-info.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          sudo readlink "$GENTOO_ROOT/etc/portage/make.profile" |
+            tee "$report/stage3-profile.txt" || true
+
+      - name: Configure D630 Core 2 Portage environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          sudo mkdir -p "$root/etc/portage/package.use" "$root/etc/portage/package.accept_keywords" \
+            "$root/etc/portage/repos.conf" "$root/etc/portage/binrepos.conf" \
+            "$root/etc/portage/profile/package.use.force" "$root/etc/bash/bashrc.d" \
+            "$root/etc/env.d" "$root/etc/profile.d" "$root/var/cache/binpkgs" \
+            "$root/var/log/portage" "$root/dev" "$root/proc" "$root/sys" "$root/run"
+
+          if [[ -f "$root/etc/portage/package.use" ]]; then
+            sudo mv "$root/etc/portage/package.use" "$root/etc/portage/package.use.stage3"
+          fi
+          sudo mkdir -p "$root/etc/portage/package.use"
+          sudo install -m 0644 config/portage/make.conf "$root/etc/portage/make.conf"
+          sudo install -m 0644 config/portage/profile/package.use.force \
+            "$root/etc/portage/profile/package.use.force/zz-d630-llvm"
+          sudo install -m 0644 config/bash/bashrc.d/10-portage-ask.sh \
+            "$root/etc/bash/bashrc.d/10-portage-ask.sh"
+          sudo install -m 0644 config/locale.gen "$root/etc/locale.gen"
+          sudo install -m 0644 config/env.d/02locale "$root/etc/env.d/02locale"
+
+          sudo rm -rf "$root/etc/portage/package.accept_keywords" "$root/etc/portage/package.keywords"
+          sudo mkdir -p "$root/etc/portage/package.accept_keywords"
+          sudo cp -a config/portage/package.use/. "$root/etc/portage/package.use/"
+          sudo cp -a config/portage/package.accept_keywords/. "$root/etc/portage/package.accept_keywords/"
+          sudo cp -a config/portage/binrepos.conf/. "$root/etc/portage/binrepos.conf/"
+
+          if [[ ! -f "$root/etc/portage/repos.conf/gentoo.conf" ]]; then
+            sudo tee "$root/etc/portage/repos.conf/gentoo.conf" >/dev/null <<'EOF'
+          [gentoo]
+          location = /var/db/repos/gentoo
+          sync-type = rsync
+          sync-uri = rsync://rsync.gentoo.org/gentoo-portage
+          auto-sync = yes
+          EOF
+          fi
+
+          sudo rm -f "$root/etc/resolv.conf"
+          sudo cp -L /etc/resolv.conf "$root/etc/resolv.conf"
+          for mountpoint in dev proc sys run; do
+            sudo mount --rbind "/$mountpoint" "$root/$mountpoint"
+            sudo mount --make-rslave "$root/$mountpoint"
+          done
+
+      - name: Install the selected D630 kernel profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          profile="$GITHUB_WORKSPACE/kernels/profiles/$KERNEL_PROFILE.config"
+          sudo install -d -m 0755 "$root/etc/kernel/config.d" "$root/root/d630-kernel-profiles"
+          sudo cp -a "$GITHUB_WORKSPACE/kernels/profiles/." "$root/root/d630-kernel-profiles/"
+          sudo install -m 0644 "$profile" "$root/etc/kernel/config.d/$KERNEL_PROFILE.config"
+
+          sudo tee "$root/etc/profile.d/50-d630-kernel-profile.sh" >/dev/null <<EOF
+          export D630_KERNEL_PROFILE="$KERNEL_PROFILE"
+          export D630_KERNEL_CONFIG="/etc/kernel/config.d/$KERNEL_PROFILE.config"
+          export KCFLAGS="-mtune=core2"
+          EOF
+
+          {
+            echo "Installed profile: /etc/kernel/config.d/$KERNEL_PROFILE.config"
+            echo "Available profile fragments: /root/d630-kernel-profiles/"
+            echo "Login environment: D630_KERNEL_PROFILE=$KERNEL_PROFILE"
+            echo "Login environment: D630_KERNEL_CONFIG=/etc/kernel/config.d/$KERNEL_PROFILE.config"
+            echo "Kernel compiler tuning: KCFLAGS=-mtune=core2; keep generic x86-64 ISA baseline."
+            case "$KERNEL_PROFILE" in
+              20-d630-base) echo "Profile purpose: Gentoo distribution-kernel config.d overlay." ;;
+              30-d630-live) echo "Profile purpose: standalone D630 Tiny kernel." ;;
+              40-d630-builtin) echo "Profile purpose: D630 Gentoo live/SquashFS built-in kernel." ;;
+            esac
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Tune Portage parallelism to runner resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GENTOO_ROOT"
+          cpus="$(nproc)"
+          mem_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+          if [[ -r /sys/fs/cgroup/memory.max ]]; then
+            limit="$(cat /sys/fs/cgroup/memory.max)"
+            if [[ "$limit" =~ ^[0-9]+$ ]]; then
+              limit_kib=$((limit / 1024))
+              (( limit_kib < mem_kib )) && mem_kib="$limit_kib"
+            fi
+          fi
+
+          if (( cpus >= 4 && mem_kib >= 9000000 )); then
+            jobs=8
+          elif (( cpus >= 4 && mem_kib >= 6000000 )); then
+            jobs=6
+          elif (( cpus >= 2 && mem_kib >= 7000000 )); then
+            jobs=4
+          elif (( cpus >= 2 && mem_kib >= 3500000 )); then
+            jobs=2
+          else
+            jobs=1
+          fi
+
+          sudo sed -i '/^MAKEOPTS=/d;/^NINJAOPTS=/d' "$root/etc/portage/make.conf"
+          printf 'MAKEOPTS="-j%s"\nNINJAOPTS="-j%s"\n' "$jobs" "$jobs" |
+            sudo tee -a "$root/etc/portage/make.conf" >/dev/null
+          printf 'Runner resources: %s CPUs, %s KiB RAM; MAKEOPTS=-j%s\n' \
+            "$cpus" "$mem_kib" "$jobs" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify Portage configuration and sync Gentoo repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
+            set -euo pipefail
+            printf "COMMON_FLAGS=%s\nMAKEOPTS=%s\nPKGDIR=%s\nACCEPT_KEYWORDS=%s\n" \
+              "$(portageq envvar COMMON_FLAGS)" "$(portageq envvar MAKEOPTS)" \
+              "$(portageq envvar PKGDIR)" "$(portageq envvar ACCEPT_KEYWORDS)"
+            [[ "$(portageq envvar PKGDIR)" == "/var/cache/binpkgs" ]]
+            [[ "$(portageq envvar COMMON_FLAGS)" == *"-march=core2"* ]]
+            [[ "$(portageq envvar COMMON_FLAGS)" == *"-mtune=core2"* ]]
+            [[ -s /etc/portage/binrepos.conf/gentoobinhost.conf ]]
+            mkdir -p /var/cache/binpkgs
+            test -w /var/cache/binpkgs
+            emerge-webrsync --quiet
+            command -v getuto >/dev/null
+            getuto
+          ' |& tee "$RUNNER_TEMP/kernel-builder/portage-bootstrap.log"
+
+      - name: Connect runner to private Tailscale network
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          use-cache: "true"
+
+      - name: Configure key-only SSH into the Gentoo kernel builder
+        shell: bash
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          ssh_key="${SSH_PUBLIC_KEY//$'\r'/}"
+          ssh_key="${ssh_key%$'\n'}"
+          tailnet_ip="$(tailscale ip -4 | awk '/^100\./ {print; exit}')"
+          [[ "$tailnet_ip" =~ ^100\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || {
+            echo "Tailscale IPv4 address not found." >&2
+            exit 1
+          }
+
+          sudo useradd --create-home --shell /bin/bash gentoo 2>/dev/null || true
+          sudo install -d -o gentoo -g gentoo -m 0700 /home/gentoo/.ssh
+          printf 'from="100.64.0.0/10",no-agent-forwarding,no-X11-forwarding,no-port-forwarding %s\n' \
+            "$ssh_key" | sudo tee /home/gentoo/.ssh/authorized_keys >/dev/null
+          sudo chown gentoo:gentoo /home/gentoo/.ssh/authorized_keys
+          sudo chmod 0600 /home/gentoo/.ssh/authorized_keys
+
+          sudo tee /etc/ssh/sshd_config.d/00-kernel-builder.conf >/dev/null <<'EOF'
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin no
+          AllowUsers gentoo
+          EOF
+
+          sudo tee /usr/local/sbin/kernel-builder-ssh-force-command >/dev/null <<'EOF'
+          #!/bin/sh
+          exec /usr/bin/sudo -n /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          EOF
+          sudo chmod 0755 /usr/local/sbin/kernel-builder-ssh-force-command
+
+          sudo tee /etc/sudoers.d/kernel-builder-chroot >/dev/null <<'EOF'
+          gentoo ALL=(root) NOPASSWD: /usr/sbin/chroot /opt/gentoo /bin/bash --login
+          EOF
+          sudo chmod 0440 /etc/sudoers.d/kernel-builder-chroot
+          sudo visudo -cf /etc/sudoers.d/kernel-builder-chroot
+
+          sudo tee -a /etc/ssh/sshd_config >/dev/null <<'EOF'
+
+          Match User gentoo
+              ForceCommand /usr/local/sbin/kernel-builder-ssh-force-command
+              PermitTTY yes
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTunnel no
+          EOF
+
+          sudo install -d -o root -g root -m 0755 /run/sshd
+          sudo sshd -t
+          sudo systemctl restart ssh
+          sudo systemctl is-active --quiet ssh
+          sudo iptables -I INPUT 1 -i tailscale0 -s 100.64.0.0/10 -p tcp --dport 22 -j ACCEPT
+          sudo iptables -I INPUT 2 -p tcp --dport 22 -j DROP
+
+          {
+            echo "## Interactive kernel builder ready"
+            echo "Tailscale IPv4: $tailnet_ip"
+            echo "SSH: ssh -tt gentoo@$tailnet_ip"
+            echo "The SSH key is restricted to Tailnet sources; password login and forwarding are disabled."
+            echo "SSH opens a root shell inside /opt/gentoo, not the Ubuntu host."
+            echo "Selected profile: $KERNEL_PROFILE"
+            echo "Selected config: /etc/kernel/config.d/$KERNEL_PROFILE.config"
+            echo "Session duration: $SESSION_MINUTES minutes."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the interactive kernel builder alive
+        shell: bash
+        timeout-minutes: 310
+        run: |
+          set -euo pipefail
+          end_epoch=$(( $(date +%s) + SESSION_MINUTES * 60 ))
+          while :; do
+            remaining=$(( end_epoch - $(date +%s) ))
+            (( remaining > 0 )) || break
+            sleep_seconds=60
+            (( remaining < sleep_seconds )) && sleep_seconds="$remaining"
+            sleep "$sleep_seconds"
+          done
+          echo "Interactive kernel builder session expired." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Record runner teardown notice
+        if: always()
+        shell: bash
+        run: |
+          echo "This runner is disposable. The fresh Stage 3 and all session changes are discarded at job teardown."
+          echo "No runner-state archive, Stage 3 snapshot, binary-package release or session artifact is created."
