@@ -241,15 +241,20 @@ jobs:
           masters = gentoo
           thin-manifests = true
           EOF
-          sudo tee "$GENTOO_ROOT/etc/portage/repos.conf/d630-local.conf" >/dev/null <<EOF
+          sudo tee "$GENTOO_ROOT/etc/portage/repos.conf/d630-local.conf" >/dev/null <<'EOF'
           [d630-local]
-          location = $local_repo
+          location = /var/db/repos/d630-local
           priority = 1000
           auto-sync = no
           EOF
           sudo install -m 0644 \
             config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild \
             "$local_repo/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
+
+          # Recreate writable temporary paths omitted from the saved state archive.
+          sudo install -d -m 1777 "$GENTOO_ROOT/tmp" "$GENTOO_ROOT/var/tmp"
+          sudo install -d -o portage -g portage -m 2775 \
+            "$GENTOO_ROOT/var/tmp/portage" "$GENTOO_ROOT/var/cache/distfiles"
 
           # The encrypted state archive intentionally contains no /dev device nodes
           # and may omit the other transient mount points too.
@@ -268,14 +273,14 @@ jobs:
           trap cleanup_chroot_mounts EXIT
 
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
-            'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest'
+            'export TMPDIR=/tmp FEATURES="-sandbox -userpriv"; ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest'
 
           # All missing runtime atoms are compiled here into reusable binpkgs.
           # Dependencies may reuse existing Core 2 binpkgs; the remote generic binhost
           # is disabled. The later SFS job uses --usepkgonly and never compiles.
           build_atoms='media-libs/libsdl2 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-fs/ntfs3g sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xdg-utils x11-misc/xclip sys-apps/file sys-apps/less app-misc/mc sys-apps/ripgrep media-video/pipewire x11-base/xorg-server =app-mobilephone/scrcpy-3.3.4::d630-local'
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
-            "export FEATURES=\"\${FEATURES} -sandbox -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$build_atoms' --oneshot $build_atoms"
+            "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$build_atoms' --oneshot $build_atoms"
 
           dbus_binpkg="$(sudo find "$GENTOO_ROOT/var/cache/binpkgs/sys-apps/dbus" -maxdepth 1 -type f \
             \( -name 'dbus-*.gpkg.tar' -o -name 'dbus-*.tbz2' \) -print -quit 2>/dev/null)"
