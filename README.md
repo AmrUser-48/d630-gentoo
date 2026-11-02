@@ -50,6 +50,7 @@ The Gentoo ISO is an optional packaging target. Direct three-file boot remains t
 Use the workflow for the target component:
 
 - [Gentoo kernel and initramfs](.github/workflows/build-d630-kernel.yml) — profile 40.
+- [Interactive kernel builder](.github/workflows/kernel-builder-interactive.yml) — fresh Gentoo Stage 3 SSH session with a selectable D630 kernel profile; independent runs do not restore or save runner state.
 - [Tiny initramfs](.github/workflows/build-d630-tiny-initramfs.yml).
 - [Gentoo runtime SquashFS](.github/workflows/build-d630-runtime-squashfs.yml).
 - [Gentoo interactive builder](.github/workflows/gentoo-interactive-build.yml) — package builds and runner sessions.
