@@ -40,7 +40,7 @@ getfacl -R -P /etc /usr /var /opt /root /home \
   > /root/permission-audit-20261103/acl-before.txt
 
 find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /usr/libexec /usr/lib/portage \
-  -type f -perm -0002 -printf '%m %u:%g %p\\n' 2>/dev/null | sort \
+  -type f -perm -0002 -printf '%m %u:%g %p\n' 2>/dev/null | sort \
   > /root/permission-audit-20261103/world-writable-files.txt
 
 getfacl -R -P -s /etc /usr /var /opt /root /home 2>/dev/null \
