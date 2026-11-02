@@ -191,27 +191,44 @@ jobs:
           set -euo pipefail
           root="$GENTOO_ROOT"
           profile="$GITHUB_WORKSPACE/kernels/profiles/$KERNEL_PROFILE.config"
-          sudo install -d -m 0755 "$root/etc/kernel/config.d" "$root/root/d630-kernel-profiles"
+          sudo install -d -m 0755 "$root/root/d630-kernel-profiles"
           sudo cp -a "$GITHUB_WORKSPACE/kernels/profiles/." "$root/root/d630-kernel-profiles/"
-          sudo install -m 0644 "$profile" "$root/etc/kernel/config.d/$KERNEL_PROFILE.config"
+
+          # Only profile 20 is a Gentoo distribution-kernel config.d overlay.
+          # Profiles 30 and 40 are standalone kernel fragments; keep them available
+          # for the corresponding custom kernel build rather than auto-merging them
+          # into Gentoo's distribution-kernel build.
+          case "$KERNEL_PROFILE" in
+            20-d630-base)
+              sudo install -d -m 0755 "$root/etc/kernel/config.d"
+              sudo install -m 0644 "$profile" "$root/etc/kernel/config.d/20-d630-base.config"
+              config_path="/etc/kernel/config.d/20-d630-base.config"
+              profile_purpose="Gentoo distribution-kernel config.d overlay"
+              ;;
+            30-d630-live)
+              config_path="/root/d630-kernel-profiles/30-d630-live.config"
+              profile_purpose="standalone D630 Tiny kernel fragment"
+              ;;
+            40-d630-builtin)
+              config_path="/root/d630-kernel-profiles/40-d630-builtin.config"
+              profile_purpose="D630 Gentoo live/SquashFS built-in kernel fragment"
+              ;;
+          esac
 
           sudo tee "$root/etc/profile.d/50-d630-kernel-profile.sh" >/dev/null <<EOF
           export D630_KERNEL_PROFILE="$KERNEL_PROFILE"
-          export D630_KERNEL_CONFIG="/etc/kernel/config.d/$KERNEL_PROFILE.config"
+          export D630_KERNEL_CONFIG="$config_path"
           export KCFLAGS="-mtune=core2"
           EOF
 
           {
-            echo "Installed profile: /etc/kernel/config.d/$KERNEL_PROFILE.config"
-            echo "Available profile fragments: /root/d630-kernel-profiles/"
+            echo "Selected profile: $KERNEL_PROFILE"
+            echo "Selected config: $config_path"
+            echo "All profile fragments: /root/d630-kernel-profiles/"
+            echo "Profile purpose: $profile_purpose"
             echo "Login environment: D630_KERNEL_PROFILE=$KERNEL_PROFILE"
-            echo "Login environment: D630_KERNEL_CONFIG=/etc/kernel/config.d/$KERNEL_PROFILE.config"
+            echo "Login environment: D630_KERNEL_CONFIG=$config_path"
             echo "Kernel compiler tuning: KCFLAGS=-mtune=core2; keep generic x86-64 ISA baseline."
-            case "$KERNEL_PROFILE" in
-              20-d630-base) echo "Profile purpose: Gentoo distribution-kernel config.d overlay." ;;
-              30-d630-live) echo "Profile purpose: standalone D630 Tiny kernel." ;;
-              40-d630-builtin) echo "Profile purpose: D630 Gentoo live/SquashFS built-in kernel." ;;
-            esac
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Tune Portage parallelism to runner resources
@@ -271,7 +288,7 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          use-cache: "false"
+          use-cache: "true"
 
       - name: Configure key-only SSH into the Gentoo kernel builder
         shell: bash
