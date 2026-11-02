@@ -283,8 +283,9 @@ jobs:
           # Dependencies may reuse existing Core 2 binpkgs; the remote generic binhost
           # is disabled. The later SFS job uses --usepkgonly and never compiles.
           build_atoms='media-libs/libsdl2 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-fs/ntfs3g sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xdg-utils x11-misc/xclip sys-apps/file sys-apps/less app-misc/mc sys-apps/ripgrep media-video/pipewire x11-base/xorg-server =app-mobilephone/scrcpy-3.3.4::d630-local'
+          reinstall_atoms="${build_atoms% =app-mobilephone/scrcpy-3.3.4::d630-local} app-mobilephone/scrcpy"
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
-            "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$build_atoms' --oneshot $build_atoms"
+            "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$reinstall_atoms' --oneshot $build_atoms"
 
           dbus_binpkg="$(sudo find "$GENTOO_ROOT/var/cache/binpkgs/sys-apps/dbus" -maxdepth 1 -type f \
             \( -name 'dbus-*.gpkg.tar' -o -name 'dbus-*.tbz2' \) -print -quit 2>/dev/null)"
