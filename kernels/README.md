@@ -64,6 +64,8 @@ Add a `~amd64` keyword exception for the exact testing version before emerging i
 
 Current custom workflow: [Build D630 Gentoo SFS built-in kernel and initramfs](https://github.com/AmrUser-48/d630-gentoo/actions/workflows/build-d630-kernel.yml). It merges profile 40 and publishes a kernel/initramfs bundle.
 
+For interactive Gentoo kernel work, use [Kernel Builder — Interactive](../.github/workflows/kernel-builder-interactive.yml). Dispatch it with one profile selected: profile 20 is the Gentoo distribution-kernel `config.d` overlay; profiles 30 and 40 target Tiny and the Gentoo live/SquashFS kernel paths respectively. The workflow downloads a fresh official OpenRC Stage 3, installs only the selected fragment in `/etc/kernel/config.d/`, and opens a temporary Tailnet-only SSH session. It does not import prior runner state or binpkg archives and does not save a session snapshot or publish a release. Multiple dispatches use separate concurrency groups.
+
 Run static checks from repository root:
 
     bash scripts/validate-kernel-profiles.sh
