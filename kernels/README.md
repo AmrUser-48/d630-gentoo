@@ -119,7 +119,7 @@ From a checkout of this repository on the Gentoo build system, install only the 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
 ls -l /etc/kernel/config.d/
-emerge --ask --verbose --buildpkgonly sys-kernel/gentoo-kernel
+emerge --ask --verbose --buildpkgonly --reinstall-atoms =sys-kernel/gentoo-kernel-6.18.57 =sys-kernel/gentoo-kernel-6.18.57
 ~~~
 
 Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Check the merge output and verify that the intended exclusions resolved to disabled symbols. Do not infer success from the source fragment or package installation alone.
