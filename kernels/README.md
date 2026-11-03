@@ -69,6 +69,9 @@ The intended no-module design is explicit: `CONFIG_MODULES=n`. With module suppo
 | Keyboard and pointing devices | i8042/serio, AT keyboard, evdev, PS/2 ALPS DualPoint touchpad and TrackPoint, plus USB HID |
 | Dell laptop platform | ACPI-WMI, Dell SMBIOS WMI/SMM backends, Dell WMI hotkeys and Dell Laptop Extras |
 | Power and thermal management | ACPI battery/buttons/thermal, CPU frequency scaling, thermal framework and Core temperature sensors |
+| Compressed swap | Built-in ZRAM with the LZ4 backend and `CONFIG_SWAP=y`; userspace must create `/dev/zram0`, set its size, run `mkswap` and `swapon` |
+
+ZRAM is part of the Tiny memory-management target. Enable `CONFIG_SWAP=y`, `CONFIG_ZRAM=y`, `CONFIG_ZRAM_BACKEND_LZ4=y` and `CONFIG_ZRAM_DEF_COMP_LZ4=y`; ZRAM selects its `zsmalloc` allocator. Keep optional compressors, writeback, multi-compression and debug statistics disabled to avoid unused code. Kernel support alone does not activate swap: the BusyBox initramfs must initialize the device, set a size, create the swap area and enable it with `swapon`. The current Tiny init script does not yet perform that setup, so runtime ZRAM is not yet validated.
 
 The current low-latency experiment also evaluates PREEMPT_RT, a 1000 Hz kernel tick and high-resolution timers. These are tuning choices, not prerequisites for boot. A 1000 Hz tick does not by itself guarantee a 1 ms scheduling deadline; measure latency, throughput, power use and thermal behavior on the physical two-core D630 before treating this combination as the default.
 
