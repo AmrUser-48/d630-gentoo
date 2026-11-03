@@ -33,7 +33,6 @@ sys-fs/dosfstools
 sys-fs/ntfs3g
 sys-fs/btrfs-progs
 sys-block/parted
-sys-boot/grub
 app-editors/nano
 app-misc/mc
 app-cdr/cdrtools
