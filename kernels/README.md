@@ -41,7 +41,7 @@ The target is a Dell Latitude D630 with:
 - i8042 keyboard and Alps DualPoint touchpad/TrackPoint.
 - ACPI laptop battery, thermal, fan and Dell platform support.
 
-Use a generic x86-64 kernel ISA baseline. Kernel builds may use KCFLAGS=-mtune=core2; do not use -march=core2 or -march=native for the kernel, and do not add CONFIG_MCORE2. Userland compiler flags are a separate policy. CONFIG_X86_MSR=y and CONFIG_X86_CPUID=y are required and are present in all three current profile fragments.
+Use a generic x86-64 kernel ISA baseline. Kernel builds may use KCFLAGS=-mtune=core2; do not use -march=core2 or -march=native for the kernel, and do not add CONFIG_MCORE2. Userland compiler flags are a separate policy. CONFIG_X86_MSR=y and CONFIG_X86_CPUID=y are required and are present in all three current profile fragments. All three profiles also enable CONFIG_PROC_FS, CONFIG_IKCONFIG and CONFIG_IKCONFIG_PROC so the running kernel exposes its exact embedded configuration at /proc/config.gz.
 
 ## Use
 
@@ -59,7 +59,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 
 **Profile 20 — use Gentoo's baseline, not tinyconfig.** The Gentoo distribution-kernel ebuild selects a version-specific upstream distribution configuration and Gentoo's common configuration. Its kernel-build integration then merges user snippets from /etc/kernel/config.d/*.config in lexical order, after the distribution config and any savedconfig input. A config.d fragment is an overlay, not a replacement full .config. Avoid USE=savedconfig for this design unless deliberately replacing the distribution baseline with a saved full configuration.
 
-**Profile 30 — start with make tinyconfig.** A bare tinyconfig is not a usable laptop kernel: it also disables parent infrastructure such as PCI, the block layer, USB, networking and input. Enable the required subsystem foundations, merge the D630 hardware fragment, run olddefconfig, then inspect the complete resolved .config. Every driver required by Tiny must resolve to =y. With CONFIG_MODULES=n there must be no =m entries and no /lib/modules dependency.
+**Profile 30 — start with make tinyconfig.** A bare tinyconfig is not a usable laptop kernel: it also disables parent infrastructure such as PCI, the block layer, USB, networking and input. Kconfig does not automatically enable a symbol's unmet depends-on prerequisites just because the leaf driver is requested; merge_config.sh is a fragment merger, not a dependency-closure solver. Use the fragment only while developing the first working config: enable subsystem foundations first, resolve with olddefconfig, then enable the dependent D630 drivers in a second pass. Use menuconfig's / search on any symbol that refuses to resolve to inspect its direct and recursive dependencies. Once the complete config is correct, save it with make savedefconfig as a dedicated d630-tiny_defconfig and use that defconfig as the reproducible build input. This avoids re-solving the same dependency chain on every build. On kernel upgrades, carry the previous resolved config forward with olddefconfig, inspect scripts/diffconfig output and re-run the required-symbol checks. Every driver required by Tiny must resolve to =y. With CONFIG_MODULES=n there must be no =m entries and no /lib/modules dependency. The current repository profile is still a tinyconfig-derived fragment; the dedicated Tiny kernel build workflow/defconfig has not yet been added.
 
 **Profile 40 — start with x86_64_defconfig.** Merge the live/SquashFS fragment and resolve dependencies. The block layer, storage controller, filesystems needed to locate the SquashFS, loop, SquashFS-Zstd, OverlayFS, USB, Wi-Fi and graphics paths required before or during early userspace must be built in. Do not assume a fragment assignment survived Kconfig.
 
@@ -149,7 +149,7 @@ bash scripts/validate-kernel-config.sh
 
 These scripts validate fragments and selected policy assertions. They do not prove that a Portage build consumed an overlay, that a driver survived Kconfig, or that a kernel booted.
 
-For a completed Gentoo build, inspect the full generated .config and check the actual policy symbols. For example:
+For a completed Gentoo build, inspect the full generated .config and check the actual policy symbols. On the running kernel, use `zcat /proc/config.gz` to verify the config embedded in that exact image; this distinguishes the active kernel from a stale build artifact or an unrelated `/boot/config-*` file. For example:
 
 ~~~bash
 grep -E '^(CONFIG_(X86_MSR|X86_CPUID|BLK_DEV_NVME|NVME_CORE|NVME_FABRICS|NVME_TARGET|USB_XHCI_HCD|MEDIA_SUPPORT|DVB_CORE|IWL3945|DRM_I915)=|# CONFIG_(BLK_DEV_NVME|NVME_CORE|NVME_FABRICS|NVME_TARGET|USB_XHCI_HCD|MEDIA_SUPPORT|DVB_CORE) is not set)' /usr/src/linux-*/.config
