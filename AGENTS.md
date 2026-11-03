@@ -198,37 +198,27 @@ Do not assume a USE flag exists. Verify the selected ebuild's metadata and the a
 
 ## 6. README and human documentation style
 
-All active project READMEs use one human-readable Markdown format. The canonical section order is enforced by scripts/validate-sources.sh and defined in docs/README-TEMPLATE.md.
+README files are human-facing orientation and navigation documents, not forms to fill in. The validator `scripts/validate-readmes.py` checks structural quality without requiring every README to repeat a fixed set of sections.
 
-Required order, with these exact H2 headings:
+Recommended section names and order are defined in `docs/README-TEMPLATE.md`. Use only sections that add useful information; omit inapplicable sections rather than writing "Not applicable". Purpose-specific headings are allowed. When multiple recommended sections are used, preserve their relative order.
 
-1. Overview
-2. Status
-3. Layout
-4. Requirements
-5. Use
-6. Build
-7. Releases
-8. Validation
-9. Related documentation
+Style and quality rules:
 
-Style rules:
-
-- Exactly one H1 title. Use the nine H2 sections above, in order; do not rename, reorder, omit or add top-level H2 sections in active README files. H3 subsections are allowed only when they improve navigation.
-- Write for a person using or maintaining the project, not for an AI model. Use direct, concrete language and short paragraphs.
-- Documentation is project documentation, not a conversation with the repository owner or an assistant response. Never include direct replies to the user, chat references, personal messages, profanity, rhetorical reactions, assistant meta-commentary, or raw scratch notes/placeholders such as `!TODO` and `!DOTO`. Convert verified requirements into neutral technical statements and usable instructions. Track unfinished work in issues or a dedicated roadmap, not as ad hoc conversational blocks in a README. Normal imperative usage instructions are allowed.
-- Keep the root README an index: concise project overview, status table, repository map, essential boot/build pointers and links. Do not put lengthy procedures, historical research, raw logs, full configuration files or repeated technical policy in it.
-- Keep component READMEs focused on that component. Put step-by-step procedures in user guides; hardware research in hardware/technical guides; historical detail in archive or technical references.
-- Use one consistent vocabulary: “D630 Tiny”, “D630 Gentoo”, “kernel profile”, “SquashFS”, “OverlayFS”, “Core 2”, “GM965/GMA X3100”. Explain uncommon acronyms once when needed.
-- Use Markdown tables for compact status/matrix data, bullets for short parallel items, and fenced code blocks with a language tag for commands/configuration. Do not use screenshots or decorative ASCII art as a substitute for instructions.
-- Prefer relative links inside the repository. Use exact release tags/asset names when known; do not write ambiguous “latest” links when a pinned release is required.
-- State what is implemented and what is not. Distinguish source validation, package/kernel build, checksum verification, QEMU boot, graphical startup and physical D630 validation. Never turn a plan or an untested hypothesis into a “working” claim.
+- Use exactly one descriptive H1 title. Avoid duplicate headings at the same level and headings with no content.
+- Keep fenced code blocks balanced and use language tags for commands and configuration.
+- Ensure relative/local Markdown links point to existing files or directories. Prefer descriptive link labels.
+- Write for people using or maintaining the project. Use direct, concrete language and short paragraphs.
+- Documentation is project documentation, not a conversation with the repository owner or an assistant response. Never include direct replies to the user, chat references, personal messages, profanity, rhetorical reactions, assistant meta-commentary, or raw scratch notes/placeholders such as `!TODO` and `!DOTO`. Convert verified requirements into neutral technical statements and usable instructions.
+- Keep the root README an index: concise project overview, status, repository map, essential boot/build pointers and links. Do not put lengthy procedures, historical research, raw logs, full configuration files or repeated technical policy in it.
+- Keep component READMEs focused on their component. Put step-by-step procedures in user guides; hardware research in hardware/technical guides; historical detail in archive or technical references.
+- Use one consistent vocabulary: "D630 Tiny", "D630 Gentoo", "kernel profile", "SquashFS", "OverlayFS", "Core 2", "GM965/GMA X3100". Explain uncommon acronyms once when needed.
+- Use Markdown tables for compact status/matrix data, bullets for short parallel items, and fenced code blocks for commands/configuration. Do not use screenshots or decorative ASCII art as a substitute for instructions.
+- Prefer relative links inside the repository. Use exact release tags/asset names when known; do not write ambiguous "latest" links when a pinned release is required.
+- State what is implemented and what is not. Distinguish source validation, package/kernel build, checksum verification, QEMU boot, graphical startup and physical D630 validation. Never turn a plan or an untested hypothesis into a "working" claim.
 - Avoid badges, oversized banners, duplicate summaries, changelog dumps, verbose AI-generated filler and duplicated content maintained in several READMEs.
-- Keep the section headings even when a section is short; use “Not applicable” only when it is genuinely relevant.
-- Update related READMEs and the README template when changing the required format. The root README is the only human-facing README that links to this file.
+- The root README is the only human-facing README that links to this file.
 
-The authoritative template is docs/README-TEMPLATE.md. Do not introduce an alternative README structure in a component directory.
-
+The authoritative guidance is `docs/README-TEMPLATE.md`; it is intentionally flexible. Do not create filler sections merely to satisfy a template.
 ## 7. Source, workflow and release discipline
 
 - Inspect the active workflow and its scripts before changing build inputs, runner restoration, caches, artifact names or release behavior.
