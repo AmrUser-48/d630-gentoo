@@ -380,11 +380,11 @@ EOF
     cat "$PIPEWIRE_PLAN_LOG"
     MISSING_ATOM="$(sed -nE \
       -e 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\\1/p' \
-      -e 's/^!!! All ebuilds that could satisfy "([^"]+)" have been masked\\./\\1/p' \
+      -e 's/^!!! All ebuilds that could satisfy "([^"]+)" have been masked\\./\1/p' \
       "$PIPEWIRE_PLAN_LOG" | head -n 1)"
     [[ -n "$MISSING_ATOM" ]] || die "PipeWire USE-matched binpkg preflight failed without a resolvable missing atom; see pipewire-binpkg-plan.log"
 
-    printf 'Attempt %s: fetch USE-matched %s from signed Gentoo x86-64 binhost\\n' "$attempt" "$MISSING_ATOM" | tee -a "$PIPEWIRE_FALLBACK_LOG"
+    printf 'Attempt %s: fetch USE-matched %s from signed Gentoo x86-64 binhost\n' "$attempt" "$MISSING_ATOM" | tee -a "$PIPEWIRE_FALLBACK_LOG"
     printf -v QUOTED_MISSING_ATOM '%q' "$MISSING_ATOM"
     chroot "$ROOT" /bin/bash -lc \
       "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot --binpkg-respect-use=y $QUOTED_MISSING_ATOM" \
@@ -400,8 +400,8 @@ EOF
   if grep -qw bluetooth "$pipewire_pkg/USE"; then
     die "PipeWire binary package still has USE=bluetooth despite the D630 package.use setting"
   fi
-  printf 'PipeWire package: %s\\nPipeWire USE: %s\\nBluetooth: disabled\\n' \
-    "${pipewire_pkg##*/}" "$(tr '\\n' ' ' < "$pipewire_pkg/USE")" >> "$OUT/BUILD-INPUTS.txt"
+  printf 'PipeWire package: %s\nPipeWire USE: %s\nBluetooth: disabled\n' \
+    "${pipewire_pkg##*/}" "$(tr '\n' ' ' < "$pipewire_pkg/USE")" >> "$OUT/BUILD-INPUTS.txt"
 
   log "Preflight mandatory Openbox closure; fetch only missing packages from the signed Gentoo x86-64 binhost"
   REQUIRED_ATOMS="$(paste -sd ' ' "$WORK/required-atoms.txt")"
