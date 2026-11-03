@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eux
+set -eu
 
 test -s README.md
 test -s d630-tiny/README.md
@@ -107,6 +107,7 @@ grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
 grep -Fq 'SCRCPY_RELEASE_TAG="v5.0.1-debian12-core2-keyboard-gamepad"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq '47d41abd3cf607a2688310a829496d787d799cedcd6cd9f30fb9c6b39cff23aa' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'SCRCPY-BUNDLE-SHA256.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq '8b2ac5512d4301218cf8b458aaf1f74b9d35d82f' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy 5.0.1 binary does not expose keyboard-gamepad support' d630-gentoo/scripts/build-runtime-squashfs.sh
