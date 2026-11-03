@@ -327,12 +327,15 @@ jobs:
               echo "The restored scrcpy 5.0.1 binary does not expose keyboard-gamepad -j." >&2
               exit 1
             }
-          links_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit)"
-          if [[ -z "$links_pkg" || ! -s "$links_pkg/USE" ]] || ! grep -qw X "$links_pkg/USE"; then
-            echo "The restored Gentoo root has no X-enabled Links package variant." >&2
+          links_binpkg_dir="$GENTOO_ROOT/var/cache/binpkgs/www-client/links"
+          mapfile -t links_binpkgs < <(sudo find "$links_binpkg_dir" -maxdepth 1 -type f \
+            -name 'links-2.30-r3-*.gpkg.tar' -print | sort)
+          if (( ${#links_binpkgs[@]} < 3 )); then
+            echo "Expected all three Links binpkg builds in the restored PKGDIR; found ${#links_binpkgs[@]}." >&2
             exit 1
           fi
-          echo "Verified Core 2 runtime inputs: scrcpy 5.0.1 (-j), Links (USE=X), PipeWire (-bluetooth), rootless Xorg (elogind), and NetworkManager (Wi-Fi/WEXT/tools)."
+          printf 'Verified Links binpkg builds:\n%s\n' "${links_binpkgs[@]}"
+          echo "Verified Core 2 runtime inputs: scrcpy 5.0.1 (-j), three Links binpkg builds (X variant selected by the SFS USE config), PipeWire (-bluetooth), rootless Xorg (elogind), and NetworkManager (Wi-Fi/WEXT/tools)."
           echo "Additional missing D630 runtime dependencies were built into the same PKGDIR as binary packages."
 
       - name: Package current PKGDIR and publish the updated binpkg release
