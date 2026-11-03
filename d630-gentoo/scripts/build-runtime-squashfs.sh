@@ -143,26 +143,7 @@ EOF
   git clone --depth 1 https://github.com/gentoo-mirror/guru.git "$ROOT/var/db/repos/guru"
 fi
 
-log "Install the pinned SDL3 scrcpy 5.0.1 D630 -j local ebuild"
-LOCAL_REPO="$ROOT/var/db/repos/d630-local"
-mkdir -p "$LOCAL_REPO/metadata" "$LOCAL_REPO/app-mobilephone/scrcpy"
-cat > "$LOCAL_REPO/metadata/layout.conf" <<'EOF'
-repo-name = d630-local
-masters = gentoo
-thin-manifests = true
-EOF
-cat > "$ROOT/etc/portage/repos.conf/d630-local.conf" <<'EOF'
-[d630-local]
-location = /var/db/repos/d630-local
-priority = 1000
-auto-sync = no
-EOF
-install -m 0644 "$GITHUB_WORKSPACE/config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild" \
-  "$LOCAL_REPO/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild"
-chroot "$ROOT" /bin/bash -lc \
-  'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild manifest' \
-  |& tee "$OUT/scrcpy-manifest.log"
-
+log "Prepare strict binpkg-only Openbox runtime"
 log "Import binary package assets"
 if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
   log "Verify recovered publisher artifact and import package shards"
@@ -217,18 +198,31 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-ap
 fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-  log "Restrict scrcpy candidates to the user's BUILD_ID=2"
-  SCRCPY_PKGDIR="$ROOT/var/cache/binpkgs/app-mobilephone/scrcpy"
-  SCRCPY_BUILD2="$SCRCPY_PKGDIR/scrcpy-5.0.1-2.gpkg.tar"
-  [[ -s "$SCRCPY_BUILD2" ]] || die "saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing"
-  mkdir -p "$WORK/scrcpy-other-build-ids"
-  shopt -s nullglob
-  SCRCPY_CANDIDATES=( "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.gpkg.tar "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.tbz2 )
-  shopt -u nullglob
-  for candidate in "${SCRCPY_CANDIDATES[@]}"; do
-    [[ "$candidate" == "$SCRCPY_BUILD2" ]] || mv "$candidate" "$WORK/scrcpy-other-build-ids/"
-  done
-  sha256sum "$SCRCPY_BUILD2" | tee "$OUT/SCRCPY-BINPKG-SHA256.txt"
+  log "Install verified Core 2 scrcpy 5.0.1 keyboard-gamepad release bundle"
+  SCRCPY_RELEASE_TAG="v5.0.1-debian12-core2-keyboard-gamepad"
+  SCRCPY_ARCHIVE="scrcpy-5.0.1-debian12-core2-x86_64.tar.gz"
+  SCRCPY_URL="https://github.com/AmrUser-48/scrcpy/releases/download/$SCRCPY_RELEASE_TAG/$SCRCPY_ARCHIVE"
+  SCRCPY_SHA256="47d41abd3cf607a2688310a829496d787d799cedcd6cd9f30fb9c6b39cff23aa"
+  mkdir -p "$WORK/scrcpy" "$ROOT/usr/libexec/d630-scrcpy-5.0.1" "$ROOT/usr/bin"
+  curl -fL --retry 3 "$SCRCPY_URL" -o "$WORK/scrcpy/$SCRCPY_ARCHIVE"
+  printf '%s  %s\n' "$SCRCPY_SHA256" "$WORK/scrcpy/$SCRCPY_ARCHIVE" | sha256sum --check -
+  tar -xzf "$WORK/scrcpy/$SCRCPY_ARCHIVE" -C "$WORK/scrcpy"
+  SCRCPY_BUNDLE="$WORK/scrcpy/scrcpy-5.0.1-debian12-core2-x86_64"
+  [[ -x "$SCRCPY_BUNDLE/scrcpy" && -s "$SCRCPY_BUNDLE/scrcpy-server" ]] || die "scrcpy release bundle is incomplete"
+  [[ -s "$SCRCPY_BUNDLE/lib/libSDL3.so.0" && -s "$SCRCPY_BUNDLE/lib/libavcodec.so.60" ]] || die "scrcpy release bundle lacks its matching SDL3/FFmpeg libraries"
+  cp -a "$SCRCPY_BUNDLE/." "$ROOT/usr/libexec/d630-scrcpy-5.0.1/"
+  cat > "$ROOT/usr/bin/scrcpy" <<'EOF'
+#!/bin/sh
+SCRCPY_HOME=/usr/libexec/d630-scrcpy-5.0.1
+export LD_LIBRARY_PATH="$SCRCPY_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+cd "$SCRCPY_HOME"
+exec ./scrcpy "$@"
+EOF
+  chmod 0755 "$ROOT/usr/bin/scrcpy"
+  printf 'Release: %s\nAsset: %s\nSource commit: 8b2ac5512d4301218cf8b458aaf1f74b9d35d82f\nSHA256: %s\n' \
+    "$SCRCPY_RELEASE_TAG" "$SCRCPY_ARCHIVE" "$SCRCPY_SHA256" > "$OUT/SCRCPY-BUNDLE-SHA256.txt"
+  printf 'scrcpy source commit: 8b2ac5512d4301218cf8b458aaf1f74b9d35d82f\nscrcpy release: %s\n' \
+    "$SCRCPY_RELEASE_TAG" >> "$OUT/BUILD-INPUTS.txt"
 fi
 
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
@@ -330,7 +324,7 @@ x11-base/xorg-drivers
 x11-base/xorg-server
 x11-terms/xterm
 x11-wm/openbox
-=app-mobilephone/scrcpy-5.0.1
+dev-libs/libusb
 www-client/links
 
 EOF
@@ -484,20 +478,14 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
   done
   : > "$OUT/TOOL-AVAILABILITY.txt"
-  if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
-    [[ -n "$scrcpy_pkg" ]] || die "scrcpy 5.0.1 BUILD_ID=2 binary package was not installed"
-    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "installed scrcpy is not the user's d630-local build"; fi
-    grep -qw X "$scrcpy_pkg/USE" || die "scrcpy BUILD_ID=2 package is not X-enabled"
-    if grep -qw wayland "$scrcpy_pkg/USE"; then die "scrcpy BUILD_ID=2 package unexpectedly includes Wayland"; fi
-    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
-    scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
-    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
-    [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
-    printf 'included: scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
-  else
-    die "required scrcpy 5.0.1 binpkg was not installed"
-  fi
+  [[ -x "$ROOT/usr/bin/scrcpy" ]] || die "prebuilt scrcpy launcher is missing"
+  [[ -x "$ROOT/usr/libexec/d630-scrcpy-5.0.1/scrcpy" ]] || die "prebuilt scrcpy client is missing"
+  [[ -s "$ROOT/usr/libexec/d630-scrcpy-5.0.1/scrcpy-server" ]] || die "matching scrcpy Android server is missing"
+  [[ -s "$ROOT/usr/libexec/d630-scrcpy-5.0.1/lib/libSDL3.so.0" ]] || die "bundled SDL3 runtime is missing"
+  [[ -s "$OUT/SCRCPY-BUNDLE-SHA256.txt" ]] || die "scrcpy release checksum record is missing"
+  scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
+  grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose keyboard-gamepad support"
+  printf 'included: scrcpy 5.0.1 Core 2 portable release (-j/--joystick), bundled SDL3/FFmpeg and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   links_pkg="$(find "$ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit 2>/dev/null)"
   [[ -n "$links_pkg" && -s "$links_pkg/USE" ]] || die "required Links browser package was not installed"
   grep -qw X "$links_pkg/USE" || die "Links browser binpkg is not the X-enabled variant"
@@ -911,7 +899,7 @@ Base: Gentoo amd64 glibc/OpenRC Stage 3
 Flags: -O2 -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
 $(if [[ -x "$ROOT/etc/init.d/NetworkManager" && -x "$ROOT/usr/sbin/wpa_supplicant" ]]; then echo "Wi-Fi: NetworkManager and wpa_supplicant are installed; external connection profile can be imported."; else echo "Wi-Fi: not included; no complete NetworkManager/wpa_supplicant binpkg closure is available."; fi)
-$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL3 5.0.1 (-j) binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL3 5.0.1 (-j) binpkg unavailable."; fi)
+$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: Core 2 portable release 5.0.1 (-j) with bundled SDL3/FFmpeg and matching server."; else echo "scrcpy: not included."; fi)
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
@@ -995,7 +983,7 @@ else
     grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not supply the active VT when needed"
   fi
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy 5.0.1 package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/libexec/d630-scrcpy-5.0.1/scrcpy-server' || die "final SquashFS is missing the matching scrcpy Android server"
     unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/bin/links' || die "final SquashFS is missing the Links browser"
   fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
