@@ -48,7 +48,7 @@ if ! grep -Fxq ash "$APPLET_LIST" && ! grep -Fxq sh "$APPLET_LIST"; then
   echo "Required BusyBox shell applet ash/sh is missing." >&2
   exit 1
 fi
-for applet in mount mkdir sleep cat uname setsid cttyhack poweroff hostname dmesg grep; do
+for applet in mount mkdir sleep cat uname setsid cttyhack poweroff hostname dmesg grep mkswap swapon; do
   if ! grep -Fxq "$applet" "$APPLET_LIST"; then
     echo "Required BusyBox applet missing: $applet" >&2
     exit 1
