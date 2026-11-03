@@ -426,10 +426,22 @@ ARCHIVE="$WORK/gentoo-rootfs.tar.zst.gpg"
 PART_PREFIX="$WORK/gentoo-rootfs.tar.zst.gpg.part-"
 printf 'Tag: %s\nRepo: %s\nStarted UTC: %s\n' "$TAG" "$REPO" "$(date -u +%FT%TZ)"
 
+# Keep compiled Portage binpkgs in /var/cache/binpkgs, but never bundle downloaded
+# source archives from DISTDIR. Resolve Gentoo's effective setting instead of
+# assuming the default path; /var/tmp/portage is excluded separately below.
+DISTDIR="$(portageq envvar DISTDIR 2>/dev/null || true)"
+[[ -n "$DISTDIR" ]] || DISTDIR="/var/cache/distfiles"
+DISTDIR="${DISTDIR%/}"
+[[ "$DISTDIR" == /* && "$DISTDIR" != "/" ]] ||
+  die "Portage DISTDIR must resolve to an absolute directory other than /: $DISTDIR"
+DISTDIR_TAR="./${DISTDIR#/}"
+echo "Snapshot preserves /var/cache/binpkgs and excludes Portage DISTDIR=$DISTDIR."
+
 # The root tar -> zstd -> GPG stream never writes an unencrypted archive to disk.
 exec 3<<<"$PASS1"
 unset PASS1 PASS2
 tar --create --file=- --directory="$ROOT" --numeric-owner --acls --xattrs --xattrs-include='*' --sparse --one-file-system \
+  --exclude="$DISTDIR_TAR" --exclude="$DISTDIR_TAR/*" \
   --exclude='./proc' --exclude='./proc/*' \
   --exclude='./sys' --exclude='./sys/*' \
   --exclude='./dev' --exclude='./dev/*' \
@@ -466,7 +478,9 @@ Restore workflow secret required: STATE_ENCRYPTION_PASSPHRASE
 Chunk prefix: gentoo-rootfs.tar.zst.gpg.part-
 Chunks: ${#PARTS[@]}
 The complete root archive is encrypted before being written to release chunks.
-Excluded runtime paths: /proc /sys /dev /run /tmp /mnt /media /var/tmp/portage
+Excluded runtime/build/source-cache paths: /proc /sys /dev /run /tmp /mnt /media /var/tmp/portage $DISTDIR
+Preserved compiled package cache: /var/cache/binpkgs
+Downloaded Portage source archives in DISTDIR are intentionally excluded.
 The token/configuration files inside the root are contained only inside the encrypted archive.
 EOF_MANIFEST
 
