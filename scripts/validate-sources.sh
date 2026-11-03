@@ -103,6 +103,8 @@ grep -Fxq '=app-misc/lf-28' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'binpkg-multi-instance' config/make.conf
 ! grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/config/package-sets/multimedia.list
 grep -Fxq 'dev-libs/libusb' d630-gentoo/config/package-sets/multimedia.list
+grep -Fq 'elogind-255.24-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'libusb-1.0.29-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
