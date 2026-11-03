@@ -344,7 +344,7 @@ jobs:
           expect eof
           EXPECT
           grep -Fq 'D630_TINY_SETUP_OK' "$QEMU_LOG"
-grep -Fq 'D630_TINY_ZRAM_OK' "$QEMU_LOG"
+          grep -Fq 'D630_TINY_ZRAM_OK' "$QEMU_LOG"
           grep -Fq 'D630_TINY_CHROOT_GUARD_OK' "$QEMU_LOG"
           grep -Fq 'D630_TINY_SETUP_INTERNET_OK' "$QEMU_LOG"
           grep -Fq 'D630_TINY_REBUILD_OK' "$QEMU_LOG"
