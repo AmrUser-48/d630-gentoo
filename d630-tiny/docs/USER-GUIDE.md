@@ -185,6 +185,20 @@ id -u
 
 The result should be `0`. Type `exit` to leave the root shell and return to `gmini`.
 
+### Compressed RAM swap
+
+Tiny enables ZRAM swap automatically during boot when the kernel provides `/dev/zram0`. The device's logical capacity is set to 40% of detected RAM; `/init` formats it with `mkswap` and activates it with `swapon`. The kernel profile selects LZ4 compression. The device is volatile and is recreated at every boot.
+
+Check that swap is active:
+
+```sh
+cat /proc/swaps
+cat /sys/block/zram0/comp_algorithm
+cat /sys/block/zram0/mm_stat
+```
+
+The active compressor is shown in square brackets in `comp_algorithm`, for example `[lz4]`. ZRAM uses physical RAM for its compressed pages; the configured capacity is a logical limit, not memory reserved in advance. If the kernel has no ZRAM support or initialization fails, Tiny prints a warning and continues booting without compressed swap.
+
 ### Open another virtual console
 
 Tiny starts one shell automatically. The kernel supports virtual terminals, but the initramfs does not start a shell on every VT. From the running Tiny shell, open another one with:
@@ -392,6 +406,8 @@ Reboot and select D630 Tiny Linux from GRUB. If the rebuilt image does not boot,
 ## What's included
 
 The combined initramfs contains:
+
+- Automatic ZRAM swap initialization in `/init`, using BusyBox `mkswap` and `swapon` when the kernel exposes `/dev/zram0`.
 
 - A statically linked BusyBox environment and a minimal `/init` with `/dev`, `/proc`, `/sys`, `/run`, and `/tmp` set up at boot.
 - A passwordless `gmini` account, Gentoo-built Bash, `lf`, and a Gentoo banner displayed by BusyBox `login` from `/etc/motd`.
