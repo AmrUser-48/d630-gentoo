@@ -378,11 +378,11 @@ EOF
     fi
 
     cat "$OUT/required-binpkg-plan.log"
-    MISSING_ATOM="$(sed -nE 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\\1/p' \
+    MISSING_ATOM="$(sed -nE 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\1/p' \
       "$OUT/required-binpkg-plan.log" | head -n 1)"
     [[ -n "$MISSING_ATOM" ]] || die "mandatory Openbox binpkg preflight failed without a resolvable missing atom; see required-binpkg-plan.log"
 
-    printf 'Attempt %s: fetch %s from signed official Gentoo x86-64 binhost\\n' "$attempt" "$MISSING_ATOM" | tee -a "$FALLBACK_LOG"
+    printf 'Attempt %s: fetch %s from signed official Gentoo x86-64 binhost\n' "$attempt" "$MISSING_ATOM" | tee -a "$FALLBACK_LOG"
     printf -v QUOTED_MISSING_ATOM '%q' "$MISSING_ATOM"
     chroot "$ROOT" /bin/bash -lc \
       "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot $QUOTED_MISSING_ATOM" \
@@ -390,7 +390,7 @@ EOF
   done
   [[ "$PREFLIGHT_OK" == true ]] || die "mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements"
   if [[ -s "$FALLBACK_LOG" ]]; then
-    printf 'Supplemental source: signed official Gentoo x86-64 binhost (binary-only); details in official-binpkg-fallback.log\\n' \
+    printf 'Supplemental source: signed official Gentoo x86-64 binhost (binary-only); details in official-binpkg-fallback.log\n' \
       >> "$OUT/BUILD-INPUTS.txt"
   fi
 
