@@ -34,7 +34,7 @@ Target hardware is an x86-64 Dell Latitude D630 with legacy BIOS and a partition
 └── tiny.cfg
 ~~~
 
-The kernel must support an external initramfs (CONFIG_BLK_DEV_INITRD=y with an empty CONFIG_INITRAMFS_SOURCE), and all drivers needed before the Tiny userspace starts must be built into the kernel. A genuinely module-free Tiny kernel uses CONFIG_MODULES=n and has no /lib/modules dependency.
+The kernel must support an external initramfs (CONFIG_BLK_DEV_INITRD=y with an empty CONFIG_INITRAMFS_SOURCE), and all drivers needed by Tiny must be built into the kernel. A genuinely module-free Tiny kernel uses CONFIG_MODULES=n, has no =m entries and has no /lib/modules dependency. The current published Tiny kernel is reused from the Gentoo live kernel bundle; it is module-capable, but the Tiny image does not ship a matching /lib/modules tree, so its required drivers must already be built in.
 
 The D630 hardware set includes Intel AHCI/ATA PIIX storage, ICH8 UHCI/EHCI USB 2.0, GM965 / GMA X3100 graphics, Intel 3945ABG Wi-Fi, HDA/SigmaTel audio, PS/2 ALPS DualPoint input, ACPI and Dell laptop support. The intended dedicated kernel configuration is [Profile 30](../kernels/profiles/30-d630-live.config).
 
@@ -58,7 +58,7 @@ Keep the separate /d630-gentoo/ kernel, initramfs and SquashFS files untouched. 
 
 ## Build
 
-The canonical initramfs workflow is [Build D630 Tiny standalone initramfs](../.github/workflows/build-d630-tiny-initramfs.yml). It assembles the BusyBox environment, optional network/setup tools, firmware, early microcode and the final external initramfs. The workflow currently consumes a pinned kernel bundle rather than building a kernel from Profile 30.
+The canonical initramfs workflow is [Build D630 Tiny standalone initramfs](../.github/workflows/build-d630-tiny-initramfs.yml). It assembles the BusyBox environment, optional network/setup tools, firmware, early microcode and the final external initramfs. The workflow currently consumes a pinned kernel bundle rather than building a kernel from Profile 30. That reused kernel has module support enabled; the Tiny initramfs does not include its modules archive or a /lib/modules tree. The present image therefore relies on the required Tiny hardware drivers being built into that kernel. A future Profile 30 kernel should make CONFIG_MODULES=n explicit and must pass the no-module checks before it replaces the pinned kernel.
 
 The kernel and initramfs have separate roles:
 
