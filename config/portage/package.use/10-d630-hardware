@@ -40,8 +40,10 @@ media-sound/pulseaudio -daemon
 # D630 multimedia: ALSA, Opus/MP3 codecs and PipeWire output.
 media-sound/sox alsa opus flac ogg mad sndfile -ffmpeg
 media-video/ffmpeg mp3 opus
-# Pinned scrcpy 3.3.4 D630 fork: SDL2/X11 only, no Wayland.
+# Pinned scrcpy 5.0.1 D630 keyboard-gamepad fork: SDL3/X11, no Wayland.
 app-mobilephone/scrcpy X -wayland
+# Require the graphical Links browser variant for use inside Openbox.
+www-client/links X
 
 # Reduce optional Clang runtime components pulled by the Mesa build helper.
 llvm-runtimes/clang-runtime -sanitize -openmp

@@ -143,7 +143,7 @@ EOF
   git clone --depth 1 https://github.com/gentoo-mirror/guru.git "$ROOT/var/db/repos/guru"
 fi
 
-log "Install the pinned SDL2 scrcpy 3.3.4 local ebuild"
+log "Install the pinned SDL3 scrcpy 5.0.1 D630 -j local ebuild"
 LOCAL_REPO="$ROOT/var/db/repos/d630-local"
 mkdir -p "$LOCAL_REPO/metadata" "$LOCAL_REPO/app-mobilephone/scrcpy"
 cat > "$LOCAL_REPO/metadata/layout.conf" <<'EOF'
@@ -157,10 +157,10 @@ location = /var/db/repos/d630-local
 priority = 1000
 auto-sync = no
 EOF
-install -m 0644 "$GITHUB_WORKSPACE/config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild" \
-  "$LOCAL_REPO/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
+install -m 0644 "$GITHUB_WORKSPACE/config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild" \
+  "$LOCAL_REPO/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild"
 chroot "$ROOT" /bin/bash -lc \
-  'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest' \
+  'ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild manifest' \
   |& tee "$OUT/scrcpy-manifest.log"
 
 log "Import binary package assets"
@@ -308,6 +308,8 @@ x11-base/xorg-drivers
 x11-base/xorg-server
 x11-terms/xterm
 x11-wm/openbox
+=app-mobilephone/scrcpy-5.0.1
+www-client/links
 
 EOF
   sed -i '/^[[:space:]]*$/d' "$WORK/required-atoms.txt"
@@ -461,16 +463,24 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   done
   : > "$OUT/TOOL-AVAILABILITY.txt"
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "pinned scrcpy 3.3.4 binpkg is missing its matching scrcpy-server"
-    printf 'included: matching scrcpy-server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
+    [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
+    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
+    chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 | grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
+    printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
-    printf 'omitted: scrcpy 3.3.4 (no matching imported binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    die "required scrcpy 5.0.1 binpkg was not installed"
   fi
+  links_pkg="$(find "$ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit 2>/dev/null)"
+  [[ -n "$links_pkg" && -s "$links_pkg/USE" ]] || die "required Links browser package was not installed"
+  grep -qw X "$links_pkg/USE" || die "Links browser binpkg is not the X-enabled variant"
+  [[ -x "$ROOT/usr/bin/links" ]] || die "Links browser executable is missing"
+  printf 'included: Links browser (X-enabled binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   for executable in /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
     /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
     /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/sox /usr/bin/lame /usr/bin/ffmpeg /usr/bin/ffprobe \
     /usr/bin/xclip /usr/bin/xdg-open /usr/bin/xmodmap /usr/bin/xrdb /usr/sbin/iw \
-    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy \
+    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy /usr/bin/links \
     /usr/bin/ntfs-3g /usr/sbin/mount.ntfs-3g; do
     if [[ -x "$ROOT$executable" ]]; then
       printf 'included: %s\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
@@ -866,7 +876,7 @@ Base: Gentoo amd64 glibc/OpenRC Stage 3
 Flags: -O2 -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
 $(if [[ -x "$ROOT/etc/init.d/NetworkManager" && -x "$ROOT/usr/sbin/wpa_supplicant" ]]; then echo "Wi-Fi: NetworkManager and wpa_supplicant are installed; external connection profile can be imported."; else echo "Wi-Fi: not included; no complete NetworkManager/wpa_supplicant binpkg closure is available."; fi)
-$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL2 3.3.4 binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL2 3.3.4 binpkg unavailable."; fi)
+$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL3 5.0.1 (-j) binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL3 5.0.1 (-j) binpkg unavailable."; fi)
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
@@ -950,7 +960,8 @@ else
     grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not supply the active VT when needed"
   fi
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy 5.0.1 package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/bin/links' || die "final SquashFS is missing the Links browser"
   fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
@@ -996,7 +1007,8 @@ x11-base/xorg-drivers
 x11-base/xorg-server
 x11-terms/xterm
 x11-wm/openbox
-app-mobilephone/scrcpy
+=app-mobilephone/scrcpy-5.0.1
+www-client/links
 EOF
   sort -u "$WORK/required-atoms.txt" -o "$WORK/required-atoms.txt"
   while IFS= read -r atom; do
@@ -1136,16 +1148,24 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   done
   : > "$OUT/TOOL-AVAILABILITY.txt"
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "pinned scrcpy 3.3.4 binpkg is missing its matching scrcpy-server"
-    printf 'included: matching scrcpy-server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
+    [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
+    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
+    chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 | grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
+    printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
-    printf 'omitted: scrcpy 3.3.4 (no matching imported binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    die "required scrcpy 5.0.1 binpkg was not installed"
   fi
+  links_pkg="$(find "$ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit 2>/dev/null)"
+  [[ -n "$links_pkg" && -s "$links_pkg/USE" ]] || die "required Links browser package was not installed"
+  grep -qw X "$links_pkg/USE" || die "Links browser binpkg is not the X-enabled variant"
+  [[ -x "$ROOT/usr/bin/links" ]] || die "Links browser executable is missing"
+  printf 'included: Links browser (X-enabled binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   for executable in /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
     /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
     /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/sox /usr/bin/lame /usr/bin/ffmpeg /usr/bin/ffprobe \
     /usr/bin/xclip /usr/bin/xdg-open /usr/bin/xmodmap /usr/bin/xrdb /usr/sbin/iw \
-    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy \
+    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy /usr/bin/links \
     /usr/bin/ntfs-3g /usr/sbin/mount.ntfs-3g; do
     if [[ -x "$ROOT$executable" ]]; then
       printf 'included: %s\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
@@ -1541,7 +1561,7 @@ Base: Gentoo amd64 glibc/OpenRC Stage 3
 Flags: -O2 -march=core2 -mtune=core2
 Source fallback: $SOURCE_FALLBACK
 $(if [[ -x "$ROOT/etc/init.d/NetworkManager" && -x "$ROOT/usr/sbin/wpa_supplicant" ]]; then echo "Wi-Fi: NetworkManager and wpa_supplicant are installed; external connection profile can be imported."; else echo "Wi-Fi: not included; no complete NetworkManager/wpa_supplicant binpkg closure is available."; fi)
-$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL2 3.3.4 binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL2 3.3.4 binpkg unavailable."; fi)
+$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL3 5.0.1 (-j) binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL3 5.0.1 (-j) binpkg unavailable."; fi)
 Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
 Writable storage: RAM-only; changes are lost on reboot.
 Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
@@ -1625,7 +1645,8 @@ else
     grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not supply the active VT when needed"
   fi
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
-    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy 5.0.1 package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/bin/links' || die "final SquashFS is missing the Links browser"
   fi
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
