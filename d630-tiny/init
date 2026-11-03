@@ -18,6 +18,48 @@ mount -t sysfs sysfs /sys 2>/dev/null || :
 mount -t devpts devpts /dev/pts 2>/dev/null || :
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || :
 mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || :
+
+# Initialize built-in ZRAM as swap. The logical device size is half of
+# detected RAM; physical memory is allocated lazily as pages are compressed.
+setup_zram() {
+    if [ ! -b /dev/zram0 ] || [ ! -w /sys/block/zram0/disksize ]; then
+        printf '[d630-tiny] Built-in ZRAM is unavailable; continuing without compressed swap.\n'
+        return
+    fi
+
+    mem_kb=
+    while read -r key value rest; do
+        if [ "$key" = "MemTotal:" ]; then
+            mem_kb=$value
+            break
+        fi
+    done < /proc/meminfo
+
+    case "$mem_kb" in
+        ''|*[!0-9]*)
+            printf '[d630-tiny] Could not determine RAM size; ZRAM not enabled.\n'
+            return
+            ;;
+    esac
+
+    zram_bytes=$((mem_kb * 512))
+    if ! printf '%s\n' "$zram_bytes" > /sys/block/zram0/disksize; then
+        printf '[d630-tiny] Could not set ZRAM size; continuing without compressed swap.\n'
+        return
+    fi
+    if ! mkswap /dev/zram0 >/dev/null 2>&1; then
+        printf '[d630-tiny] mkswap failed for /dev/zram0; continuing without compressed swap.\n'
+        return
+    fi
+    if ! swapon /dev/zram0; then
+        printf '[d630-tiny] swapon failed for /dev/zram0; continuing without compressed swap.\n'
+        return
+    fi
+
+    printf '[d630-tiny] ZRAM swap enabled: %s MiB (LZ4).\n' "$((zram_bytes / 1048576))"
+}
+
+setup_zram
 hostname d630-tiny 2>/dev/null || :
 dmesg -n 4 2>/dev/null || :
 
