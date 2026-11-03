@@ -212,7 +212,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-au
   log "Supplement pambase binary package from release v0.2.0"
   mkdir -p "$WORK/supplemental" "$ROOT/var/cache/binpkgs/sys-auth/pambase"
   curl -fL --retry 3 "https://github.com/AmrUser-48/d630-gentoo/releases/download/v0.2.0/pambase-20251104-r1-1.gpkg.tar" -o "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar"
-  printf '%s  %s\n' 'f89b8b400409f9a2c39981c10e2ececc5f68148bea334e8dae69f74f9ec9c56' "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar" | sha256sum --check -
+  printf '%s  %s\n' 'f89b8b400409f9a2c39981c10e2ececc5f68148bea334e8dae69f74f9ec9c56d' "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar" | sha256sum --check -
   install -m 0644 "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-auth/pambase/pambase-20251104-r1-1.gpkg.tar"
 fi
 
