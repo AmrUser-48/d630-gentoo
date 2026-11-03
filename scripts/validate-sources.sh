@@ -109,6 +109,8 @@ grep -Fxq 'sys-auth/pambase' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'rm -rf "$OUT"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'libusb-1.0.29-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--getbinpkgonly --oneshot dev-libs/glib:2' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq '>=dev-libs/gobject-introspection-1.83.2:0/0=' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'official-binpkg-gobject-introspection.log' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'official-binpkg-glib.log' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
