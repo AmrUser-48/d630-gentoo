@@ -3,4 +3,3 @@ media-video/ffmpeg
 media-sound/lame
 media-libs/opus
 media-sound/sox
-=app-mobilephone/scrcpy-5.0.1
