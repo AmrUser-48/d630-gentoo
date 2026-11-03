@@ -42,6 +42,8 @@ IDS="$(printf '%s' "$BINPKG_RUN_IDS" | tr ',' ' ')"
 ROOT="$RUNNER_TEMP/d630-runtime-root"
 WORK="$RUNNER_TEMP/d630-runtime-work"
 OUT="${OUTPUT_DIR:-$GITHUB_WORKSPACE/output}"
+[[ "$OUT" != "/" && "$OUT" != "$GITHUB_WORKSPACE" ]] || die "refusing unsafe output directory: $OUT"
+rm -rf "$OUT"
 mkdir -p "$WORK" "$OUT"
 rm -rf "$ROOT" "$WORK/stage3"
 mkdir -p "$WORK/stage3"
@@ -204,6 +206,14 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-au
   curl -fL --retry 3 "https://github.com/AmrUser-48/d630-gentoo/releases/download/v0.2.0/elogind-255.24-1.gpkg.tar" -o "$WORK/supplemental/elogind-255.24-1.gpkg.tar"
   printf '%s  %s\n' '1ef56b9bb397fc80114f8c958330fe51e9f98d658122c0b62aaaa189d61e54e1' "$WORK/supplemental/elogind-255.24-1.gpkg.tar" | sha256sum --check -
   install -m 0644 "$WORK/supplemental/elogind-255.24-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-auth/elogind/elogind-255.24-1.gpkg.tar"
+fi
+
+if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-auth/pambase" -maxdepth 1 -type f -name 'pambase-*.gpkg.tar' -print -quit 2>/dev/null | grep -q .; then
+  log "Supplement pambase binary package from release v0.2.0"
+  mkdir -p "$WORK/supplemental" "$ROOT/var/cache/binpkgs/sys-auth/pambase"
+  curl -fL --retry 3 "https://github.com/AmrUser-48/d630-gentoo/releases/download/v0.2.0/pambase-20251104-r1-1.gpkg.tar" -o "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar"
+  printf '%s  %s\n' 'f89b8b400409f9a2c39981c10e2ececc5f68148bea334e8dae69f74f9ec9c56' "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar" | sha256sum --check -
+  install -m 0644 "$WORK/supplemental/pambase-20251104-r1-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-auth/pambase/pambase-20251104-r1-1.gpkg.tar"
 fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/dev-libs/libusb" -maxdepth 1 -type f -name 'libusb-*.gpkg.tar' -print -quit 2>/dev/null | grep -q .; then
