@@ -116,6 +116,7 @@ grep -Fq 'official-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squash
 grep -Fq 'media-video/pipewire -bluetooth' config/portage/package.use/10-d630-hardware
 grep -Fq 'binpkg-respect-use=y media-video/pipewire' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'pipewire-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'All ebuilds that could satisfy) "([^\"]+)"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'Bluetooth: disabled' d630-gentoo/scripts/build-runtime-squashfs.sh
 ! grep -Fq -- '--binpkg-respect-use=y $RUNTIME_ATOMS' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
