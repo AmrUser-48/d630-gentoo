@@ -55,6 +55,10 @@ concurrency:
 
 jobs:
   build:
+    # Pushes that change the SFS builder should publish refreshed binpkgs first.
+    # The publisher workflow builds Openbox after those binpkgs are available.
+    # Keep this standalone workflow for explicit/manual builds with chosen inputs.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     name: Assemble runtime root and SquashFS
     runs-on: ubuntu-24.04
     timeout-minutes: 360
