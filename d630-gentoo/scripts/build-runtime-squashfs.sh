@@ -326,18 +326,6 @@ sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
 if grep -Evq '^(=|>=|<=|>|<|~)?[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(-[0-9][A-Za-z0-9+_.-]*)?(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-  log "Install missing GLib and GObject Introspection from signed official Gentoo x86-64 binhost (binary-only)"
-  chroot "$ROOT" /bin/bash -lc \
-    'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot dev-libs/glib:2' \
-    |& tee "$OUT/official-binpkg-glib.log"
-  chroot "$ROOT" /bin/bash -lc \
-    'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot ">=dev-libs/gobject-introspection-1.83.2:0/0="' \
-    |& tee "$OUT/official-binpkg-gobject-introspection.log"
-  printf 'Supplemental signed binhost packages: dev-libs/glib:2; >=dev-libs/gobject-introspection-1.83.2:0/0=\nBinhost: https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/\nSource fallback: disabled\n' \
-    >> "$OUT/BUILD-INPUTS.txt"
-fi
-
-if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   # Mandatory desktop and device services must resolve from imported Core 2 binpkgs.
   # Every other tool is included only if its complete dependency closure is available.
   cat > "$WORK/required-atoms.txt" <<'EOF'
@@ -375,11 +363,36 @@ EOF
   done < "$WORK/required-atoms.txt"
   grep -Fvx -f "$WORK/required-atoms.txt" "$WORK/atoms.txt" > "$WORK/optional-atoms.txt" || true
 
-  log "Preflight mandatory Openbox dependency closure from imported binpkgs"
+  log "Preflight mandatory Openbox closure; fetch only missing packages from the signed Gentoo x86-64 binhost"
   REQUIRED_ATOMS="$(paste -sd ' ' "$WORK/required-atoms.txt")"
-  chroot "$ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $REQUIRED_ATOMS" \
-    |& tee "$OUT/required-binpkg-plan.log"
+  FALLBACK_LOG="$OUT/official-binpkg-fallback.log"
+  : > "$FALLBACK_LOG"
+  PREFLIGHT_OK=false
+  for ((attempt = 1; attempt <= 20; attempt += 1)); do
+    if chroot "$ROOT" /bin/bash -lc \
+        "emerge --ignore-default-opts --ask=n --verbose --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $REQUIRED_ATOMS" \
+        > "$OUT/required-binpkg-plan.log" 2>&1; then
+      cat "$OUT/required-binpkg-plan.log"
+      PREFLIGHT_OK=true
+      break
+    fi
+
+    cat "$OUT/required-binpkg-plan.log"
+    MISSING_ATOM="$(sed -nE 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\\1/p' \
+      "$OUT/required-binpkg-plan.log" | head -n 1)"
+    [[ -n "$MISSING_ATOM" ]] || die "mandatory Openbox binpkg preflight failed without a resolvable missing atom; see required-binpkg-plan.log"
+
+    printf 'Attempt %s: fetch %s from signed official Gentoo x86-64 binhost\\n' "$attempt" "$MISSING_ATOM" | tee -a "$FALLBACK_LOG"
+    printf -v QUOTED_MISSING_ATOM '%q' "$MISSING_ATOM"
+    chroot "$ROOT" /bin/bash -lc \
+      "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot $QUOTED_MISSING_ATOM" \
+      |& tee -a "$FALLBACK_LOG"
+  done
+  [[ "$PREFLIGHT_OK" == true ]] || die "mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements"
+  if [[ -s "$FALLBACK_LOG" ]]; then
+    printf 'Supplemental source: signed official Gentoo x86-64 binhost (binary-only); details in official-binpkg-fallback.log\\n' \
+      >> "$OUT/BUILD-INPUTS.txt"
+  fi
 
   : > "$WORK/selected-optional-atoms.txt"
   : > "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
@@ -1033,7 +1046,7 @@ else
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
   sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt SCRCPY-BUNDLE-SHA256.txt scrcpy-ldd.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log official-binpkg-glib.log official-binpkg-gobject-introspection.log)
+    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log official-binpkg-fallback.log)
   fi
 fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
