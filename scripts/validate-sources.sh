@@ -113,6 +113,8 @@ grep -Fq 'FALLBACK_LOG="$OUT/official-binpkg-fallback.log"' d630-gentoo/scripts/
 grep -Fq -- '--getbinpkgonly --oneshot $QUOTED_MISSING_ATOM' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'official-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -c -- '--binpkg-respect-use=y' d630-gentoo/scripts/build-runtime-squashfs.sh | grep -Fxq '7'
+grep -Fq 'media-video/pipewire -bluetooth' config/portage/package.use/10-d630-hardware
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
