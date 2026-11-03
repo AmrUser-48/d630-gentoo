@@ -461,7 +461,6 @@ jobs:
     env:
       RUNTIME_PROFILE: openbox
       BINPKG_RUN_IDS: ""
-      LOCAL_RELEASE_ASSETS_DIR: ${{ runner.temp }}/refreshed-core2-binpkgs
       SOURCE_FALLBACK: "false"
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-41317026490' }}
       GH_TOKEN: ${{ github.token }}
@@ -489,6 +488,8 @@ jobs:
 
       - name: Build runtime root and trimmed SquashFS
         shell: bash
+        env:
+          LOCAL_RELEASE_ASSETS_DIR: ${{ runner.temp }}/refreshed-core2-binpkgs
         run: |
           set -Eeuo pipefail
           sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,LOCAL_RELEASE_ASSETS_DIR,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
