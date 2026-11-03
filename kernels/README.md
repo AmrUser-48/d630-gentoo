@@ -71,7 +71,7 @@ The intended no-module design is explicit: `CONFIG_MODULES=n`. With module suppo
 | Power and thermal management | ACPI battery/buttons/thermal, CPU frequency scaling, thermal framework and Core temperature sensors |
 | Compressed swap | Built-in ZRAM with the LZ4 backend and `CONFIG_SWAP=y`; userspace must create `/dev/zram0`, set its size, run `mkswap` and `swapon` |
 
-ZRAM is part of the Tiny memory-management target. Enable `CONFIG_SWAP=y`, `CONFIG_ZRAM=y`, `CONFIG_ZRAM_BACKEND_LZ4=y` and `CONFIG_ZRAM_DEF_COMP_LZ4=y`; ZRAM selects its `zsmalloc` allocator. Keep optional compressors, writeback, multi-compression and debug statistics disabled to avoid unused code. Kernel support alone does not activate swap: the BusyBox initramfs must initialize the device, set a size, create the swap area and enable it with `swapon`. The current Tiny init script does not yet perform that setup, so runtime ZRAM is not yet validated.
+ZRAM is initialized automatically by the Tiny `/init` script after `/dev`, `/proc` and `/sys` are mounted. The startup code sizes `/dev/zram0` to 40% of detected `MemTotal`, runs `mkswap`, and enables it with `swapon`; allocation of compressed pages remains demand-driven. The kernel profile enables `CONFIG_SWAP=y`, `CONFIG_ZRAM=y`, `CONFIG_ZRAM_BACKEND_LZ4=y` and `CONFIG_ZRAM_DEF_COMP_LZ4=y`; ZRAM selects its `zsmalloc` allocator. Optional compressors, writeback, multi-compression and debug statistics remain disabled. The initramfs builder checks that BusyBox contains both `mkswap` and `swapon`, and the Tiny QEMU workflow checks that `/dev/zram0` appears in `/proc/swaps`. This automated path is implemented in source; it still requires a successful workflow run and physical D630 validation.
 
 The current low-latency experiment also evaluates PREEMPT_RT, a 1000 Hz kernel tick and high-resolution timers. These are tuning choices, not prerequisites for boot. A 1000 Hz tick does not by itself guarantee a 1 ms scheduling deadline; measure latency, throughput, power use and thermal behavior on the physical two-core D630 before treating this combination as the default.
 
@@ -121,7 +121,7 @@ Latest bundle: [d630-kernel-6.18.56-run-41134237939](https://github.com/AmrUser-
 Static profile validators inspect fragments and selected Kconfig requirements; they do not compile a kernel. For the Tiny no-module target, inspect the *resolved full* `.config`, not only the fragment:
 
 ```sh
-grep -E '^(CONFIG_(BLOCK|PCI|NET|NETDEVICES|USB_SUPPORT|EXT4_FS|NTFS3_FS|USB_EHCI_HCD|USB_UHCI_HCD|USB_NET_RNDIS_HOST|DRM_I915|IWL3945|DELL_WMI|DELL_LAPTOP))=y
+grep -E '^(CONFIG_(BLOCK|PCI|NET|NETDEVICES|USB_SUPPORT|EXT4_FS|NTFS3_FS|USB_EHCI_HCD|USB_UHCI_HCD|USB_NET_RNDIS_HOST|DRM_I915|IWL3945|DELL_WMI|DELL_LAPTOP|SWAP|ZRAM|ZRAM_BACKEND_LZ4|ZRAM_DEF_COMP_LZ4))=y
 
 ## Related documentation
 
