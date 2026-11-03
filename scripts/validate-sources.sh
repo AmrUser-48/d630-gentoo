@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eux
+set -eu
 
 test -s README.md
 test -s d630-tiny/README.md
@@ -113,8 +113,11 @@ grep -Fq 'FALLBACK_LOG="$OUT/official-binpkg-fallback.log"' d630-gentoo/scripts/
 grep -Fq -- '--getbinpkgonly --oneshot --binpkg-respect-use=y $QUOTED_MISSING_ATOM' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'official-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -c 'emerge .*--binpkg-respect-use=y' d630-gentoo/scripts/build-runtime-squashfs.sh | grep -Fxq '7'
 grep -Fq 'media-video/pipewire -bluetooth' config/portage/package.use/10-d630-hardware
+grep -Fq 'binpkg-respect-use=y media-video/pipewire' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'pipewire-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'Bluetooth: disabled' d630-gentoo/scripts/build-runtime-squashfs.sh
+! grep -Fq -- '--binpkg-respect-use=y $RUNTIME_ATOMS' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
