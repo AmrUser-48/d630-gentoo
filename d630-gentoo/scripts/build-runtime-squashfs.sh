@@ -207,6 +207,837 @@ PY
     done < "$WORK/assets.tsv"
   done
 fi
+
+if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-apps/dbus" -maxdepth 1 -type f \\
+    -name 'dbus-*.gpkg.tar' -print -quit 2>/dev/null | grep -q .; then
+  log "Supplement the missing D-Bus Core 2 binary from the current live-package release"
+  mkdir -p "$WORK/supplemental"
+  curl -fsSL --retry 3 "${GH_API_AUTH_ARGS[@]}" -H 'Accept: application/vnd.github+json' \\
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v0.2.0" -o "$WORK/supplemental/release.json"
+  python3 - "$WORK/supplemental/release.json" "$WORK/supplemental/assets.tsv" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    release = json.load(stream)
+name = "dbus-1.16.2-1.gpkg.tar"
+asset = next((item for item in release.get("assets", []) if item.get("name") == name), None)
+if asset is None:
+    raise SystemExit(f"Supplemental release is missing {name}")
+digest = asset.get("digest", "")
+if not digest.startswith("sha256:") or not asset.get("browser_download_url"):
+    raise SystemExit(f"Supplemental release has no usable SHA-256 digest or download URL for {name}")
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    stream.write(f"{name}\\t{digest[7:]}\\t{asset['browser_download_url']}\\n")
+PY
+  while IFS=
+
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  log "Restrict scrcpy candidates to the user's BUILD_ID=2"
+  SCRCPY_PKGDIR="$ROOT/var/cache/binpkgs/app-mobilephone/scrcpy"
+  SCRCPY_BUILD2="$SCRCPY_PKGDIR/scrcpy-5.0.1-2.gpkg.tar"
+  [[ -s "$SCRCPY_BUILD2" ]] || die "saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing"
+  mkdir -p "$WORK/scrcpy-other-build-ids"
+  shopt -s nullglob
+  SCRCPY_CANDIDATES=( "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.gpkg.tar "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.tbz2 )
+  shopt -u nullglob
+  for candidate in "${SCRCPY_CANDIDATES[@]}"; do
+    [[ "$candidate" == "$SCRCPY_BUILD2" ]] || mv "$candidate" "$WORK/scrcpy-other-build-ids/"
+  done
+  sha256sum "$SCRCPY_BUILD2" | tee "$OUT/SCRCPY-BINPKG-SHA256.txt"
+  chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
+fi
+
+log "Select package atoms"
+if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
+  # A deliberately narrow runtime atop the official OpenRC Stage 3.
+  # Keep only account/boot/package-manager essentials plus the requested tools.
+  cat > "$WORK/atoms.txt" <<'EOF'
+app-admin/sudo
+sys-apps/openrc
+sys-apps/portage
+sys-apps/coreutils
+sys-apps/util-linux
+sys-apps/shadow
+sys-apps/kmod
+EOF
+  cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/tiny-console.list" >> "$WORK/atoms.txt"
+elif [[ "$RUNTIME_PROFILE" == gui-initram ]]; then
+  cat > "$WORK/atoms.txt" <<'EOF'
+app-admin/sudo
+app-shells/bash
+net-misc/dhcpcd
+sys-apps/coreutils
+sys-apps/kmod
+sys-apps/openrc
+sys-apps/portage
+sys-apps/shadow
+sys-apps/util-linux
+EOF
+  cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
+else
+  cat > "$WORK/atoms.txt" <<'EOF'
+app-admin/sudo
+app-shells/bash
+sys-apps/openrc
+sys-apps/portage
+sys-apps/coreutils
+sys-apps/util-linux
+sys-apps/shadow
+sys-apps/kmod
+sys-apps/pciutils
+sys-apps/usbutils
+sys-apps/dbus
+sys-apps/man-db
+sys-auth/pambase
+sys-fs/e2fsprogs
+sys-fs/dosfstools
+sys-fs/ntfs3g
+sys-fs/btrfs-progs
+sys-block/parted
+net-misc/dhcpcd
+net-misc/networkmanager
+net-wireless/iw
+net-wireless/wpa_supplicant
+net-wireless/wireless-regdb
+EOF
+  case "$RUNTIME_PROFILE" in
+    console) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt" ;;
+    openbox)
+      cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/gui-initram.list" >> "$WORK/atoms.txt"
+      grep -vx 'sys-apps/man-db' "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" >> "$WORK/atoms.txt"
+      cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/multimedia.list" >> "$WORK/atoms.txt"
+      ;;
+    desktop) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/cli.list" "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/desktop.list" >> "$WORK/atoms.txt" ;;
+    daily-driver) cat "$GITHUB_WORKSPACE/d630-gentoo/config/package-sets/daily-driver.list" >> "$WORK/atoms.txt" ;;
+  esac
+fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  sed -i '/^sys-apps\/man-db$/d' "$WORK/atoms.txt"
+fi
+sed -i 's/#.*$//; /^[[:space:]]*$/d' "$WORK/atoms.txt"
+sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
+if grep -Evq '^(=|>=|<=|>|<|~)?[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(-[0-9][A-Za-z0-9+_.-]*)?(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
+
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  # Mandatory desktop and device services must resolve from imported Core 2 binpkgs.
+  # Every other tool is included only if its complete dependency closure is available.
+  cat > "$WORK/required-atoms.txt" <<'EOF'
+app-admin/sudo
+app-shells/bash
+sys-apps/openrc
+sys-apps/coreutils
+sys-apps/util-linux
+sys-apps/shadow
+sys-apps/kmod
+sys-apps/dbus
+sys-auth/elogind
+sys-auth/pambase
+net-misc/dhcpcd
+dev-lang/python
+media-libs/mesa
+media-libs/alsa-lib
+media-libs/alsa-ucm-conf
+media-video/pipewire
+media-video/wireplumber
+media-sound/alsa-utils
+x11-apps/xinit
+x11-base/xorg-drivers
+x11-base/xorg-server
+x11-terms/xterm
+x11-wm/openbox
+=app-mobilephone/scrcpy-5.0.1
+www-client/links
+
+EOF
+  sed -i '/^[[:space:]]*$/d' "$WORK/required-atoms.txt"
+  sort -u "$WORK/required-atoms.txt" -o "$WORK/required-atoms.txt"
+  while IFS= read -r atom; do
+    [[ -n "$atom" ]] || continue
+    grep -Fqx "$atom" "$WORK/atoms.txt" || die "required Openbox atom is absent from runtime package sets: $atom"
+  done < "$WORK/required-atoms.txt"
+  grep -Fvx -f "$WORK/required-atoms.txt" "$WORK/atoms.txt" > "$WORK/optional-atoms.txt" || true
+
+  log "Preflight mandatory Openbox dependency closure from imported binpkgs"
+  REQUIRED_ATOMS="$(paste -sd ' ' "$WORK/required-atoms.txt")"
+  chroot "$ROOT" /bin/bash -lc \
+    "emerge --ignore-default-opts --ask=n --verbose --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $REQUIRED_ATOMS" \
+    |& tee "$OUT/required-binpkg-plan.log"
+
+  : > "$WORK/selected-optional-atoms.txt"
+  : > "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+  mkdir -p "$WORK/binpkg-probes"
+
+  # NTFS-3G is optional in this runtime. Do not leave it in the final emerge
+  # request when the imported Core 2 PKGDIR has no matching binary package.
+  if ! find "$ROOT/var/cache/binpkgs/sys-fs/ntfs3g" -maxdepth 1 -type f \
+      \( -name 'ntfs3g-*.gpkg.tar' -o -name 'ntfs3g-*.tbz2' \) \
+      -print -quit 2>/dev/null | grep -q .; then
+    sed -i '\|^sys-fs/ntfs3g$|d' "$WORK/optional-atoms.txt"
+    echo 'sys-fs/ntfs3g (no imported binary package)' >> "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+    log "Omitting sys-fs/ntfs3g: no imported binary package"
+  fi
+
+  while IFS= read -r atom; do
+    [[ -n "$atom" ]] || continue
+    probe_name="$(printf '%s' "$atom" | tr '/:' '__')"
+    if chroot "$ROOT" /bin/bash -lc \
+        "emerge --ignore-default-opts --ask=n --quiet --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly '$atom'" \
+        > "$WORK/binpkg-probes/$probe_name.log" 2>&1; then
+      printf '%s\n' "$atom" >> "$WORK/selected-optional-atoms.txt"
+    else
+      printf '%s\n' "$atom" >> "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+    fi
+  done < "$WORK/optional-atoms.txt"
+
+  cat "$WORK/required-atoms.txt" "$WORK/selected-optional-atoms.txt" | sort -u > "$WORK/selected-atoms.txt"
+  mv -f "$WORK/selected-atoms.txt" "$WORK/atoms.txt"
+  if [[ -s "$OUT/BINPKG-OPTIONAL-SKIPPED.txt" ]]; then
+    log "Skipped optional packages without a complete imported binary-package closure"
+    cat "$OUT/BINPKG-OPTIONAL-SKIPPED.txt"
+  fi
+fi
+
+cp "$WORK/atoms.txt" "$OUT/PACKAGES.txt"
+ATOMS="$(paste -sd ' ' "$WORK/atoms.txt")"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  mesa_binpkg="$(find "$ROOT/var/cache/binpkgs/media-libs/mesa" -maxdepth 1 -type f \
+    \( -name 'mesa-*.gpkg.tar' -o -name 'mesa-*.tbz2' \) -print -quit 2>/dev/null || true)"
+  [[ -n "$mesa_binpkg" ]] || die "imported binary packages do not contain Mesa"
+  mesa_filename="$(basename "$mesa_binpkg")"
+  case "$mesa_filename" in
+    *.gpkg.tar) mesa_version="${mesa_filename#mesa-}"; mesa_version="${mesa_version%-[0-9]*.gpkg.tar}"; mesa_version="${mesa_version%.gpkg.tar}" ;;
+    *.tbz2) mesa_version="${mesa_filename#mesa-}"; mesa_version="${mesa_version%.tbz2}" ;;
+  esac
+  [[ -n "$mesa_version" ]] || die "could not determine the Mesa version from $mesa_filename"
+  mesa_atom="=media-libs/mesa-$mesa_version"
+  log "Install Mesa runtime dependencies from binary packages"
+  chroot "$ROOT" /bin/bash -lc \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --onlydeps '$mesa_atom'" \
+    |& tee "$OUT/mesa-binpkg.log"
+  log "Install Mesa from an imported binary package only"
+  chroot "$ROOT" /bin/bash -lc \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly '$mesa_atom'" \
+    |& tee -a "$OUT/mesa-binpkg.log"
+  mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
+  [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Mesa binary package did not install package metadata"
+  if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
+    die "the installed Mesa binpkg has USE=llvm; refusing an LLVM-enabled Mesa runtime"
+  fi
+  find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null | grep -q . ||
+    die "installed Mesa binary package is missing the Crocus driver"
+fi
+
+RUNTIME_ATOMS="$ATOMS"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  RUNTIME_ATOMS="$(awk '$0 != "media-libs/mesa"' "$WORK/atoms.txt" | paste -sd ' ' -)"
+  log "Mesa is already installed from its verified binpkg; installing the remaining runtime atoms"
+fi
+
+# Strict runtime assembly reads only the imported Core 2 PKGDIR. The Gentoo
+# network binhost is disabled so an untracked generic package cannot slip in.
+# Missing binaries fail immediately; source compilation is never permitted.
+
+log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
+if [[ "$SOURCE_FALLBACK" == true ]]; then
+  chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+else
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+fi
+
+# glxgears is optional: use it only when its already-built binary package was
+# imported. Never start a new source build merely to add this diagnostic tool.
+GLXGEARS_STATUS="omitted: no imported x11-apps/mesa-progs binary package"
+MESA_PROGS_BINPKG="$(find "$ROOT/var/cache/binpkgs/x11-apps/mesa-progs" -maxdepth 1 -type f \
+  \( -name 'mesa-progs-*.gpkg.tar' -o -name 'mesa-progs-*.tbz2' \) -print -quit 2>/dev/null || true)"
+if [[ -n "$MESA_PROGS_BINPKG" ]]; then
+  if chroot "$ROOT" /bin/bash -lc \
+      'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly x11-apps/mesa-progs' \
+      |& tee "$OUT/mesa-progs-binpkg.log"; then
+    GLXGEARS_STATUS="installed from existing binary package"
+  else
+    GLXGEARS_STATUS="omitted: imported mesa-progs binary package had unresolved dependencies"
+  fi
+fi
+if [[ -x "$ROOT/usr/bin/glxgears" ]]; then
+  GLXGEARS_STATUS="included: /usr/bin/glxgears"
+else
+  GLXGEARS_STATUS="omitted: glxgears was not successfully installed"
+fi
+printf '%s\n' "$GLXGEARS_STATUS" > "$OUT/GLXGEARS-STATUS.txt"
+
+chroot "$ROOT" /bin/bash -lc 'test -x /sbin/init && command -v useradd && command -v groupadd && command -v usermod && command -v openssl && command -v visudo'
+chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --ask=n --verbose --depclean --with-bdeps=n' |& tee "$OUT/depclean.log"
+if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
+  for atom in llvm-core/llvm llvm-core/clang llvm-runtimes/compiler-rt llvm-runtimes/clang-runtime llvm-runtimes/libclc dev-util/mesa_clc dev-util/spirv-llvm-translator; do
+    category="${atom%%/*}"
+    package="${atom#*/}"
+    if find "$ROOT/var/db/pkg/$category" -mindepth 1 -maxdepth 1 -type d -name "$package-*" -print -quit 2>/dev/null | grep -q .; then
+      die "GUI runtime retained build-only Mesa compiler dependency $atom after depclean"
+    fi
+  done
+fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  bluez_pkg="$(find "$ROOT/var/db/pkg/net-wireless" -mindepth 1 -maxdepth 1 -type d -name 'bluez-*' -print -quit 2>/dev/null || true)"
+  [[ -z "$bluez_pkg" ]] || die "Openbox runtime unexpectedly contains BlueZ: ${bluez_pkg##*/}"
+  pipewire_pkg="$(find "$ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit 2>/dev/null || true)"
+  [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || die "Openbox runtime has no PipeWire package metadata"
+  if grep -qw bluetooth "$pipewire_pkg/USE"; then
+    die "Openbox PipeWire was built with Bluetooth enabled; rebuild the binpkg with USE=-bluetooth"
+  fi
+  xorg_server="$ROOT/usr/bin/Xorg"
+  [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
+  [[ -x "$xorg_server" ]] || die "Openbox runtime has no executable Xorg server"
+  xorg_pkg="$(find "$ROOT/var/db/pkg/x11-base" -mindepth 1 -maxdepth 1 -type d -name 'xorg-server-*' -print -quit)"
+  [[ -n "$xorg_pkg" && -s "$xorg_pkg/USE" ]] || die "Xorg package USE metadata is missing"
+  grep -qw elogind "$xorg_pkg/USE" || die "Xorg lacks elogind VT/session support"
+  if grep -qw suid "$xorg_pkg/USE"; then die "Xorg was built with USE=suid"; fi
+  [[ ! -u "$xorg_server" ]] || die "Xorg unexpectedly has the setuid bit; use the elogind-managed local VT"
+  chroot "$ROOT" chmod 0755 /usr/bin/startx
+  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session \
+    /usr/bin/python3 /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/aplay /usr/bin/arecord \
+    /usr/bin/amixer /usr/bin/alsamixer /usr/bin/speaker-test; do
+    chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "Openbox runtime missing required executable $executable"
+  done
+  : > "$OUT/TOOL-AVAILABILITY.txt"
+  if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
+    scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
+    [[ -n "$scrcpy_pkg" ]] || die "scrcpy 5.0.1 BUILD_ID=2 binary package was not installed"
+    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "installed scrcpy is not the user's d630-local build"; fi
+    grep -qw X "$scrcpy_pkg/USE" || die "scrcpy BUILD_ID=2 package is not X-enabled"
+    if grep -qw wayland "$scrcpy_pkg/USE"; then die "scrcpy BUILD_ID=2 package unexpectedly includes Wayland"; fi
+    [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
+    scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
+    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
+    [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
+    printf 'included: scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+  else
+    die "required scrcpy 5.0.1 binpkg was not installed"
+  fi
+  links_pkg="$(find "$ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit 2>/dev/null)"
+  [[ -n "$links_pkg" && -s "$links_pkg/USE" ]] || die "required Links browser package was not installed"
+  grep -qw X "$links_pkg/USE" || die "Links browser binpkg is not the X-enabled variant"
+  [[ -x "$ROOT/usr/bin/links" ]] || die "Links browser executable is missing"
+  printf 'included: Links browser (X-enabled binpkg)\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+  for executable in /usr/bin/nvim /usr/bin/lf /usr/bin/fd /usr/bin/sd /usr/bin/rdmsr /usr/bin/wrmsr /usr/bin/msr-cpuid \
+    /usr/bin/grep /usr/bin/egrep /usr/bin/tldr /usr/bin/htop /usr/bin/btop /usr/bin/mc /usr/bin/rg /usr/bin/xdotool \
+    /usr/bin/zsh /usr/bin/nano /usr/bin/tmux /usr/bin/sox /usr/bin/lame /usr/bin/ffmpeg /usr/bin/ffprobe \
+    /usr/bin/xclip /usr/bin/xdg-open /usr/bin/xmodmap /usr/bin/xrdb /usr/sbin/iw \
+    /usr/bin/nmcli /usr/bin/nmtui /usr/sbin/wpa_supplicant /usr/bin/scrcpy /usr/bin/links \
+    /usr/bin/ntfs-3g /usr/sbin/mount.ntfs-3g; do
+    if [[ -x "$ROOT$executable" ]]; then
+      printf 'included: %s\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
+    else
+      printf 'omitted: %s (no compatible imported binpkg)\n' "$executable" >> "$OUT/TOOL-AVAILABILITY.txt"
+    fi
+  done
+  mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
+  [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Openbox runtime has no installed Mesa package metadata"
+  if grep -Eq '(^|[[:space:]])llvm([[:space:]]|$)' "$mesa_pkg/USE"; then
+    die "the installed Mesa binpkg has USE=llvm; refusing an LLVM-enabled Mesa runtime"
+  fi
+  find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null | grep -q . ||
+    die "Openbox runtime is missing Mesa's Crocus driver"
+fi
+
+log "Install pinned deb12dots user configuration"
+bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/install-runtime-dotfiles.sh" "$ROOT" "$WORK/dotfiles"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  # The selected optional CLI packages depend on the imported binpkg cache.
+  # Keep Openbox shortcuts only for applications that actually survived selection.
+  python3 - "$ROOT/etc/skel/.config/openbox/rc.xml" "$ROOT" "$OUT/OPENBOX-OPTIONAL-KEYS.txt" <<'PY'
+import os
+import re
+import shlex
+import sys
+import xml.etree.ElementTree as ET
+
+config_path, root, report_path = sys.argv[1:]
+with open(config_path, encoding="utf-8") as stream:
+    source = stream.read()
+
+pattern = re.compile(r"(?m)^[ \t]*<keybind\b.*?</keybind>[ \t]*(?:\r?\n)?", re.S)
+matches = list(pattern.finditer(source))
+report = []
+
+def command_exists(name):
+    if name.startswith("/"):
+        candidates = [os.path.join(root, name.lstrip("/"))]
+    else:
+        candidates = [
+            os.path.join(root, "usr/bin", name),
+            os.path.join(root, "usr/sbin", name),
+            os.path.join(root, "bin", name),
+            os.path.join(root, "sbin", name),
+            os.path.join(root, "usr/local/bin", name),
+        ]
+    return any(os.path.isfile(path) and os.access(path, os.X_OK) for path in candidates)
+
+for match in reversed(matches):
+    block = match.group(0)
+    element = ET.fromstring(block)
+    commands = [
+        (node.text or "").strip()
+        for node in element.iter()
+        if node.tag.rsplit("}", 1)[-1] == "command" and (node.text or "").strip()
+    ]
+    missing = None
+    for command in commands:
+        argv = shlex.split(command)
+        if not argv:
+            continue
+        target = argv[0]
+        if target == "xterm" and "-e" in argv:
+            index = argv.index("-e")
+            if index + 1 < len(argv):
+                target = argv[index + 1]
+        if not command_exists(argv[0]):
+            missing = argv[0]
+            break
+        if target != argv[0] and not command_exists(target):
+            missing = target
+            break
+    if missing:
+        source = source[:match.start()] + source[match.end():]
+        key = element.attrib.get("key", "(unnamed)")
+        report.append(f"omitted: {key} -> {missing} (not present in the selected binpkg set)")
+    elif commands:
+        report.append(f"included: {element.attrib.get('key', '(unnamed)')} -> {'; '.join(commands)}")
+
+with open(config_path, "w", encoding="utf-8") as stream:
+    stream.write(source)
+with open(report_path, "w", encoding="utf-8") as stream:
+    stream.write("\n".join(reversed(report)) + ("\n" if report else ""))
+PY
+fi
+chroot "$ROOT" /bin/bash -lc 'env-update'
+
+log "Configure console login, first-boot account creation, and OpenRC"
+mkdir -p "$ROOT/etc/sudoers.d" "$ROOT/etc/skel" "$ROOT/var/lib/d630"
+chroot "$ROOT" /bin/bash -lc 'getent group wheel >/dev/null 2>&1 || groupadd wheel'
+install -m 0755 "$GITHUB_WORKSPACE/d630-gentoo/config/runtime/d630-firstboot" "$ROOT/etc/init.d/d630-firstboot"
+printf '%s\n' '%wheel ALL=(ALL:ALL) NOPASSWD: ALL' > "$ROOT/etc/sudoers.d/10-d630-wheel"
+chmod 0755 "$ROOT/etc/sudoers.d"
+chmod 0440 "$ROOT/etc/sudoers.d/10-d630-wheel"
+grep -Eq '^[#@]includedir[[:space:]]+/etc/sudoers.d' "$ROOT/etc/sudoers" || echo '#includedir /etc/sudoers.d' >> "$ROOT/etc/sudoers"
+chroot "$ROOT" /bin/bash -lc 'visudo -c'
+chroot "$ROOT" chmod 4755 /usr/bin/sudo
+printf '%s\n' d630-gentoo > "$ROOT/etc/hostname"
+cat > "$ROOT/etc/hosts" <<'EOF'
+127.0.0.1 localhost
+::1 localhost
+127.0.1.1 d630-gentoo.localdomain d630-gentoo
+EOF
+cat > "$ROOT/etc/fstab" <<'EOF'
+# The initramfs mounts the read-only SquashFS and volatile OverlayFS.
+EOF
+if [[ "$RUNTIME_PROFILE" != console ]]; then
+  cat > "$ROOT/etc/skel/.xinitrc" <<'EOF'
+#!/bin/sh
+cd "$HOME" || exit 1
+if command -v xrdb >/dev/null 2>&1 && [ -r "$HOME/.Xresources" ]; then
+  xrdb -merge "$HOME/.Xresources"
+fi
+if command -v xmodmap >/dev/null 2>&1 && [ -r "$HOME/.Xmodmap" ]; then
+  xmodmap "$HOME/.Xmodmap"
+fi
+exec openbox-session
+EOF
+  chmod 0644 "$ROOT/etc/skel/.xinitrc"
+fi
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  # Rootless Xorg must use the VT owned by the current logind login session.
+  # startx can infer it; direct xinit must use the same local VT explicitly.
+  mkdir -p "$ROOT/etc/X11/xinit"
+  cat > "$ROOT/etc/X11/xinit/xserverrc" <<'EOF'
+#!/bin/sh
+set -eu
+current_tty="$(tty 2>/dev/null || true)"
+case "$current_tty" in
+  /dev/tty[0-9]*) vt="${current_tty#/dev/tty}" ;;
+  *) vt="${XDG_VTNR:-}" ;;
+esac
+case "$vt" in
+  ''|*[!0-9]*|0)
+    echo "Xorg requires an active local VT; run startx/xinit from the tty login session." >&2
+    exit 1
+    ;;
+esac
+
+# startx may already pass the active vtN; direct xinit often does not.
+# Accept a matching argument, reject a conflicting one, and add only if absent.
+has_vt=0
+for argument in "$@"; do
+  case "$argument" in
+    vt[0-9]*)
+      supplied_vt="${argument#vt}"
+      case "$supplied_vt" in
+        ''|*[!0-9]*|0)
+          echo "Invalid Xorg virtual-terminal argument: $argument" >&2
+          exit 1
+          ;;
+      esac
+      if [ "$supplied_vt" != "$vt" ]; then
+        echo "Xorg VT mismatch: login owns tty$vt but caller requested $argument." >&2
+        exit 1
+      fi
+      has_vt=1
+      ;;
+  esac
+done
+if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi
+if [ -x /usr/bin/Xorg ]; then xorg=/usr/bin/Xorg; else xorg=/usr/libexec/Xorg; fi
+exec "$xorg" -nolisten tcp "$@" -keeptty
+EOF
+  chmod 0755 "$ROOT/etc/X11/xinit/xserverrc"
+  sh -n "$ROOT/etc/X11/xinit/xserverrc"
+fi
+# Configure the kernel's built-in ZRAM as 1.5 GiB LZ4 swap.
+cat > "$ROOT/etc/init.d/d630-zram" <<'EOF'
+#!/sbin/openrc-run
+description="D630 LZ4 compressed RAM swap"
+
+depend() {
+  before localmount
+}
+
+start() {
+  ebegin "Activating 1.5 GiB LZ4 ZRAM swap"
+  if [ ! -b /dev/zram0 ] || [ ! -w /sys/block/zram0/disksize ]; then
+    eerror "Built-in zram device is missing; expected CONFIG_ZRAM=y"
+    eend 1
+    return 1
+  fi
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    eend 0
+    return 0
+  fi
+  current_size="$(cat /sys/block/zram0/disksize)" || {
+    eend 1
+    return 1
+  }
+  if [ "$current_size" -eq 0 ]; then
+    echo lz4 > /sys/block/zram0/comp_algorithm || {
+      eend 1
+      return 1
+    }
+    echo 2 > /sys/block/zram0/max_comp_streams 2>/dev/null || true
+    echo 1610612736 > /sys/block/zram0/disksize || {
+      eend 1
+      return 1
+    }
+    mkswap -L d630-zram /dev/zram0 >/dev/null || {
+      eend 1
+      return 1
+    }
+  fi
+  swapon -p 100 /dev/zram0
+  result=$?
+  eend "$result"
+  return "$result"
+}
+
+stop() {
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    swapoff /dev/zram0 || return 1
+  fi
+  echo 1 > /sys/block/zram0/reset
+}
+EOF
+chmod 0755 "$ROOT/etc/init.d/d630-zram"
+chroot "$ROOT" /bin/bash -lc 'rc-update add d630-zram boot'
+
+# Create the live user during sysinit, before init starts the tty1 login.
+chroot "$ROOT" /bin/bash -lc 'rc-update add d630-firstboot sysinit'
+
+# tty1 is the only local login respawn. Do not create a serial getty on ttyS0;
+# Xorg must take the active login VT rather than reserving tty7.
+AGETTY_BIN="$(chroot "$ROOT" /bin/bash -lc 'command -v agetty' | tail -n 1)"
+[[ "$AGETTY_BIN" == /* && -x "$ROOT$AGETTY_BIN" ]] || die "util-linux agetty executable is missing from the runtime root"
+for runlevel_dir in "$ROOT"/etc/runlevels/*; do
+  [[ -d "$runlevel_dir" ]] || continue
+  rm -f "$runlevel_dir"/agetty.tty* "$runlevel_dir"/getty.tty*
+done
+rm -f "$ROOT"/etc/init.d/agetty.tty* "$ROOT"/etc/init.d/getty.tty*
+[[ -f "$ROOT/etc/inittab" ]] || die "Stage 3 has no /etc/inittab; cannot configure tty1 autologin"
+python3 - "$ROOT/etc/inittab" "$AGETTY_BIN" <<'PY'
+import re
+import sys
+
+path, agetty = sys.argv[1:]
+with open(path, encoding="utf-8") as stream:
+    lines = stream.readlines()
+
+kept = []
+for line in lines:
+    if line.lstrip().startswith("#"):
+        kept.append(line)
+        continue
+    fields = line.rstrip("\n").split(":", 3)
+    if len(fields) == 4:
+        ident, _runlevels, action, command = fields
+        is_getty = re.search(r"\b(?:agetty|getty)\b", command)
+        owns_target_vt = re.search(r"\b(?:tty1|tty7|ttyS0)\b", command)
+        if ident in {"c1", "s0"} or (action == "respawn" and is_getty and owns_target_vt):
+            continue
+    kept.append(line)
+
+entry = f"c1:12345:respawn:{agetty} --autologin gentoo --noclear tty1 linux\n"
+with open(path, "w", encoding="utf-8") as stream:
+    stream.writelines(kept)
+    if kept and not kept[-1].endswith("\n"):
+        stream.write("\n")
+    stream.write(entry)
+PY
+[[ "$(grep -Ec '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*tty1([[:space:]]|$)' "$ROOT/etc/inittab")" == 1 ]] ||
+  die "expected exactly one tty1 getty respawn entry"
+! grep -Eq '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*(tty7|ttyS0)([[:space:]]|$)' "$ROOT/etc/inittab" ||
+  die "unexpected tty7 or serial getty respawn entry remains"
+grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$ROOT/etc/inittab" ||
+  die "tty1 autologin entry was not written to /etc/inittab"
+if find "$ROOT/etc/runlevels" -type l \( -name 'agetty.tty*' -o -name 'getty.tty*' \) -print -quit | grep -q .; then
+  die "OpenRC still has a local getty runlevel alias"
+fi
+if [[ -L "$ROOT/etc/runlevels/default/netmount" ]]; then
+  chroot "$ROOT" /bin/bash -lc 'rc-update del netmount default'
+fi
+grep -E '^[^#].*respawn:.*(tty1|tty7|ttyS0)' "$ROOT/etc/inittab" > "$OUT/INITTAB-PROBE.txt"
+if [[ "$RUNTIME_PROFILE" == gui-initram || "$RUNTIME_PROFILE" == openbox ]]; then
+  [[ -x "$ROOT/etc/init.d/elogind" ]] || die "rootless Xorg requires the elogind OpenRC service"
+  chroot "$ROOT" /bin/bash -lc 'rc-update add elogind boot'
+  grep -Rqs 'pam_elogind\.so' "$ROOT/etc/pam.d" || die "PAM login stack has no pam_elogind session hook"
+fi
+for SERVICE in dbus NetworkManager; do
+  [[ -x "$ROOT/etc/init.d/$SERVICE" ]] && chroot "$ROOT" /bin/bash -lc "rc-update add '$SERVICE' default" || true
+done
+if [[ "$RUNTIME_PROFILE" == gui-initram && -x "$ROOT/etc/init.d/dhcpcd" ]]; then
+  chroot "$ROOT" /bin/bash -lc 'rc-update add dhcpcd default'
+fi
+if chroot "$ROOT" /bin/bash -lc 'command -v locale-gen >/dev/null 2>&1'; then
+  chroot "$ROOT" /bin/bash -lc 'locale-gen && env-update' |& tee "$OUT/locale.log" || true
+fi
+
+log "Install matching kernel modules and preserve the recovered boot files"
+if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
+  [[ -s "$LOCAL_RELEASE_ASSETS_DIR/kernel" && -s "$LOCAL_RELEASE_ASSETS_DIR/initramfs" ]] ||
+    die "prepared assets do not contain both kernel and initramfs"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/kernel" "$OUT/kernel"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/initramfs" "$OUT/initramfs"
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/KERNELRELEASE.txt" "$OUT/KERNELRELEASE.txt" 2>/dev/null || true
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/KERNEL-BUILD-MANIFEST.txt" "$OUT/KERNEL-BUILD-MANIFEST.txt" 2>/dev/null || true
+  cp -p "$LOCAL_RELEASE_ASSETS_DIR/BUILD-MANIFEST.txt" "$OUT/SOURCE-BUILD-MANIFEST.txt" 2>/dev/null || true
+  MOD_ARCHIVE="$(find "$LOCAL_RELEASE_ASSETS_DIR" -maxdepth 1 -name 'modules-*.tar.zst' -print -quit)"
+  [[ -n "$MOD_ARCHIVE" ]] || die "prepared assets do not contain a matching modules-*.tar.zst archive"
+  MOD_DIR="$(tar --use-compress-program=unzstd -tf "$MOD_ARCHIVE" | awk '/^(\.\/)?lib\/modules\/[^/]+\/$/ && !found { print; found = 1 }')"
+  [[ -n "$MOD_DIR" ]] || die "module archive has no /lib/modules tree"
+  MOD_REL="$(printf '%s\n' "$MOD_DIR" | sed -E 's#^(\./)?lib/modules/([^/]+)/$#\2#')"
+  REL_FILE="$LOCAL_RELEASE_ASSETS_DIR/KERNELRELEASE.txt"
+  [[ -s "$REL_FILE" ]] || REL_FILE="$LOCAL_RELEASE_ASSETS_DIR/kernel-release.txt"
+  if [[ -s "$REL_FILE" ]]; then
+    [[ "$(tr -d '\r\n' < "$REL_FILE")" == "$MOD_REL" ]] || die "module release mismatch"
+  fi
+  tar --use-compress-program=unzstd -xf "$MOD_ARCHIVE" -C "$ROOT"
+  [[ ! -f "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" ]] ||
+    tar --use-compress-program=unzstd -xf "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" -C "$ROOT"
+  printf 'Source: recovered Actions artifact\nKernel release: %s\nModules: %s\n' "$MOD_REL" "$(basename "$MOD_ARCHIVE")" > "$OUT/KERNEL-MODULES.txt"
+elif [[ -n "$KERNEL_BUNDLE_TAG" ]]; then
+  mkdir -p "$WORK/kernel"
+  curl -fsSL --retry 3 "${GH_API_AUTH_ARGS[@]}" -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$KERNEL_BUNDLE_TAG" -o "$WORK/kernel/release.json"
+  python3 - "$WORK/kernel/release.json" "$WORK/kernel/assets.tsv" <<'PY'
+import json,re,sys
+with open(sys.argv[1],encoding="utf-8") as f:r=json.load(f)
+assets=r.get("assets",[])
+sums=[a for a in assets if a.get("name")=="SHA256SUMS"]
+mods=[a for a in assets if re.fullmatch(r"modules-[A-Za-z0-9._+-]+\.tar\.zst",a.get("name",""))]
+extra=[a for a in assets if a.get("name") in ("d630-firmware.tar.zst","KERNELRELEASE.txt","kernel-release.txt","kernel","initramfs","BUILD-MANIFEST.txt","d630-6.18.56.config")]
+if not sums or len(mods)!=1: raise SystemExit("Kernel release must contain SHA256SUMS and exactly one modules-*.tar.zst")
+with open(sys.argv[2],"w",encoding="utf-8") as f:
+ f.write("SHA256SUMS\t"+sums[0]["browser_download_url"]+"\n")
+ for a in mods+extra:f.write(a["name"]+"\t"+a["browser_download_url"]+"\n")
+PY
+  SUMS_URL="$(awk -F '\t' '$1=="SHA256SUMS"{print $2;exit}' "$WORK/kernel/assets.tsv")"
+  curl -fsSL --retry 3 "$SUMS_URL" -o "$WORK/kernel/SHA256SUMS"
+  while IFS=$'\t' read -r NAME URL; do
+    [[ "$NAME" == SHA256SUMS ]] && continue
+    curl -fL --retry 3 "$URL" -o "$WORK/kernel/$NAME"
+    (cd "$WORK/kernel" && grep -F "  $NAME" SHA256SUMS | sha256sum --check)
+  done < "$WORK/kernel/assets.tsv"
+  MOD_ARCHIVE="$(find "$WORK/kernel" -maxdepth 1 -name 'modules-*.tar.zst' -print -quit)"
+  MOD_DIR="$(tar --use-compress-program=unzstd -tf "$MOD_ARCHIVE" | awk '/^(\.\/)?lib\/modules\/[^/]+\/$/ && !found { print; found = 1 }')"
+  [[ -n "$MOD_DIR" ]] || die "module archive has no /lib/modules tree"
+  MOD_REL="$(printf '%s\n' "$MOD_DIR" | sed -E 's#^(\./)?lib/modules/([^/]+)/$#\2#')"
+  REL_FILE="$WORK/kernel/KERNELRELEASE.txt"
+  [[ -s "$REL_FILE" ]] || REL_FILE="$WORK/kernel/kernel-release.txt"
+  if [[ -s "$REL_FILE" ]]; then [[ "$(tr -d '\r\n' < "$REL_FILE")" == "$MOD_REL" ]] || die "module release mismatch"; fi
+  tar --use-compress-program=unzstd -xf "$MOD_ARCHIVE" -C "$ROOT"
+  [[ ! -f "$WORK/kernel/d630-firmware.tar.zst" ]] || tar --use-compress-program=unzstd -xf "$WORK/kernel/d630-firmware.tar.zst" -C "$ROOT"
+  for BOOT_FILE in kernel initramfs; do
+    [[ -s "$WORK/kernel/$BOOT_FILE" ]] || die "kernel release is missing required boot asset: $BOOT_FILE"
+    cp -p "$WORK/kernel/$BOOT_FILE" "$OUT/$BOOT_FILE"
+  done
+  printf '%s\n' "$MOD_REL" > "$OUT/KERNELRELEASE.txt"
+  [[ ! -s "$WORK/kernel/BUILD-MANIFEST.txt" ]] || cp -p "$WORK/kernel/BUILD-MANIFEST.txt" "$OUT/KERNEL-BUILD-MANIFEST.txt"
+  [[ ! -s "$WORK/kernel/d630-6.18.56.config" ]] || cp -p "$WORK/kernel/d630-6.18.56.config" "$OUT/KERNEL-CONFIG.txt"
+  printf 'Release: %s\nKernel release: %s\nBoot files: kernel, initramfs\n' "$KERNEL_BUNDLE_TAG" "$MOD_REL" > "$OUT/KERNEL-MODULES.txt"
+else
+  echo "No kernel bundle supplied; optional modules are not bundled." > "$OUT/KERNEL-MODULES.txt"
+fi
+
+log "Validate runtime root and build SquashFS"
+[[ -x "$ROOT/sbin/init" ]] || die "runtime root has no executable /sbin/init"
+if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then
+  chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/Xorg || test -x /usr/libexec/Xorg' || die "graphical profile missing Xorg"
+  chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/openbox-session' || die "graphical profile missing openbox-session"
+fi
+if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
+  for executable in /usr/bin/startx /usr/bin/xterm /usr/bin/openbox-session; do
+    chroot "$ROOT" /bin/bash -lc "test -x '$executable'" || die "GUI runtime missing required executable $executable"
+  done
+  xorg_server="$ROOT/usr/bin/Xorg"
+  [[ -x "$xorg_server" ]] || xorg_server="$ROOT/usr/libexec/Xorg"
+  [[ -x "$xorg_server" ]] || die "GUI runtime has no executable Xorg server"
+  xorg_pkg="$(find "$ROOT/var/db/pkg/x11-base" -mindepth 1 -maxdepth 1 -type d -name 'xorg-server-*' -print -quit)"
+  [[ -n "$xorg_pkg" && -s "$xorg_pkg/USE" ]] || die "Xorg package USE metadata is missing"
+  grep -qw elogind "$xorg_pkg/USE" || die "Xorg was not built with elogind support"
+  if grep -qw suid "$xorg_pkg/USE"; then die "Xorg was built with USE=suid"; fi
+  [[ ! -u "$xorg_server" ]] || die "Xorg executable unexpectedly has the setuid bit"
+  [[ -s "$ROOT/etc/X11/xinit/xserverrc" ]] || die "rootless Xorg is missing the active-VT xserverrc"
+  crocus_driver="$(find "$ROOT/usr/lib" "$ROOT/usr/lib64" -path '*/dri/crocus_dri.so' -print -quit 2>/dev/null || true)"
+  [[ -n "$crocus_driver" ]] || die "Mesa Crocus driver is missing from the GUI runtime"
+fi
+chroot "$ROOT" /bin/bash -lc 'emerge --ignore-default-opts --info' > "$OUT/EMERGE-INFO.txt"
+find "$ROOT/var/db/pkg" -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort > "$OUT/INSTALLED-PACKAGES.txt"
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  filtered_packages="$OUT/INSTALLED-PACKAGES.txt.tmp"
+  grep -Ev '^(app-admin/(eselect|perl-cleaner)-|app-eselect/|app-portage/|dev-build/|dev-lang/perl-|dev-perl/|dev-util/|perl-core/|dev-libs/gobject-introspection-common-|sys-apps/(locale-gen|portage)-|sys-devel/(binutils|binutils-config|gcc|gcc-config|gettext|gnuconfig|patch)-)' \
+    "$OUT/INSTALLED-PACKAGES.txt" > "$filtered_packages"
+  mv -f "$filtered_packages" "$OUT/INSTALLED-PACKAGES.txt"
+fi
+rm -rf "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/cache/edb/dep" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos/gentoo" "$ROOT/var/db/repos/guru"
+mkdir -p "$ROOT/var/cache/binpkgs" "$ROOT/var/cache/distfiles" "$ROOT/var/tmp/portage" "$ROOT/var/db/repos"
+chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"
+chmod 2775 "$ROOT/var/tmp/portage"
+
+cat > "$OUT/RUNTIME-MANIFEST.txt" <<EOF
+Project: AmrUser-48/d630-gentoo
+Profile: $RUNTIME_PROFILE
+Base: Gentoo amd64 glibc/OpenRC Stage 3
+Flags: -O2 -march=core2 -mtune=core2
+Source fallback: $SOURCE_FALLBACK
+$(if [[ -x "$ROOT/etc/init.d/NetworkManager" && -x "$ROOT/usr/sbin/wpa_supplicant" ]]; then echo "Wi-Fi: NetworkManager and wpa_supplicant are installed; external connection profile can be imported."; else echo "Wi-Fi: not included; no complete NetworkManager/wpa_supplicant binpkg closure is available."; fi)
+$(if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then echo "scrcpy: pinned D630 SDL3 5.0.1 (-j) binpkg included."; else echo "scrcpy: omitted; pinned D630 SDL3 5.0.1 (-j) binpkg unavailable."; fi)
+Root file: $(if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then echo "gui-initram (complete Gentoo runtime root)"; else echo "/d630-gentoo/squashfs (no extension)"; fi)
+Writable storage: RAM-only; changes are lost on reboot.
+Live login: gentoo / gentoo; account and all-group membership are initialized at every boot.
+TTY: one tty1 autologin respawn; no tty7 or serial getty.
+Xorg: rootless elogind session uses the active login VT.
+$(if [[ "$RUNTIME_PROFILE" == openbox ]]; then echo "Minimal runtime: Python 3 and its installed runtime modules retained; no Portage, package database, Perl, development tools, or compiler binaries. Only libgcc_s/libstdc++/libatomic GCC runtime libraries retained."; fi)
+$(cat "$OUT/KERNEL-MODULES.txt")
+EOF
+cat > "$OUT/RELEASE-NOTES.md" <<EOF
+D630 Gentoo runtime SquashFS — profile $RUNTIME_PROFILE
+
+Place the release assets **squashfs**, **kernel**, and **initramfs** at **/d630-gentoo/{squashfs,kernel,initramfs}**. These three boot files are built and verified together.
+
+This live image uses a volatile RAM OverlayFS. Changes are lost on reboot. Every boot creates or refreshes the local **gentoo** account, assigns it to all system groups, and resets its password to **gentoo**. The account can use `sudo`; log in as `gentoo` with password `gentoo`. This fixed test password is intended for local live-media testing, not network-exposed use.
+
+The selected kernel release supplies its verified kernel, initramfs, modules, and D630 firmware as one matched bundle.
+EOF
+if [[ "$BUILD_GUI_INITRAMFS" == true ]]; then
+  log "Create complete Gentoo desktop initramfs"
+  cat > "$ROOT/init" <<'INIT'
+#!/bin/sh
+set -eu
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+mkdir -p /dev /dev/pts /dev/shm /proc /sys /run /run/lock /tmp
+mount -t proc proc /proc 2>/dev/null || grep -q ' /proc proc ' /proc/mounts
+mount -t sysfs sysfs /sys 2>/dev/null || grep -q ' /sys sysfs ' /proc/mounts
+grep -q ' /dev devtmpfs ' /proc/mounts ||
+  mount -t devtmpfs -o mode=0755 devtmpfs /dev
+mount -t devpts devpts /dev/pts 2>/dev/null || grep -q ' /dev/pts devpts ' /proc/mounts
+mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run
+mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
+hostname d630-gui 2>/dev/null || :
+exec /sbin/init
+INIT
+  chmod 0755 "$ROOT/init"
+  root_cpio="$WORK/gui-rootfs.cpio"
+  root_zstd="$WORK/gui-rootfs.cpio.zst"
+  if ! (
+    cd "$ROOT"
+    find . -xdev -print0 | LC_ALL=C sort -z | cpio --null --create --format=newc --owner=0:0
+  ) > "$root_cpio"; then
+    die "could not create the GUI root CPIO archive"
+  fi
+  zstd -q -T0 -3 -f "$root_cpio" -o "$root_zstd"
+  zstd -q -t "$root_zstd"
+  cat "$EARLY_MICROCODE_CPIO" "$root_zstd" > "$OUT/gui-initram"
+  [[ -s "$OUT/gui-initram" ]] || die "GUI initramfs output is empty"
+  zstd -q -dc "$root_zstd" | cpio -it > "$OUT/GUI-INITRAMFS-FILES.txt" 2>"$OUT/gui-cpio-list.log" ||
+    die "could not list the generated GUI CPIO archive"
+  for path in ./init ./sbin/init ./usr/bin/openbox-session ./usr/bin/startx ./usr/bin/xterm; do
+    grep -Fxq "$path" "$OUT/GUI-INITRAMFS-FILES.txt" || die "GUI archive is missing $path"
+  done
+  file "$OUT/gui-initram" > "$OUT/GUI-INITRAMFS-INFO.txt"
+  du -h "$OUT/gui-initram" | tee -a "$GITHUB_STEP_SUMMARY"
+  {
+    echo "GUI initramfs: Gentoo OpenRC runtime root with Xorg, Crocus Mesa, xinit, xterm, and Openbox"
+    echo "Package source: pinned Core 2 binpkg release; source builds disabled"
+    echo "Target: Intel Core 2 Duo / Dell Latitude D630"
+    echo "Early microcode: original CPIO prepended unchanged"
+    echo "Changes: RAM-only; save them by rebuilding the initramfs to persistent storage"
+    echo "X startup: log in on tty1 and run startx; /etc/skel/.xinitrc starts Openbox"
+    echo
+    cat "$OUT/GUI-INITRAMFS-INFO.txt"
+  } > "$OUT/GUI-INITRAMFS-MANIFEST.txt"
+  sum_files=(gui-initram RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt GUI-INITRAMFS-MANIFEST.txt)
+else
+  log "Build Zstandard SquashFS from runtime-only root"
+  if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+    MINIMAL_RUNTIME=true bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  else
+    bash "$GITHUB_WORKSPACE/d630-gentoo/scripts/build-squashfs.sh" "$ROOT" "$OUT/squashfs"
+  fi
+  unsquashfs -s "$OUT/squashfs" | tee "$OUT/SQUASHFS-INFO.txt"
+  unsquashfs -cat "$OUT/squashfs" etc/inittab > "$OUT/INITTAB-PROBE.txt" || die "final SquashFS has no readable /etc/inittab"
+  grep -Fq "c1:12345:respawn:$AGETTY_BIN --autologin gentoo --noclear tty1 linux" "$OUT/INITTAB-PROBE.txt" || die "final SquashFS lost the tty1 autologin respawn entry"
+  [[ "$(grep -Ec '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*tty1([[:space:]]|$)' "$OUT/INITTAB-PROBE.txt")" == 1 ]] || die "final SquashFS has duplicate or missing tty1 getty respawns"
+  ! grep -Eq '^[^#][^:]*:[^:]*:respawn:.*(agetty|getty).*(tty7|ttyS0)([[:space:]]|$)' "$OUT/INITTAB-PROBE.txt" || die "final SquashFS unexpectedly has tty7 or serial getty respawn"
+  if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+    unsquashfs -cat "$OUT/squashfs" etc/X11/xinit/xserverrc > "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS has no rootless-Xorg xserverrc"
+    grep -Fq 'if [ "$has_vt" -eq 0 ]; then set -- "$@" "vt$vt"; fi' "$OUT/XSERVERRC-PROBE.txt" || die "final SquashFS xserverrc does not supply the active VT when needed"
+  fi
+  if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/share/scrcpy/scrcpy-server' || die "final SquashFS scrcpy 5.0.1 package is missing its matching server"
+    unsquashfs -ll "$OUT/squashfs" | grep -Fq 'usr/bin/links' || die "final SquashFS is missing the Links browser"
+  fi
+  unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
+  [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
+  (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
+  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+  if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log)
+  fi
+fi
+for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
+  [[ ! -f "$OUT/$optional" ]] || sum_files+=("$optional")
+done
+(cd "$OUT" && sha256sum "${sum_files[@]}" > SHA256SUMS)
+[[ ! -s "$OUT/squashfs" ]] || du -h "$OUT/squashfs" | tee -a "$GITHUB_STEP_SUMMARY"
+cat "$OUT/SHA256SUMS" | tee -a "$GITHUB_STEP_SUMMARY"
+[[ ! -s "$OUT/SQUASHFS-SHA256.txt" ]] || cat "$OUT/SQUASHFS-SHA256.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+log "Runtime image completed"
+\\t' read -r NAME SHA URL; do
+    [[ "$NAME" == dbus-1.16.2-1.gpkg.tar && "$SHA" =~ ^[[:xdigit:]]{64}$ ]] || die "invalid supplemental binpkg manifest"
+    curl -fL --retry 3 "$URL" -o "$WORK/supplemental/$NAME"
+    printf '%s  %s\\n' "$SHA" "$WORK/supplemental/$NAME" | sha256sum --check -
+    mkdir -p "$ROOT/var/cache/binpkgs/sys-apps/dbus"
+    install -m 0644 "$WORK/supplemental/$NAME" "$ROOT/var/cache/binpkgs/sys-apps/dbus/$NAME"
+  done < "$WORK/supplemental/assets.tsv"
+  [[ -s "$ROOT/var/cache/binpkgs/sys-apps/dbus/dbus-1.16.2-1.gpkg.tar" ]] || die "D-Bus supplemental binpkg import failed"
+  printf 'Supplemental release: v0.2.0\\nSupplemental package: sys-apps/dbus-1.16.2-1\\n' >> "$OUT/BUILD-INPUTS.txt"
+fi
+
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
