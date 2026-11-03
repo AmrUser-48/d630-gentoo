@@ -36,7 +36,7 @@ Do not add a section just to preserve this list. Omit inapplicable sections inst
 Run `python3 scripts/validate-readmes.py` from the repository root. The validator discovers tracked `README.md` files and checks:
 
 - exactly one H1 document title;
-- duplicate headings at the same level and empty sections;
+- duplicate H2 sections and empty sections;
 - balanced fenced code blocks;
 - order of canonical sections when those headings are used;
 - existence of relative/local Markdown link targets.
