@@ -233,24 +233,6 @@ jobs:
           sudo install -m 0644 config/portage/env/custom-opt.conf \
             "$GENTOO_ROOT/etc/portage/env/custom-opt.conf"
 
-          # Register the pinned SDL2-only scrcpy 3.3.4 fork as a local ebuild.
-          local_repo="$GENTOO_ROOT/var/db/repos/d630-local"
-          sudo install -d -m 0755 "$local_repo/metadata" "$local_repo/app-mobilephone/scrcpy"
-          sudo tee "$local_repo/metadata/layout.conf" >/dev/null <<'EOF'
-          repo-name = d630-local
-          masters = gentoo
-          thin-manifests = true
-          EOF
-          sudo tee "$GENTOO_ROOT/etc/portage/repos.conf/d630-local.conf" >/dev/null <<'EOF'
-          [d630-local]
-          location = /var/db/repos/d630-local
-          priority = 1000
-          auto-sync = no
-          EOF
-          sudo install -m 0644 \
-            config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild \
-            "$local_repo/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild"
-
           # Recreate writable temporary paths omitted from the saved state archive.
           sudo install -d -m 1777 "$GENTOO_ROOT/tmp" "$GENTOO_ROOT/var/tmp"
           sudo install -d -m 0755 \
@@ -276,14 +258,14 @@ jobs:
           }
           trap cleanup_chroot_mounts EXIT
 
-          sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
-            'export TMPDIR=/tmp FEATURES="-sandbox -userpriv"; ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild manifest'
-
           # All missing runtime atoms are compiled here into reusable binpkgs.
           # Dependencies may reuse existing Core 2 binpkgs; the remote generic binhost
           # is disabled. The later SFS job uses --usepkgonly and never compiles.
-          build_atoms='media-libs/libsdl2 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-fs/ntfs3g sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xdg-utils x11-misc/xclip sys-apps/file sys-apps/less app-misc/mc sys-apps/ripgrep media-video/pipewire x11-base/xorg-server =app-mobilephone/scrcpy-3.3.4::d630-local'
-          reinstall_atoms="${build_atoms% =app-mobilephone/scrcpy-3.3.4::d630-local} app-mobilephone/scrcpy"
+          # The previous cache already contains scrcpy 5.0.1 (-j), SDL3 and all
+          # three Links builds. Refresh only the missing desktop/runtime package
+          # set; do not rebuild optional xdg-utils or Midnight Commander here.
+          build_atoms='sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xclip sys-apps/file sys-apps/less sys-apps/ripgrep media-video/pipewire x11-base/xorg-server'
+          reinstall_atoms="$build_atoms"
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
             "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$reinstall_atoms' --oneshot $build_atoms"
 
@@ -335,13 +317,23 @@ jobs:
             exit 1
           }
 
-          scrcpy_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-3.3.4*' -print -quit)"
+          scrcpy_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit)"
           [[ -n "$scrcpy_pkg" && -s "$scrcpy_pkg/USE" ]] || {
-            echo "Pinned SDL2 scrcpy 3.3.4 binpkg was not built." >&2
+            echo "The existing scrcpy 5.0.1 package is missing from the restored Gentoo root." >&2
             exit 1
           }
-          echo "Verified Core 2 binpkgs: PipeWire (-bluetooth), rootless Xorg (elogind), NetworkManager (Wi-Fi/WEXT/tools), and SDL2 scrcpy 3.3.4."
-          echo "Additional runtime gaps were built into the same PKGDIR as binary packages."
+          sudo chroot "$GENTOO_ROOT" /usr/bin/scrcpy --help 2>&1 |
+            grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || {
+              echo "The restored scrcpy 5.0.1 binary does not expose keyboard-gamepad -j." >&2
+              exit 1
+            }
+          links_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/www-client" -mindepth 1 -maxdepth 1 -type d -name 'links-*' -print -quit)"
+          [[ -n "$links_pkg" && -s "$links_pkg/USE" ]] && grep -qw X "$links_pkg/USE" || {
+            echo "The restored Gentoo root has no X-enabled Links package variant." >&2
+            exit 1
+          }
+          echo "Verified Core 2 runtime inputs: scrcpy 5.0.1 (-j), Links (USE=X), PipeWire (-bluetooth), rootless Xorg (elogind), and NetworkManager (Wi-Fi/WEXT/tools)."
+          echo "Additional missing D630 runtime dependencies were built into the same PKGDIR as binary packages."
 
       - name: Package current PKGDIR and publish the updated binpkg release
         id: publish
