@@ -198,6 +198,22 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-ap
   install -m 0644 "$WORK/supplemental/dbus-1.16.2-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-apps/dbus/dbus-1.16.2-1.gpkg.tar"
 fi
 
+if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-auth/elogind" -maxdepth 1 -type f -name 'elogind-*.gpkg.tar' -print -quit 2>/dev/null | grep -q .; then
+  log "Supplement Elogind binary package from release v0.2.0"
+  mkdir -p "$WORK/supplemental" "$ROOT/var/cache/binpkgs/sys-auth/elogind"
+  curl -fL --retry 3 "https://github.com/AmrUser-48/d630-gentoo/releases/download/v0.2.0/elogind-255.24-1.gpkg.tar" -o "$WORK/supplemental/elogind-255.24-1.gpkg.tar"
+  printf '%s  %s\n' '1ef56b9bb397fc80114f8c958330fe51e9f98d658122c0b62aaaa189d61e54e1' "$WORK/supplemental/elogind-255.24-1.gpkg.tar" | sha256sum --check -
+  install -m 0644 "$WORK/supplemental/elogind-255.24-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-auth/elogind/elogind-255.24-1.gpkg.tar"
+fi
+
+if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/dev-libs/libusb" -maxdepth 1 -type f -name 'libusb-*.gpkg.tar' -print -quit 2>/dev/null | grep -q .; then
+  log "Supplement libusb binary package from release v0.2.0"
+  mkdir -p "$WORK/supplemental" "$ROOT/var/cache/binpkgs/dev-libs/libusb"
+  curl -fL --retry 3 "https://github.com/AmrUser-48/d630-gentoo/releases/download/v0.2.0/libusb-1.0.29-1.gpkg.tar" -o "$WORK/supplemental/libusb-1.0.29-1.gpkg.tar"
+  printf '%s  %s\n' '674a09af41edc3c55dbaa283245aa94c04aafb4545989af6b8e79b0be1dafa44' "$WORK/supplemental/libusb-1.0.29-1.gpkg.tar" | sha256sum --check -
+  install -m 0644 "$WORK/supplemental/libusb-1.0.29-1.gpkg.tar" "$ROOT/var/cache/binpkgs/dev-libs/libusb/libusb-1.0.29-1.gpkg.tar"
+fi
+
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   log "Install verified Core 2 scrcpy 5.0.1 keyboard-gamepad release bundle"
   SCRCPY_RELEASE_TAG="v5.0.1-debian12-core2-keyboard-gamepad"
