@@ -326,11 +326,14 @@ sort -u "$WORK/atoms.txt" -o "$WORK/atoms.txt"
 if grep -Evq '^(=|>=|<=|>|<|~)?[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+(-[0-9][A-Za-z0-9+_.-]*)?(:[A-Za-z0-9+_.-]+)?$' "$WORK/atoms.txt"; then die "invalid package atom in selected set"; fi
 
 if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-  log "Install missing GLib from signed official Gentoo x86-64 binhost (binary-only)"
+  log "Install missing GLib and GObject Introspection from signed official Gentoo x86-64 binhost (binary-only)"
   chroot "$ROOT" /bin/bash -lc \
     'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot dev-libs/glib:2' \
     |& tee "$OUT/official-binpkg-glib.log"
-  printf 'Supplemental signed binhost package: dev-libs/glib:2\nBinhost: https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/\nSource fallback: disabled\n' \
+  chroot "$ROOT" /bin/bash -lc \
+    'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot ">=dev-libs/gobject-introspection-1.83.2:0/0="' \
+    |& tee "$OUT/official-binpkg-gobject-introspection.log"
+  printf 'Supplemental signed binhost packages: dev-libs/glib:2; >=dev-libs/gobject-introspection-1.83.2:0/0=\nBinhost: https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/\nSource fallback: disabled\n' \
     >> "$OUT/BUILD-INPUTS.txt"
 fi
 
@@ -1030,7 +1033,7 @@ else
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
   sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt SCRCPY-BUNDLE-SHA256.txt scrcpy-ldd.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
-    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log official-binpkg-glib.log)
+    sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log official-binpkg-glib.log official-binpkg-gobject-introspection.log)
   fi
 fi
 for optional in kernel initramfs KERNELRELEASE.txt KERNEL-BUILD-MANIFEST.txt SOURCE-BUILD-MANIFEST.txt LOCAL-BINPKG-IMPORT.txt PREPARED-ASSET-CHECK.log; do
