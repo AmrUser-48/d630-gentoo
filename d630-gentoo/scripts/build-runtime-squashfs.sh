@@ -379,7 +379,7 @@ EOF
 
     cat "$PIPEWIRE_PLAN_LOG"
     MISSING_ATOM="$(sed -nE \
-      -e 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\\1/p' \
+      -e 's/^emerge: there are no binary packages to satisfy "([^"]+)".*/\1/p' \
       -e 's/^!!! All ebuilds that could satisfy "([^"]+)" have been masked\\./\1/p' \
       "$PIPEWIRE_PLAN_LOG" | head -n 1)"
     [[ -n "$MISSING_ATOM" ]] || die "PipeWire USE-matched binpkg preflight failed without a resolvable missing atom; see pipewire-binpkg-plan.log"
