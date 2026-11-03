@@ -110,7 +110,7 @@ grep -Fq 'rm -rf "$OUT"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'libusb-1.0.29-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'FALLBACK_LOG="$OUT/official-binpkg-fallback.log"' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq -- '--getbinpkgonly --oneshot $QUOTED_MISSING_ATOM' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--getbinpkgonly --oneshot --binpkg-respect-use=y $QUOTED_MISSING_ATOM' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'official-binpkg-fallback.log' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -c 'emerge .*--binpkg-respect-use=y' d630-gentoo/scripts/build-runtime-squashfs.sh | grep -Fxq '7'
