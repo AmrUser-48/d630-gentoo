@@ -370,7 +370,7 @@ EOF
   PREFLIGHT_OK=false
   for ((attempt = 1; attempt <= 20; attempt += 1)); do
     if chroot "$ROOT" /bin/bash -lc \
-        "emerge --ignore-default-opts --ask=n --verbose --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $REQUIRED_ATOMS" \
+        "emerge --ignore-default-opts --ask=n --verbose --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --binpkg-respect-use=y $REQUIRED_ATOMS" \
         > "$OUT/required-binpkg-plan.log" 2>&1; then
       cat "$OUT/required-binpkg-plan.log"
       PREFLIGHT_OK=true
@@ -385,7 +385,7 @@ EOF
     printf 'Attempt %s: fetch %s from signed official Gentoo x86-64 binhost\n' "$attempt" "$MISSING_ATOM" | tee -a "$FALLBACK_LOG"
     printf -v QUOTED_MISSING_ATOM '%q' "$MISSING_ATOM"
     chroot "$ROOT" /bin/bash -lc \
-      "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot $QUOTED_MISSING_ATOM" \
+      "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkgonly --oneshot --binpkg-respect-use=y $QUOTED_MISSING_ATOM" \
       |& tee -a "$FALLBACK_LOG"
   done
   [[ "$PREFLIGHT_OK" == true ]] || die "mandatory Openbox binary closure did not resolve after 20 signed-binhost supplements"
@@ -412,7 +412,7 @@ EOF
     [[ -n "$atom" ]] || continue
     probe_name="$(printf '%s' "$atom" | tr '/:' '__')"
     if chroot "$ROOT" /bin/bash -lc \
-        "emerge --ignore-default-opts --ask=n --quiet --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly '$atom'" \
+        "emerge --ignore-default-opts --ask=n --quiet --pretend --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --binpkg-respect-use=y '$atom'" \
         > "$WORK/binpkg-probes/$probe_name.log" 2>&1; then
       printf '%s\n' "$atom" >> "$WORK/selected-optional-atoms.txt"
     else
@@ -443,11 +443,11 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   mesa_atom="=media-libs/mesa-$mesa_version"
   log "Install Mesa runtime dependencies from binary packages"
   chroot "$ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --onlydeps '$mesa_atom'" \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --onlydeps --binpkg-respect-use=y '$mesa_atom'" \
     |& tee "$OUT/mesa-binpkg.log"
   log "Install Mesa from an imported binary package only"
   chroot "$ROOT" /bin/bash -lc \
-    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly '$mesa_atom'" \
+    "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --binpkg-respect-use=y '$mesa_atom'" \
     |& tee -a "$OUT/mesa-binpkg.log"
   mesa_pkg="$(find "$ROOT/var/db/pkg/media-libs" -mindepth 1 -maxdepth 1 -type d -name 'mesa-*' -print -quit 2>/dev/null)"
   [[ -n "$mesa_pkg" && -s "$mesa_pkg/USE" ]] || die "Mesa binary package did not install package metadata"
@@ -472,7 +472,7 @@ log "Install runtime packages (source fallback: $SOURCE_FALLBACK)"
 if [[ "$SOURCE_FALLBACK" == true ]]; then
   chroot "$ROOT" /bin/bash -lc "umask 0002; export LC_ALL=C; source /etc/portage/make.conf; export FEATURES=\"\${FEATURES} -userpriv\"; emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --usepkg --buildpkg $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 else
-  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
+  chroot "$ROOT" /bin/bash -lc "emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --binpkg-respect-use=y $RUNTIME_ATOMS" |& tee "$OUT/emerge-runtime.log"
 fi
 
 # glxgears is optional: use it only when its already-built binary package was
@@ -482,7 +482,7 @@ MESA_PROGS_BINPKG="$(find "$ROOT/var/cache/binpkgs/x11-apps/mesa-progs" -maxdept
   \( -name 'mesa-progs-*.gpkg.tar' -o -name 'mesa-progs-*.tbz2' \) -print -quit 2>/dev/null || true)"
 if [[ -n "$MESA_PROGS_BINPKG" ]]; then
   if chroot "$ROOT" /bin/bash -lc \
-      'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly x11-apps/mesa-progs' \
+      'emerge --ignore-default-opts --ask=n --verbose --jobs=1 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkgonly --binpkg-respect-use=y x11-apps/mesa-progs' \
       |& tee "$OUT/mesa-progs-binpkg.log"; then
     GLXGEARS_STATUS="installed from existing binary package"
   else
@@ -512,6 +512,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   [[ -z "$bluez_pkg" ]] || die "Openbox runtime unexpectedly contains BlueZ: ${bluez_pkg##*/}"
   pipewire_pkg="$(find "$ROOT/var/db/pkg/media-video" -mindepth 1 -maxdepth 1 -type d -name 'pipewire-*' -print -quit 2>/dev/null || true)"
   [[ -n "$pipewire_pkg" && -s "$pipewire_pkg/USE" ]] || die "Openbox runtime has no PipeWire package metadata"
+  # --binpkg-respect-use=y must honour the D630 package.use entry (-bluetooth).
   if grep -qw bluetooth "$pipewire_pkg/USE"; then
     die "Openbox PipeWire was built with Bluetooth enabled; rebuild the binpkg with USE=-bluetooth"
   fi
