@@ -121,36 +121,9 @@ Latest bundle: [d630-kernel-6.18.56-run-41134237939](https://github.com/AmrUser-
 Static profile validators inspect fragments and selected Kconfig requirements; they do not compile a kernel. For the Tiny no-module target, inspect the *resolved full* `.config`, not only the fragment:
 
 ```sh
-grep -E '^(CONFIG_(BLOCK|PCI|NET|NETDEVICES|USB_SUPPORT|EXT4_FS|NTFS3_FS|USB_EHCI_HCD|USB_UHCI_HCD|USB_NET_RNDIS_HOST|DRM_I915|IWL3945|DELL_WMI|DELL_LAPTOP|SWAP|ZRAM|ZRAM_BACKEND_LZ4|ZRAM_DEF_COMP_LZ4))=y
-
-## Related documentation
-
-- [Repository overview](../README.md)
-- [Hardware inventory](../docs/hardware-inventory.md)
-- [Known issues](../docs/known-issues.md)
-- [Legacy notes](NOTES-legacy.md)
-- [Release index](../docs/releases.md)
- .config
-grep -E '^# CONFIG_(MODULES|USB_XHCI_HCD) is not set
-
-## Related documentation
-
-- [Repository overview](../README.md)
-- [Hardware inventory](../docs/hardware-inventory.md)
-- [Known issues](../docs/known-issues.md)
-- [Legacy notes](NOTES-legacy.md)
-- [Release index](../docs/releases.md)
- .config
-! grep -q '=m
-
-## Related documentation
-
-- [Repository overview](../README.md)
-- [Hardware inventory](../docs/hardware-inventory.md)
-- [Known issues](../docs/known-issues.md)
-- [Legacy notes](NOTES-legacy.md)
-- [Release index](../docs/releases.md)
- .config
+grep -E '^(CONFIG_(BLOCK|PCI|NET|NETDEVICES|USB_SUPPORT|EXT4_FS|NTFS3_FS|USB_EHCI_HCD|USB_UHCI_HCD|USB_NET_RNDIS_HOST|DRM_I915|IWL3945|DELL_WMI|DELL_LAPTOP|SWAP|ZRAM|ZRAM_BACKEND_LZ4|ZRAM_DEF_COMP_LZ4))=y' .config
+grep -E '^# CONFIG_(MODULES|USB_XHCI_HCD) is not set' .config
+! grep -q '=m' .config
 ```
 
 For every release, verify the kernel/initramfs/firmware manifest and checksums, then test QEMU boot. Confirm USB RNDIS tethering, Wi-Fi firmware loading, storage/filesystem mounts, console and input devices separately. QEMU checks do not establish that the real D630's i915, iwl3945, Alps touchpad, TrackPoint, Dell WMI, thermal and power-management paths work; physical D630 testing is required.
