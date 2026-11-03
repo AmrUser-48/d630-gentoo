@@ -41,7 +41,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: d630-openbox-binpkgs-refresh-v3
+  group: d630-openbox-binpkgs-refresh-v4
   cancel-in-progress: false
 
 jobs:
@@ -405,8 +405,8 @@ jobs:
             echo "Source commit: $GITHUB_SHA"
             echo "Publisher run ID: $GITHUB_RUN_ID"
             echo "Binary package files in restored PKGDIR: $count"
-            echo "Release tag: binpkgs-$GITHUB_RUN_ID"
-            echo "This release exports the current saved runner PKGDIR, including any package updates saved there."
+            echo "Same-run artifact: refreshed-core2-binpkgs-$GITHUB_RUN_ID"
+            echo "This artifact exports the complete current saved runner PKGDIR for the dependent SFS job."
             echo
             echo "Most recently modified package files:"
             cat "$RUNNER_TEMP/latest-binpkgs.txt"
@@ -416,16 +416,22 @@ jobs:
             sha256sum PACKAGE-LIST.txt BUILD-MANIFEST.txt binpkgs-part-*.tar.zst > SHA256SUMS
             sha256sum --check SHA256SUMS
           )
-          tag="binpkgs-$GITHUB_RUN_ID"
-          gh release create "$tag" "$release_dir"/PACKAGE-LIST.txt "$release_dir"/BUILD-MANIFEST.txt \
-            "$release_dir"/SHA256SUMS "$release_dir"/binpkgs-part-*.tar.zst \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "D630 Core 2 binary packages — refreshed state run $GITHUB_RUN_ID" \
-            --notes-file "$release_dir/BUILD-MANIFEST.txt" \
-            --target "$GITHUB_SHA" --prerelease
-          echo "binpkg_run_ids=39507549274,$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "Published $tag from the restored PKGDIR. The Openbox build will import the older Mesa set first, then this newer cache so updated package files take precedence." |
+          echo "binpkg_run_ids=" >> "$GITHUB_OUTPUT"
+          echo "Prepared the complete Core 2 PKGDIR for same-run artifact transfer to the Openbox SFS job." |
             tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload refreshed Core 2 binpkgs for the Openbox build
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-core2-binpkgs-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/binpkgs-release/PACKAGE-LIST.txt
+            ${{ runner.temp }}/binpkgs-release/BUILD-MANIFEST.txt
+            ${{ runner.temp }}/binpkgs-release/SHA256SUMS
+            ${{ runner.temp }}/binpkgs-release/binpkgs-part-*.tar.zst
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
 
       - name: Upload binpkg refresh diagnostics
         if: always()
@@ -454,7 +460,8 @@ jobs:
     timeout-minutes: 360
     env:
       RUNTIME_PROFILE: openbox
-      BINPKG_RUN_IDS: ${{ needs.publish-binpkgs.outputs.binpkg_run_ids }}
+      BINPKG_RUN_IDS: ""
+      LOCAL_RELEASE_ASSETS_DIR: ${{ runner.temp }}/refreshed-core2-binpkgs
       SOURCE_FALLBACK: "false"
       KERNEL_BUNDLE_TAG: ${{ inputs.kernel_bundle_tag || 'd630-kernel-6.18.56-run-41317026490' }}
       GH_TOKEN: ${{ github.token }}
@@ -462,6 +469,12 @@ jobs:
     steps:
       - name: Check out D630 Gentoo configuration
         uses: actions/checkout@v4
+
+      - name: Download the freshly built Core 2 binpkgs
+        uses: actions/download-artifact@v4
+        with:
+          name: refreshed-core2-binpkgs-${{ github.run_id }}
+          path: ${{ runner.temp }}/refreshed-core2-binpkgs
 
       - name: Install host tools
         shell: bash
@@ -478,7 +491,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
+          sudo --preserve-env=RUNTIME_PROFILE,BINPKG_RUN_IDS,LOCAL_RELEASE_ASSETS_DIR,SOURCE_FALLBACK,KERNEL_BUNDLE_TAG,GH_TOKEN,RUNNER_TEMP,GITHUB_WORKSPACE,GITHUB_REPOSITORY,GITHUB_STEP_SUMMARY \
             bash d630-gentoo/scripts/build-runtime-squashfs.sh
 
       - name: Test the resulting SquashFS contents
