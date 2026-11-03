@@ -488,7 +488,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
     grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
     [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
-    printf 'included: user's scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    printf 'included: scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"
   fi
@@ -1178,7 +1178,7 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
     grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
     [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
-    printf 'included: user's scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    printf 'included: scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"
   fi
