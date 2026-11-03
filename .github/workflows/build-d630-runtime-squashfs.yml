@@ -162,6 +162,8 @@ jobs:
             output/SQUASHFS-INFO.txt
             output/INIT-PROBE.txt
             output/KERNEL-MODULES.txt
+            output/SCRCPY-BUNDLE-SHA256.txt
+            output/scrcpy-ldd.txt
             output/portage-bootstrap.log
             output/emerge-runtime.log
             output/depclean.log
