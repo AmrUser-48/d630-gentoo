@@ -163,6 +163,9 @@ jobs:
             output/INIT-PROBE.txt
             output/KERNEL-MODULES.txt
             output/official-binpkg-fallback.log
+            output/pipewire-binpkg-plan.log
+            output/pipewire-binpkg-fallback.log
+            output/pipewire-binpkg-install.log
             output/SCRCPY-BUNDLE-SHA256.txt
             output/scrcpy-ldd.txt
             output/portage-bootstrap.log
