@@ -108,6 +108,8 @@ grep -Fq 'pambase-20251104-r1-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squa
 grep -Fxq 'sys-auth/pambase' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'rm -rf "$OUT"' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'libusb-1.0.29-1.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--getbinpkgonly --oneshot dev-libs/glib:2' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'official-binpkg-glib.log' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
