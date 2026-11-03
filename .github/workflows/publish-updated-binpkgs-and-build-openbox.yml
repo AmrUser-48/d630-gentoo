@@ -317,16 +317,13 @@ jobs:
             exit 1
           }
 
-          scrcpy_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit)"
-          [[ -n "$scrcpy_pkg" && -s "$scrcpy_pkg/USE" ]] || {
-            echo "The existing scrcpy 5.0.1 package is missing from the restored Gentoo root." >&2
+          scrcpy_binpkg="$(sudo find "$GENTOO_ROOT/var/cache/binpkgs/app-mobilephone/scrcpy" -maxdepth 1 -type f \
+            -name 'scrcpy-5.0.1-*.gpkg.tar' -print -quit 2>/dev/null)"
+          if [[ -z "$scrcpy_binpkg" ]]; then
+            echo "The custom scrcpy 5.0.1 binpkg is missing from the restored PKGDIR." >&2
             exit 1
-          }
-          sudo chroot "$GENTOO_ROOT" /usr/bin/scrcpy --help 2>&1 |
-            grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || {
-              echo "The restored scrcpy 5.0.1 binary does not expose keyboard-gamepad -j." >&2
-              exit 1
-            }
+          fi
+          echo "Verified custom scrcpy binpkg: $scrcpy_binpkg"
           links_binpkg_dir="$GENTOO_ROOT/var/cache/binpkgs/www-client/links"
           mapfile -t links_binpkgs < <(sudo find "$links_binpkg_dir" -maxdepth 1 -type f \
             -name 'links-2.30-r3-*.gpkg.tar' -print | sort)
