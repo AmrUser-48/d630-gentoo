@@ -46,9 +46,9 @@ grep -Fq 'app-eselect/eselect-repository git' config/portage/package.use/20-repo
 grep -Fq 'app-misc/lf ~amd64' config/portage/package.accept_keywords/20-guru
 grep -Fq 'sys-apps/sd ~amd64' config/portage/package.accept_keywords/20-guru
 grep -Fq 'app-mobilephone/scrcpy ~amd64' config/portage/package.accept_keywords/20-guru
-test -s config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
-grep -Fq 'bd32f66b224e5fcac9fed3da98700f4e6c523e84' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
-grep -Fq 'prebuilt_server' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-3.3.4.ebuild
+test -s config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
+grep -Fq '8b2ac5512d4301218cf8b458aaf1f74b9d35d82f' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
+grep -Fq 'prebuilt_server' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 grep -Fq 'dev-util/mesa_clc LLVM_SLOT: -* 22' config/portage/package.use/10-d630-hardware
@@ -97,9 +97,12 @@ test -s d630-gentoo/scripts/install-runtime-dotfiles.sh
 bash -n d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-apps/msr-tools' d630-gentoo/config/package-sets/cli.list
-grep -Fxq '=app-mobilephone/scrcpy-3.3.4' d630-gentoo/config/package-sets/multimedia.list
+grep -Fxq '=app-mobilephone/scrcpy-5.0.1' d630-gentoo/config/package-sets/multimedia.list
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
+grep -Fq 'scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
 grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-process/htop' d630-gentoo/config/package-sets/cli.list
@@ -126,7 +129,7 @@ grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'OPENBOX-OPTIONAL-KEYS.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'omitted: scrcpy 3.3.4' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'required scrcpy 5.0.1 binpkg was not installed' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'omitted: %s (no compatible imported binpkg)' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh
