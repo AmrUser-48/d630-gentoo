@@ -289,8 +289,8 @@ jobs:
 
           # Reuse matching D630 binaries from the restored cache and imported v0.2.0 release.
           # Only missing or USE-mismatched desktop dependencies are compiled here.
-          # Scrcpy is excluded: the saved cache already contains the user's BUILD_ID=2.
-          build_atoms='media-libs/libsdl3 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-libs/gpm net-misc/dhcpcd net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xinit x11-apps/xmodmap x11-apps/xrdb x11-base/xorg-drivers x11-base/xorg-server x11-terms/xterm x11-misc/xdg-utils x11-misc/xclip x11-misc/xdotool sys-apps/file sys-apps/less sys-apps/ripgrep media-video/pipewire media-video/wireplumber'
+          # Scrcpy, GRUB, PipeWire, and WirePlumber are excluded from this refresh list. GRUB is not an SFS runtime package; the audio packages must be reused from the existing binpkg cache.
+          build_atoms='media-libs/libsdl3 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-fs/btrfs-progs sys-fs/dosfstools sys-libs/gpm net-misc/dhcpcd net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xinit x11-apps/xmodmap x11-apps/xrdb x11-base/xorg-drivers x11-base/xorg-server x11-terms/xterm x11-misc/xdg-utils x11-misc/xclip x11-misc/xdotool sys-apps/file sys-apps/less sys-apps/ripgrep'
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
             "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --oneshot $build_atoms"
 
