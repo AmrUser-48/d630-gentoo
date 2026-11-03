@@ -106,17 +106,21 @@ def inspect_readme(path: str, source: str, errors: list[str]) -> tuple[int, int]
             f"{path}: expected exactly one H1 document title; found {len(titles)} ({found})"
         )
 
-    # Duplicate same-level headings produce duplicate/ambiguous navigation.
-    seen: dict[tuple[int, str], int] = {}
+    # Duplicate H2 sections usually indicate pasted/repeated content.
+    # Repeated H3+ subsection names are allowed; they can be useful under
+    # different parent sections and GitHub assigns distinct heading anchors.
+    seen_h2: dict[str, int] = {}
     for heading in headings:
-        key = (heading["level"], normal_heading(heading["title"]))
-        if key in seen:
+        if heading["level"] != 2:
+            continue
+        key = normal_heading(heading["title"])
+        if key in seen_h2:
             errors.append(
-                f"{path}:{heading['line']}: duplicate H{heading['level']} "
-                f"heading {heading['title']!r}; first occurrence is line {seen[key]}"
+                f"{path}:{heading['line']}: duplicate H2 section "
+                f"{heading['title']!r}; first occurrence is line {seen_h2[key]}"
             )
         else:
-            seen[key] = heading["line"]
+            seen_h2[key] = heading["line"]
 
     # Canonical sections are optional. If a README uses any of them, keep the
     # ones it uses in the recommended order; purpose-specific headings are free.
