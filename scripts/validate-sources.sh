@@ -101,12 +101,15 @@ grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-apps/msr-tools' d630-gentoo/config/package-sets/cli.list
 grep -Fxq '=app-misc/lf-28' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'binpkg-multi-instance' config/make.conf
-grep -Fxq '=app-mobilephone/scrcpy-5.0.1' d630-gentoo/config/package-sets/multimedia.list
+! grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/config/package-sets/multimedia.list
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
-grep -Fq 'scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'SCRCPY_RELEASE_TAG="v5.0.1-debian12-core2-keyboard-gamepad"' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'SCRCPY-BUNDLE-SHA256.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq '8b2ac5512d4301218cf8b458aaf1f74b9d35d82f' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy 5.0.1 binary does not expose keyboard-gamepad support' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
 grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-process/htop' d630-gentoo/config/package-sets/cli.list
@@ -133,10 +136,9 @@ grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'OPENBOX-OPTIONAL-KEYS.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'scrcpy-5.0.1-2.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy-5.0.1-debian12-core2-x86_64.tar.gz' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--joystick' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'repository' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'SCRCPY_RELEASE_TAG' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'scrcpy-5.0.1-2.gpkg.tar' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'BUILD_ID=2' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'import-gpkg-release.py' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
