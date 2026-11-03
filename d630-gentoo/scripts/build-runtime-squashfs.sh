@@ -483,6 +483,9 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   [[ -s "$ROOT/usr/libexec/d630-scrcpy-5.0.1/scrcpy-server" ]] || die "matching scrcpy Android server is missing"
   [[ -s "$ROOT/usr/libexec/d630-scrcpy-5.0.1/lib/libSDL3.so.0" ]] || die "bundled SDL3 runtime is missing"
   [[ -s "$OUT/SCRCPY-BUNDLE-SHA256.txt" ]] || die "scrcpy release checksum record is missing"
+  scrcpy_deps="$(chroot "$ROOT" /bin/bash -lc 'ldd /usr/libexec/d630-scrcpy-5.0.1/scrcpy')"
+  grep -Fq 'not found' <<< "$scrcpy_deps" && die "scrcpy portable bundle has unresolved runtime libraries: $scrcpy_deps"
+  printf '%s\n' "$scrcpy_deps" > "$OUT/scrcpy-ldd.txt"
   scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
   grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose keyboard-gamepad support"
   printf 'included: scrcpy 5.0.1 Core 2 portable release (-j/--joystick), bundled SDL3/FFmpeg and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
@@ -989,7 +992,7 @@ else
   unsquashfs -ll "$OUT/squashfs" | grep -E 'sbin/init($| ->)|usr/bin/init($| ->)' | tee "$OUT/INIT-PROBE.txt"
   [[ -s "$OUT/squashfs" ]] || die "SquashFS output is empty"
   (cd "$OUT" && sha256sum squashfs > SQUASHFS-SHA256.txt)
-  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt)
+  sum_files=(SQUASHFS-SHA256.txt RUNTIME-MANIFEST.txt PACKAGES.txt BUILD-INPUTS.txt STAGE3-MANIFEST.txt INSTALLED-PACKAGES.txt EMERGE-INFO.txt KERNEL-MODULES.txt SCRCPY-BUNDLE-SHA256.txt scrcpy-ldd.txt)
   if [[ "$RUNTIME_PROFILE" == openbox ]]; then
     sum_files+=(INITTAB-PROBE.txt XSERVERRC-PROBE.txt BINPKG-OPTIONAL-SKIPPED.txt TOOL-AVAILABILITY.txt OPENBOX-OPTIONAL-KEYS.txt required-binpkg-plan.log)
   fi
