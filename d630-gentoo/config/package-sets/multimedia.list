@@ -1,4 +1,6 @@
 # Lightweight audio/video runtime; no MPD server, ncmpcpp, or mpv.
+# Required by the portable scrcpy 5.0.1 bundle for USB/ADB transport.
+dev-libs/libusb
 media-video/ffmpeg
 media-sound/lame
 media-libs/opus
