@@ -259,7 +259,7 @@ jobs:
           trap cleanup_chroot_mounts EXIT
 
           # Import all SHA-256-verified GPKG assets from the user's v0.2.0 release.
-          # Keep every BUILD_ID and USE variant in the native Portage PKGDIR layout.
+          # Keep every BUILD_ID and USE variant in native PKGDIR layout; derive PN from PF when omitted.
           sudo --preserve-env=GH_TOKEN,GITHUB_REPOSITORY python3 scripts/import-gpkg-release.py \
             --tag v0.2.0 \
             --pkgdir "$GENTOO_ROOT/var/cache/binpkgs" \

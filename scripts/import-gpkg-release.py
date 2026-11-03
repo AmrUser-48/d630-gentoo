@@ -118,9 +118,16 @@ def package_metadata(path: pathlib.Path) -> dict[str, str]:
             if content is not None:
                 values[key] = content.read().decode("utf-8", errors="replace").strip()
 
-    for key in ("CATEGORY", "PN", "PF"):
+    for key in ("CATEGORY", "PF"):
         if not values.get(key):
             raise RuntimeError(f"{path.name}: metadata is missing {key}")
+    # Gentoo GPKG metadata stores CATEGORY and PF; PN is not guaranteed.
+    # Recover PN from PF = PN-PV, where Gentoo PV always starts with a digit.
+    if not values.get("PN"):
+        match = re.fullmatch(r"(.+)-(\\d.*)", values["PF"])
+        if not match:
+            raise RuntimeError(f"{path.name}: cannot derive PN from PF={values['PF']!r}")
+        values["PN"] = match.group(1)
     if not values.get("BUILD_ID"):
         match = re.search(r"-(\d+)\.gpkg\.tar$", path.name)
         if not match:
