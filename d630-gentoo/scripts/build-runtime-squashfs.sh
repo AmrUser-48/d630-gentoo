@@ -110,6 +110,7 @@ sync-uri = rsync://rsync.gentoo.org/gentoo-portage
 auto-sync = yes
 EOF
 fi
+mkdir -p "$ROOT/var/db/repos/gentoo"
 rm -f "$ROOT/etc/resolv.conf"
 cp -L /etc/resolv.conf "$ROOT/etc/resolv.conf"
 CPUS="$(nproc)"
