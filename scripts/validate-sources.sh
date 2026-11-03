@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eux
+set -eu
 
 test -s README.md
 test -s d630-tiny/README.md
@@ -187,7 +187,7 @@ grep -Fq 'usr/bin/alsamixer' d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa" && $0 != "media-video/pipewire"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--usepkgonly --onlydeps' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--getbinpkg=n --usepkgonly' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/build-runtime-squashfs.sh
@@ -386,7 +386,7 @@ grep -Fq 'INITTAB-PROBE.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'Install Mesa from an imported binary package only' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'the openbox SquashFS profile requires an imported binary-package release containing Mesa' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'RUNTIME_ATOMS="$(awk '\''$0 != "media-libs/mesa" && $0 != "media-video/pipewire"'\''' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--usepkgonly --onlydeps' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq -- '--getbinpkg=n --usepkgonly' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'chown "0:$PORTAGE_GID" "$ROOT/var/tmp/portage"' d630-gentoo/scripts/build-runtime-squashfs.sh
