@@ -204,7 +204,7 @@ Recommended section names and order are defined in `docs/README-TEMPLATE.md`. Us
 
 Style and quality rules:
 
-- Use exactly one descriptive H1 title. Avoid duplicate headings at the same level and headings with no content.
+- Use exactly one descriptive H1 title. Avoid duplicate H2 sections and headings with no content. Repeated H3+ labels are allowed when they belong to separate subsections.
 - Keep fenced code blocks balanced and use language tags for commands and configuration.
 - Ensure relative/local Markdown links point to existing files or directories. Prefer descriptive link labels.
 - Write for people using or maintaining the project. Use direct, concrete language and short paragraphs.
