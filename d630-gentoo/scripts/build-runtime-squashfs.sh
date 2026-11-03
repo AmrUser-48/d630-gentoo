@@ -233,6 +233,7 @@ fi
 
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
+# OpenRC is supplied by the official OpenRC Stage 3; preserve its installed base version.
 log "Select package atoms"
 if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
   # A deliberately narrow runtime atop the official OpenRC Stage 3.
@@ -264,7 +265,6 @@ else
   cat > "$WORK/atoms.txt" <<'EOF'
 app-admin/sudo
 app-shells/bash
-sys-apps/openrc
 sys-apps/portage
 sys-apps/coreutils
 sys-apps/util-linux
@@ -310,7 +310,6 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   cat > "$WORK/required-atoms.txt" <<'EOF'
 app-admin/sudo
 app-shells/bash
-sys-apps/openrc
 sys-apps/coreutils
 sys-apps/util-linux
 sys-apps/shadow
@@ -871,6 +870,7 @@ fi
 
 log "Validate runtime root and build SquashFS"
 [[ -x "$ROOT/sbin/init" ]] || die "runtime root has no executable /sbin/init"
+chroot "$ROOT" /bin/bash -lc 'command -v openrc >/dev/null && command -v rc-update >/dev/null' || die "OpenRC Stage 3 base is missing openrc/rc-update"
 if [[ "$RUNTIME_PROFILE" == openbox || "$RUNTIME_PROFILE" == desktop || "$RUNTIME_PROFILE" == daily-driver || "$RUNTIME_PROFILE" == gui-initram ]]; then
   chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/Xorg || test -x /usr/libexec/Xorg' || die "graphical profile missing Xorg"
   chroot "$ROOT" /bin/bash -lc 'test -x /usr/bin/openbox-session' || die "graphical profile missing openbox-session"
