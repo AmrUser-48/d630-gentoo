@@ -465,8 +465,12 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
     scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
     [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
+    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "scrcpy did not come from the pinned d630-local fork"; fi
+    grep -qw X "$scrcpy_pkg/USE" || die "D630 scrcpy binary package is not X-enabled"
+    if grep -qw wayland "$scrcpy_pkg/USE"; then die "D630 scrcpy binary package unexpectedly includes Wayland"; fi
     [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
-    chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 | grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
+    scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
+    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
     printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"
@@ -1150,8 +1154,12 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
     scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
     [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
+    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "scrcpy did not come from the pinned d630-local fork"; fi
+    grep -qw X "$scrcpy_pkg/USE" || die "D630 scrcpy binary package is not X-enabled"
+    if grep -qw wayland "$scrcpy_pkg/USE"; then die "D630 scrcpy binary package unexpectedly includes Wayland"; fi
     [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
-    chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 | grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)' || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
+    scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
+    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
     printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"

@@ -258,14 +258,35 @@ jobs:
           }
           trap cleanup_chroot_mounts EXIT
 
+          # Register the pinned D630 scrcpy 5.0.1 SDL3 fork as a local Portage repo.
+          local_repo="$GENTOO_ROOT/var/db/repos/d630-local"
+          sudo install -d -m 0755 "$local_repo/metadata" "$local_repo/app-mobilephone/scrcpy"
+          sudo tee "$local_repo/metadata/layout.conf" >/dev/null <<'EOF'
+          repo-name = d630-local
+          masters = gentoo
+          thin-manifests = true
+          EOF
+          sudo tee "$GENTOO_ROOT/etc/portage/repos.conf/d630-local.conf" >/dev/null <<'EOF'
+          [d630-local]
+          location = /var/db/repos/d630-local
+          priority = 1000
+          auto-sync = no
+          EOF
+          sudo install -m 0644 \
+            config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild \
+            "$local_repo/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild"
+          sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
+            'export TMPDIR=/tmp FEATURES="-sandbox -userpriv"; ebuild /var/db/repos/d630-local/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild manifest'
+
           # All missing runtime atoms are compiled here into reusable binpkgs.
           # Dependencies may reuse existing Core 2 binpkgs; the remote generic binhost
           # is disabled. The later SFS job uses --usepkgonly and never compiles.
-          # The previous cache already contains scrcpy 5.0.1 (-j), SDL3 and all
-          # three Links builds. Refresh only the missing desktop/runtime package
-          # set; do not rebuild optional xdg-utils or Midnight Commander here.
-          build_atoms='sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xclip sys-apps/file sys-apps/less sys-apps/ripgrep media-video/pipewire x11-base/xorg-server'
-          reinstall_atoms="$build_atoms"
+          # Refresh missing desktop/runtime packages and rebuild scrcpy from the
+          # pinned D630 fork. The restored cache's old scrcpy 5.0.1 was upstream
+          # and did not contain the required keyboard-to-gamepad -j extension.
+          # Links already has three cached variants; the SFS USE config selects X.
+          build_atoms='media-libs/libsdl3 sys-apps/dbus sys-apps/usbutils sys-auth/elogind sys-auth/pambase sys-boot/grub sys-fs/btrfs-progs sys-fs/dosfstools sys-libs/gpm net-misc/networkmanager net-wireless/iw net-wireless/wpa_supplicant net-wireless/wireless-regdb x11-apps/xmodmap x11-misc/xclip sys-apps/file sys-apps/less sys-apps/ripgrep media-video/pipewire x11-base/xorg-server =app-mobilephone/scrcpy-5.0.1::d630-local'
+          reinstall_atoms="${build_atoms% =app-mobilephone/scrcpy-5.0.1::d630-local} app-mobilephone/scrcpy"
           sudo chroot "$GENTOO_ROOT" /bin/bash -lc \
             "export TMPDIR=/tmp FEATURES='-sandbox -userpriv'; emerge --ignore-default-opts --ask=n --verbose --jobs=2 --load-average=4 --with-bdeps=n --getbinpkg=n --usepkg --buildpkg --newuse --reinstall-atoms='$reinstall_atoms' --oneshot $build_atoms"
 
@@ -317,13 +338,31 @@ jobs:
             exit 1
           }
 
+          scrcpy_pkg="$(sudo find "$GENTOO_ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit)"
+          if [[ -z "$scrcpy_pkg" || ! -s "$scrcpy_pkg/USE" ]]; then
+            echo "The custom scrcpy 5.0.1 package was not installed." >&2
+            exit 1
+          fi
+          if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx 'd630-local' "$scrcpy_pkg/repository"; then
+            echo "The installed scrcpy package did not come from the pinned d630-local ebuild." >&2
+            exit 1
+          fi
+          if ! grep -qw X "$scrcpy_pkg/USE" || grep -qw wayland "$scrcpy_pkg/USE"; then
+            echo "The D630 scrcpy package must be X-enabled and Wayland-free." >&2
+            exit 1
+          fi
+          scrcpy_help="$(sudo chroot "$GENTOO_ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
+          if ! grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help"; then
+            echo "The rebuilt scrcpy binary does not expose the D630 keyboard-gamepad -j option." >&2
+            exit 1
+          fi
           scrcpy_binpkg="$(sudo find "$GENTOO_ROOT/var/cache/binpkgs/app-mobilephone/scrcpy" -maxdepth 1 -type f \
             -name 'scrcpy-5.0.1-*.gpkg.tar' -print -quit 2>/dev/null)"
           if [[ -z "$scrcpy_binpkg" ]]; then
-            echo "The custom scrcpy 5.0.1 binpkg is missing from the restored PKGDIR." >&2
+            echo "The custom scrcpy 5.0.1 binary package was not written to PKGDIR." >&2
             exit 1
           fi
-          echo "Verified custom scrcpy binpkg: $scrcpy_binpkg"
+          echo "Verified D630 scrcpy 5.0.1 (-j) from d630-local: $scrcpy_binpkg"
           links_binpkg_dir="$GENTOO_ROOT/var/cache/binpkgs/www-client/links"
           mapfile -t links_binpkgs < <(sudo find "$links_binpkg_dir" -maxdepth 1 -type f \
             -name 'links-2.30-r3-*.gpkg.tar' -print | sort)

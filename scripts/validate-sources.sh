@@ -130,6 +130,10 @@ grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'OPENBOX-OPTIONAL-KEYS.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'required scrcpy 5.0.1 binpkg was not installed' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'repository' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'Verified D630 scrcpy 5.0.1 (-j) from d630-local' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+grep -Fq 'media-libs/libsdl3' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+grep -Fq 'scrcpy-5.0.1.ebuild' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'omitted: %s (no compatible imported binpkg)' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'wifi.nmconnection.example' d630-gentoo/README.md
 grep -Fq 'for option, value in pairs(config_options) do' d630-gentoo/scripts/install-runtime-dotfiles.sh

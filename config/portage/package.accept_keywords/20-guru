@@ -8,5 +8,5 @@ app-misc/tealdeer ~amd64
 # sd is maintained in GURU and currently keyworded ~amd64.
 sys-apps/sd ~amd64
 
-# Pinned D630 SDL2 fork of scrcpy 3.3.4 is provided by the local overlay.
+# Pinned D630 SDL3 scrcpy 5.0.1 keyboard-gamepad fork is provided by the local overlay.
 app-mobilephone/scrcpy ~amd64
