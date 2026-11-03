@@ -10,6 +10,7 @@ media-video/wireplumber
 media-sound/alsa-utils
 media-fonts/terminus-font
 sys-auth/elogind
+sys-auth/pambase
 x11-apps/xinit
 x11-base/xorg-drivers
 x11-base/xorg-server
