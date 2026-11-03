@@ -124,7 +124,7 @@ def package_metadata(path: pathlib.Path) -> dict[str, str]:
     # Gentoo GPKG metadata stores CATEGORY and PF; PN is not guaranteed.
     # Recover PN from PF = PN-PV, where Gentoo PV always starts with a digit.
     if not values.get("PN"):
-        match = re.fullmatch(r"(.+)-(\\d.*)", values["PF"])
+        match = re.fullmatch(r"(.+)-([0-9].*)", values["PF"])
         if not match:
             raise RuntimeError(f"{path.name}: cannot derive PN from PF={values['PF']!r}")
         values["PN"] = match.group(1)
