@@ -272,7 +272,6 @@ sys-fs/dosfstools
 sys-fs/ntfs3g
 sys-fs/btrfs-progs
 sys-block/parted
-sys-boot/grub
 net-misc/dhcpcd
 net-misc/networkmanager
 net-wireless/iw
