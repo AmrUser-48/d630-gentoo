@@ -216,6 +216,21 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-ap
   install -m 0644 "$WORK/supplemental/dbus-1.16.2-1.gpkg.tar" "$ROOT/var/cache/binpkgs/sys-apps/dbus/dbus-1.16.2-1.gpkg.tar"
 fi
 
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  log "Restrict scrcpy candidates to the user's BUILD_ID=2"
+  SCRCPY_PKGDIR="$ROOT/var/cache/binpkgs/app-mobilephone/scrcpy"
+  SCRCPY_BUILD2="$SCRCPY_PKGDIR/scrcpy-5.0.1-2.gpkg.tar"
+  [[ -s "$SCRCPY_BUILD2" ]] || die "saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing"
+  mkdir -p "$WORK/scrcpy-other-build-ids"
+  shopt -s nullglob
+  SCRCPY_CANDIDATES=( "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.gpkg.tar "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.tbz2 )
+  shopt -u nullglob
+  for candidate in "${SCRCPY_CANDIDATES[@]}"; do
+    [[ "$candidate" == "$SCRCPY_BUILD2" ]] || mv "$candidate" "$WORK/scrcpy-other-build-ids/"
+  done
+  sha256sum "$SCRCPY_BUILD2" | tee "$OUT/SCRCPY-BINPKG-SHA256.txt"
+fi
+
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
 log "Select package atoms"
