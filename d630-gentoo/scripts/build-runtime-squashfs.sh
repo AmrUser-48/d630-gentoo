@@ -209,6 +209,22 @@ PY
 fi
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
 
+if [[ "$RUNTIME_PROFILE" == openbox ]]; then
+  log "Restrict scrcpy candidates to the user's BUILD_ID=2"
+  SCRCPY_PKGDIR="$ROOT/var/cache/binpkgs/app-mobilephone/scrcpy"
+  SCRCPY_BUILD2="$SCRCPY_PKGDIR/scrcpy-5.0.1-2.gpkg.tar"
+  [[ -s "$SCRCPY_BUILD2" ]] || die "saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing"
+  mkdir -p "$WORK/scrcpy-other-build-ids"
+  shopt -s nullglob
+  SCRCPY_CANDIDATES=( "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.gpkg.tar "$SCRCPY_PKGDIR"/scrcpy-5.0.1-*.tbz2 )
+  shopt -u nullglob
+  for candidate in "${SCRCPY_CANDIDATES[@]}"; do
+    [[ "$candidate" == "$SCRCPY_BUILD2" ]] || mv "$candidate" "$WORK/scrcpy-other-build-ids/"
+  done
+  sha256sum "$SCRCPY_BUILD2" | tee "$OUT/SCRCPY-BINPKG-SHA256.txt"
+  chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
+fi
+
 log "Select package atoms"
 if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
   # A deliberately narrow runtime atop the official OpenRC Stage 3.
@@ -464,14 +480,15 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   : > "$OUT/TOOL-AVAILABILITY.txt"
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
     scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
-    [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
-    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "scrcpy did not come from the pinned d630-local fork"; fi
-    grep -qw X "$scrcpy_pkg/USE" || die "D630 scrcpy binary package is not X-enabled"
-    if grep -qw wayland "$scrcpy_pkg/USE"; then die "D630 scrcpy binary package unexpectedly includes Wayland"; fi
+    [[ -n "$scrcpy_pkg" ]] || die "scrcpy 5.0.1 BUILD_ID=2 binary package was not installed"
+    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "installed scrcpy is not the user's d630-local build"; fi
+    grep -qw X "$scrcpy_pkg/USE" || die "scrcpy BUILD_ID=2 package is not X-enabled"
+    if grep -qw wayland "$scrcpy_pkg/USE"; then die "scrcpy BUILD_ID=2 package unexpectedly includes Wayland"; fi
     [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
     scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
-    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
-    printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
+    [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
+    printf 'included: user's scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"
   fi
@@ -1153,14 +1170,15 @@ if [[ "$RUNTIME_PROFILE" == openbox ]]; then
   : > "$OUT/TOOL-AVAILABILITY.txt"
   if [[ -x "$ROOT/usr/bin/scrcpy" ]]; then
     scrcpy_pkg="$(find "$ROOT/var/db/pkg/app-mobilephone" -mindepth 1 -maxdepth 1 -type d -name 'scrcpy-5.0.1*' -print -quit 2>/dev/null)"
-    [[ -n "$scrcpy_pkg" ]] || die "installed scrcpy package is not the pinned 5.0.1 build"
-    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "scrcpy did not come from the pinned d630-local fork"; fi
-    grep -qw X "$scrcpy_pkg/USE" || die "D630 scrcpy binary package is not X-enabled"
-    if grep -qw wayland "$scrcpy_pkg/USE"; then die "D630 scrcpy binary package unexpectedly includes Wayland"; fi
+    [[ -n "$scrcpy_pkg" ]] || die "scrcpy 5.0.1 BUILD_ID=2 binary package was not installed"
+    if [[ ! -s "$scrcpy_pkg/repository" ]] || ! grep -qx d630-local "$scrcpy_pkg/repository"; then die "installed scrcpy is not the user's d630-local build"; fi
+    grep -qw X "$scrcpy_pkg/USE" || die "scrcpy BUILD_ID=2 package is not X-enabled"
+    if grep -qw wayland "$scrcpy_pkg/USE"; then die "scrcpy BUILD_ID=2 package unexpectedly includes Wayland"; fi
     [[ -s "$ROOT/usr/share/scrcpy/scrcpy-server" ]] || die "scrcpy 5.0.1 binpkg is missing its matching server"
     scrcpy_help="$(chroot "$ROOT" /usr/bin/scrcpy --help 2>&1 || true)"
-    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option"
-    printf 'included: scrcpy 5.0.1 D630 -j fork and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
+    grep -Eq -- '(^|[[:space:]])-j([,[:space:]]|$)|--joystick([,[:space:]]|$)|--keyboard-gamepad' <<< "$scrcpy_help" || die "scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support"
+    [[ -s "$OUT/SCRCPY-BINPKG-SHA256.txt" ]] || die "scrcpy BUILD_ID=2 binpkg checksum record is missing"
+    printf 'included: user's scrcpy 5.0.1 BUILD_ID=2 (-j/--joystick) and matching server\n' >> "$OUT/TOOL-AVAILABILITY.txt"
   else
     die "required scrcpy 5.0.1 binpkg was not installed"
   fi

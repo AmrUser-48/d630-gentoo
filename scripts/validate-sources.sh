@@ -22,8 +22,8 @@ test -s config/portage/make.conf
 test -s config/portage/binrepos.conf/gentoobinhost.conf
 grep -Fq 'https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/' config/portage/binrepos.conf/gentoobinhost.conf
 grep -Fq 'verify-signature = true' config/portage/binrepos.conf/gentoobinhost.conf
-grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-dostrip binpkg-docompress -splitdebug"' config/portage/make.conf
-grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-dostrip binpkg-docompress -splitdebug"' config/make.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-multi-instance binpkg-dostrip binpkg-docompress -splitdebug"' config/portage/make.conf
+grep -Fq 'FEATURES="parallel-fetch buildpkg getbinpkg binpkg-multi-instance binpkg-dostrip binpkg-docompress -splitdebug"' config/make.conf
 for portage_conf in config/portage/make.conf config/make.conf; do
     grep -Fq 'BINPKG_COMPRESS="zstd"' "$portage_conf"
     grep -Fq 'BINPKG_COMPRESS_FLAGS="-9"' "$portage_conf"
@@ -47,8 +47,10 @@ grep -Fq 'app-misc/lf ~amd64' config/portage/package.accept_keywords/20-guru
 grep -Fq 'sys-apps/sd ~amd64' config/portage/package.accept_keywords/20-guru
 grep -Fq 'app-mobilephone/scrcpy ~amd64' config/portage/package.accept_keywords/20-guru
 test -s config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
-grep -Fq '8b2ac5512d4301218cf8b458aaf1f74b9d35d82f' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
-grep -Fq 'prebuilt_server' config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
+test -s scripts/import-gpkg-release.py
+python3 -m py_compile scripts/import-gpkg-release.py
+grep -Fq 'BUILD_ID' scripts/import-gpkg-release.py
+grep -Fq 'sha256:' scripts/import-gpkg-release.py
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
 grep -Fq 'dev-util/mesa_clc LLVM_SLOT: -* 22' config/portage/package.use/10-d630-hardware
@@ -97,12 +99,14 @@ test -s d630-gentoo/scripts/install-runtime-dotfiles.sh
 bash -n d630-gentoo/scripts/install-runtime-dotfiles.sh
 grep -Fq 'app-misc/tealdeer' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-apps/msr-tools' d630-gentoo/config/package-sets/cli.list
+grep -Fxq '=app-misc/lf-28' d630-gentoo/config/package-sets/cli.list
+grep -Fq 'binpkg-multi-instance' config/make.conf
 grep -Fxq '=app-mobilephone/scrcpy-5.0.1' d630-gentoo/config/package-sets/multimedia.list
 grep -Fq 'x11-misc/xdotool' d630-gentoo/config/package-sets/gui-initram.list
 grep -Fq 'app-mobilephone/scrcpy' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'www-client/links X' config/portage/package.use/10-d630-hardware
-grep -Fq 'scrcpy 5.0.1 binary does not expose the -j keyboard-gamepad option' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy BUILD_ID=2 binary does not expose keyboard-gamepad support' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'app-mobilephone/scrcpy custom-opt.conf' config/portage/package.env
 grep -Fq 'app-editors/neovim' d630-gentoo/config/package-sets/cli.list
 grep -Fq 'sys-process/htop' d630-gentoo/config/package-sets/cli.list
@@ -129,9 +133,13 @@ grep -Fq 'media-video/ffmpeg' d630-gentoo/config/package-sets/multimedia.list
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/rc.xml
 ! grep -Eq 'mpd|ncmpcpp|mpv' d630-gentoo/config/desktop/skel/.config/openbox/autostart
 grep -Fq 'OPENBOX-OPTIONAL-KEYS.txt' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'required scrcpy 5.0.1 binpkg was not installed' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'saved scrcpy 5.0.1 BUILD_ID=2 binpkg is missing' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'scrcpy-5.0.1-2.gpkg.tar' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq -- '--joystick' d630-gentoo/scripts/build-runtime-squashfs.sh
 grep -Fq 'repository' d630-gentoo/scripts/build-runtime-squashfs.sh
-grep -Fq 'Verified D630 scrcpy 5.0.1 (-j) from d630-local' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+grep -Fq 'scrcpy-5.0.1-2.gpkg.tar' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+grep -Fq 'BUILD_ID=2' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
+grep -Fq 'import-gpkg-release.py' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'media-libs/libsdl3' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'scrcpy-5.0.1.ebuild' .github/workflows/publish-updated-binpkgs-and-build-openbox.yml
 grep -Fq 'omitted: %s (no compatible imported binpkg)' d630-gentoo/scripts/build-runtime-squashfs.sh
