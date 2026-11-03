@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -eux
 
 test -s README.md
 test -s d630-tiny/README.md
