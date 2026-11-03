@@ -217,7 +217,6 @@ if [[ "$RUNTIME_PROFILE" == openbox ]] && ! find "$ROOT/var/cache/binpkgs/sys-ap
 fi
 
 chroot "$ROOT" /bin/bash -lc 'emaint binhost --fix' |& tee -a "$OUT/portage-bootstrap.log"
-fi
 
 log "Select package atoms"
 if [[ "$RUNTIME_PROFILE" == tiny-console ]]; then
