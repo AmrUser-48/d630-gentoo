@@ -23,7 +23,7 @@ require() {
 
 # Every D630 kernel keeps ext4 built in; it is never a module.
 for file in "$modular" "$tiny" "$builtin"; do
-    require "$file" y
+    require "$file" CONFIG_EXT4_FS y
 done
 
 # Profile 20: standard installed Gentoo kernel. Keep root boot path built in;
