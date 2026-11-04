@@ -8,7 +8,13 @@
 sys-apps/busybox
 sys-apps/msr-tools
 
-# BusyBox must be built static with at least these applets enabled:
-# ash, blkid, cat, echo, find, grep, mount+loop, mkdir, sleep, switch_root, tr.
+# Use config/busybox/d630-static.config for this early userspace.
+# The dynamic profile is linked against libc and is not suitable for a
+# standalone early initramfs shell.
+#
+# Applets used by initramfs/init:
+# ash/sh, cat, chmod, cp, echo, find (-type), mkdir, mount (flags + loop),
+# switch_root, umount, wc. printf, read, test and arithmetic are shell built-ins.
+# Do not add blkid, grep, sleep or tr unless the init script starts using them.
 # The host filesystem used to store the ISO and gentoo-data.img must have
 # built-in kernel support; OverlayFS upper/work live on ext4 inside the image.
