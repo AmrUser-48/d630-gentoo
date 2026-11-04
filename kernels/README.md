@@ -14,7 +14,7 @@ The design goal is hardware accuracy, not the smallest possible configuration at
 | [30-d630-live.config](profiles/30-d630-live.config) | D630 Tiny | Tinyconfig-derived no-module profile exists. The current Tiny release workflow does not yet build its kernel from this profile. |
 | [40-d630-builtin.config](profiles/40-d630-builtin.config) | Gentoo live SquashFS | Used by the dedicated kernel workflow. It builds the kernel, matching module archive and external initramfs; physical D630 validation remains separate. |
 
-**Profile 20 policy:** the standard installed kernel intentionally preserves Gentoo's broad distribution-kernel baseline. It does not disable NVMe, xHCI, Ethernet, media/capture, AMD/NVIDIA or virtual-device families. Their resolved settings come from Gentoo's version-specific baseline. The D630 overlay only adds target requirements and modularizes the D630 device drivers where Kconfig permits.
+**Profile 20 policy:** the standard installed kernel preserves Gentoo's broad distribution-kernel baseline, with two hardware-specific exclusions: NVMe support and the xHCI USB 3 host-controller stack are disabled because the D630 has neither. Ethernet, media/capture, AMD/NVIDIA, virtual-device and other generic driver families remain inherited from Gentoo's version-specific baseline. Confirmed D630 device drivers are modular wherever Kconfig permits.
 
 Profile 40 explicitly disables xHCI and the media/DVB stack, but currently has no complete explicit NVMe exclusion. Its resolved config must be checked before claiming that the SFS kernel contains no NVMe support. Profile 30 starts from tinyconfig, but its final resolved config must still be checked for disabled NVMe and xHCI symbols.
 
@@ -73,7 +73,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | Btrfs, NTFS3, exFAT, VFAT, ISO9660, UDF, FUSE and SquashFS | Modules. |
 | GM965 / GMA X3100 | DRM core and Intel i915/AGP drivers are modules; framebuffer and console foundations remain built in. |
 | Intel 3945ABG | cfg80211, mac80211, iwlegacy and iwl3945 are modules; the matching firmware is supplied separately. |
-| ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |
+| ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |\n| USB 3 / xHCI | Disabled; the D630 has only USB 2.0 UHCI/EHCI controllers. |\n| NVMe | Host, fabrics and target support disabled; the D630 has SATA/AHCI and ATA storage only. |
 | Android tethering | CDC Ethernet and RNDIS host drivers are modules. |
 | Keyboard, touchpad, TrackPoint and joystick | Input and HID cores, evdev, serio, PS/2, generic HID and joystick drivers are modules. Boolean protocol options remain enabled inside their parent drivers. |
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA, HDA codec and Bluetooth USB transport are modules. |
@@ -91,7 +91,7 @@ Use hardware discovery to form the candidate driver set, not as the only source 
 
 Use the kernel's merge_config.sh to apply fragments and review its override/dependency warnings. After make olddefconfig, inspect the resolved .config. Use scripts/diffconfig -m to generate a maintainable fragment from a known baseline and a validated final config. A requested CONFIG_FOO=n line in a fragment is not proof that the final kernel has disabled it.
 
-Apply the following forbidden-family checks only to profiles that intentionally strip hardware support (Profiles 30 and 40). Do not apply this pruning policy to Profile 20, which preserves Gentoo's standard hardware coverage:
+Apply this broad pruning policy only to profiles that intentionally strip hardware support (Profiles 30 and 40). Profile 20 preserves Gentoo's standard hardware coverage except for its two explicit D630 hardware exclusions: NVMe and xHCI USB 3.
 
 - NVMe: CONFIG_BLK_DEV_NVME, CONFIG_NVME_CORE, NVMe fabrics/transports and CONFIG_NVME_TARGET.
 - USB 3: CONFIG_USB_XHCI_HCD and its dependent host/controller options.
