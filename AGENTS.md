@@ -156,6 +156,12 @@ For 64-bit Linux kernels, retain the generic x86-64 ISA baseline and use `KCFLAG
 
 The userspace `-march=core2` policy must not be copied into kernel builds. Keep this policy consistent in kernel workflows, profile documentation and diagnostics. Distinguish compiler optimization from Kconfig architecture selection.
 
+### Embedded kernel configuration
+
+Enable `CONFIG_IKCONFIG=y` and `CONFIG_IKCONFIG_PROC=y` by default in general-purpose, distribution, workstation, server and diagnostic kernels. Together with `CONFIG_PROC_FS=y`, these expose the exact configuration embedded in the running kernel at `/proc/config.gz`. This is valuable for support, reproducibility and post-build verification.
+
+Do not disable IKCONFIG merely because the distribution's reference config omits it. Omit it only for a deliberately minimal or size-constrained kernel when the trade-off is intentional and documented. Prefer keeping it enabled in project profiles unless a specific target has a justified exception.
+
 ## 5. Portage configuration — canonical paths and responsibilities
 
 The configuration tree under config/portage/ is the source used by the active Gentoo chroot/build workflows. The builders copy these files into the build root's /etc/portage/; inspect the workflow before assuming a file is installed.
