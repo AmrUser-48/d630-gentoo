@@ -1,0 +1,2 @@
+# Use the edited full kernel config and let Gentoo compress installed modules.
+sys-kernel/gentoo-kernel savedconfig strip modules-compress
