@@ -1,0 +1,6 @@
+# Paths relative to /lib/firmware; all other firmware is removed from SquashFS staging.
+iwlwifi-3945-2.ucode
+regulatory.db
+regulatory.db.p7s
+intel-ucode/06-0f-0d
+intel-ucode/06-17-06
