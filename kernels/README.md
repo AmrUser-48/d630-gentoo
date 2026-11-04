@@ -71,11 +71,11 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | Root storage | AHCI, SCSI disk support and ext4 remain built in so the ordinary root filesystem does not depend on loading a storage module first. |
 | IDE/ATAPI optical drive | ATA PIIX and optical-device support are modules. |
 | Btrfs, NTFS3, exFAT, VFAT, ISO9660, UDF, FUSE and SquashFS | Modules. |
-| GM965 / GMA X3100 | DRM core and framebuffer-console integration remain available; Intel i915 and Intel AGP drivers are modules. |
+| GM965 / GMA X3100 | DRM core and Intel i915/AGP drivers are modules; framebuffer and console foundations remain built in. |
 | Intel 3945ABG | cfg80211, mac80211, iwlegacy and iwl3945 are modules; the matching firmware is supplied separately. |
 | ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |
 | Android tethering | CDC Ethernet and RNDIS host drivers are modules. |
-| Keyboard, touchpad, TrackPoint and joystick | Input and HID framework cores remain built in; evdev, serio, PS/2, generic HID and joystick drivers are modules. Boolean protocol options remain enabled. |
+| Keyboard, touchpad, TrackPoint and joystick | Input and HID cores, evdev, serio, PS/2, generic HID and joystick drivers are modules. Boolean protocol options remain enabled inside their parent drivers. |
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA, HDA codec and Bluetooth USB transport are modules. |
 | Dell platform, battery, fan and sensors | ACPI core remains built in; Dell platform, ACPI device, hwmon and SMBus drivers are modules. |
 | ZRAM | Loadable module with LZ4 selected as the default compressor. |
