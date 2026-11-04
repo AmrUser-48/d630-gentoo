@@ -22,6 +22,9 @@ test -s kernels/README.md
 test -s d630-gentoo/initramfs/init
 test -s d630-gentoo/iso/boot/grub/loopback.cfg
 test -s d630-gentoo/config/kernel-cmdline.txt
+test -s config/openrc/d630-zram
+bash -n config/openrc/d630-zram
+grep -Fq 'config/openrc/d630-zram' d630-gentoo/scripts/build-runtime-squashfs.sh
 test -s config/portage/make.conf
 test -s config/portage/binrepos.conf/gentoobinhost.conf
 grep -Fq 'https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64/' config/portage/binrepos.conf/gentoobinhost.conf
