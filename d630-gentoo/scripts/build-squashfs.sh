@@ -101,7 +101,7 @@ if [[ -d "$stage/lib/firmware" ]]; then
     if ! grep -Fqx -- "$relative" "$firmware_keep"; then
       rm -f -- "$firmware_file"
     fi
-  done < <(find "$firmware_dir" \\( -type f -o -type l \\) -print0)
+  done < <(find "$firmware_dir" \( -type f -o -type l \) -print0)
   find "$firmware_dir" -depth -type d -empty -delete
   echo "Applied D630 firmware allowlist: $firmware_keep"
 fi
