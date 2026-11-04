@@ -7,6 +7,10 @@ test -s d630-gentoo/README.md
 test -s kernels/README.md
 test -s d630-gentoo/config/package.list
 test -s d630-gentoo/config/initramfs-package.list
+test -s d630-gentoo/config/README.md
+test -s d630-gentoo/config/busybox/d630-static.config
+test -s d630-gentoo/config/busybox/d630-dynamic.config
+test -s d630-gentoo/config/firmware.keep
 ! test -e tinyos
 ! test -e grub2
 ! test -e initramfs
