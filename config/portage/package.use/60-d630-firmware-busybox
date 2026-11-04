@@ -1,2 +1,0 @@
-# Install only the firmware selected in savedconfig/sys-kernel/linux-firmware.
-sys-kernel/linux-firmware savedconfig bindist redistributable
