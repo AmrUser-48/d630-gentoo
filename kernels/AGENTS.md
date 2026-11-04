@@ -12,7 +12,7 @@ These are configuration fragments, not complete kernel configurations. Do not co
 
 ## Profile 20 preservation rule
 
-Profile 20 is the standard installed Gentoo kernel overlay, not a stripped kernel. Preserve Gentoo's version-specific distribution-kernel baseline for unrelated hardware families; do not disable NVMe, xHCI, Ethernet, media/capture, AMD/NVIDIA, virtualization or other generic driver families in this profile. Set confirmed D630 device drivers to modules wherever Kconfig allows. Keep only the ordinary SATA/AHCI root path, ext4 and essential kernel infrastructure built in. Some Kconfig menu/subsystem options are boolean and cannot be modules; keep those enabled as required by their modular drivers.
+Profile 20 is the standard installed Gentoo kernel overlay, not a stripped kernel. Preserve Gentoo's version-specific distribution-kernel baseline for unrelated hardware families. The only deliberate generic-hardware exclusions are NVMe (no such storage/controller on this D630) and xHCI USB 3 (the D630 has ICH8 USB 2.0 UHCI/EHCI only). Do not disable Ethernet, media/capture, AMD/NVIDIA, virtualization or other generic driver families here. Set confirmed D630 device drivers to modules wherever Kconfig allows. Keep the ordinary SATA/AHCI root path, ext4 and essential Kconfig infrastructure built in. Some framework cores and boolean Kconfig options must remain built in for modular device drivers to work.
 
 ## Build policy
 
