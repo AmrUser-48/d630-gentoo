@@ -2,7 +2,7 @@
 
 ## BusyBox
 
-The files in `busybox/` are Kconfig **allnoconfig fragments**, not complete Gentoo savedconfig files. The static fragment enables only the applets used by [initramfs/init](../initramfs/init): `ash`, `cat`, `chmod`, `cp`, `find -type`, `mkdir`, `mount` with loop and mount flags, `switch_root`, `umount`, and `wc`. Shell built-ins provide `case`, `read`, `printf`, tests, and arithmetic.
+The files in `busybox/` are Kconfig **allnoconfig fragments**, not complete Gentoo savedconfig files. The static fragment enables only the applets used by [initramfs/init](../initramfs/init): `ash`, `cat`, `chmod`, `cp`, `find -type`, `mkdir`, `mount` with loop and mount flags, `switch_root`, `umount`, and `wc`. Shell built-ins provide `case`, `read`, `printf`, `test`, and arithmetic.
 
 Generate a complete configuration from the BusyBox source tree matching the selected Gentoo ebuild version:
 
