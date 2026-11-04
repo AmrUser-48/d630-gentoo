@@ -1,0 +1,2 @@
+# Firmware is explicitly restricted to the redistributable subset.
+sys-kernel/linux-firmware linux-fw-redistributable
