@@ -10,3 +10,10 @@ regulatory.db.p7s
 # Supplied by the matching D630 kernel bundle (Merom and Penryn signatures).
 intel-ucode/06-0f-0d
 intel-ucode/06-17-06
+
+# Optional Broadcom Tigon3 firmware. The current lspci inventory does not show
+# the Ethernet controller, but retain these blobs temporarily for hardware testing.
+tigon/tg357766.bin
+tigon/tg3.bin
+tigon/tg3_tso5.bin
+tigon/tg3_tso.bin
