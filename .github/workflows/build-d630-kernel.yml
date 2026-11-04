@@ -118,8 +118,8 @@ jobs:
 
           # Built-in cfg80211 requires the signed regulatory database before the root is mounted.
           # Pin the same upstream release used by Gentoo net-wireless/wireless-regdb.
-          regdb_version="2026.09.03"
-          regdb_sha512="625918883b65361081db2d5ede754af5d58892da969500655d6211f163c463bfa8c6ab671d3be17117651fc45c41fb3f960a3544c91236fb314179318c191aa2"
+          regdb_version="2026.05.30"
+          regdb_sha512="db06f3115051c030f749419f074543309e24626ebdd59d468c56ac3130f38a6c9e4a69ecebbc3bf65d0cdf9876d9c0de0703e00fc9afb402ab2b1a8a0ca1e146"
           regdb_archive="$RUNNER_TEMP/wireless-regdb-$regdb_version.tar.xz"
           regdb_url="https://mirrors.edge.kernel.org/pub/software/network/wireless-regdb/wireless-regdb-$regdb_version.tar.xz"
           curl --fail --location --retry 4 --retry-all-errors "$regdb_url" -o "$regdb_archive"
@@ -130,6 +130,8 @@ jobs:
           cp "$regdb_source/regulatory.db.p7s" "$firmware_root/"
           test -s "$firmware_root/regulatory.db"
           test -s "$firmware_root/regulatory.db.p7s"
+          cp "$regdb_source/LICENSE" "$firmware_root/WIRELESS-REGDB-LICENSE.txt"
+          test -s "$firmware_root/WIRELESS-REGDB-LICENSE.txt"
 
           curl --fail --location --retry 4 --retry-all-errors \
             "https://raw.githubusercontent.com/intel/Intel-Linux-Processor-Microcode-Data-Files/$microcode_ref/license" \
@@ -148,7 +150,7 @@ jobs:
             echo "  06-17-06: Penryn/Core 2; source Git blob SHA-1 93a69eb9b1519453f0016ae575f43386c2b806b0"
             echo "Intel Wi-Fi firmware: PRO/Wireless 3945ABG; linux-firmware tag $wifi_ref; version 15.32.2.9"
             echo "Wi-Fi firmware URL: $wifi_url"
-            echo "Wireless regulatory database: wireless-regdb $regdb_version (Gentoo Manifest SHA512 verified)"
+            echo "Wireless regulatory database: stable Gentoo wireless-regdb $regdb_version (Manifest SHA512 verified)"
             echo "Regulatory database is embedded through CONFIG_EXTRA_FIRMWARE and included in initramfs and d630-firmware.tar.zst."
             echo "License notices are included in d630-firmware.tar.zst under /usr/share/licenses/d630-gentoo/."
             echo
@@ -410,6 +412,9 @@ jobs:
             "$stage/usr/share/licenses/d630-gentoo/Intel-Microcode-LICENSE.txt"
           cp "$firmware_root/LICENCE.iwlwifi_firmware" \
             "$stage/usr/share/licenses/d630-gentoo/LICENCE.iwlwifi_firmware"
+          mkdir -p "$stage/usr/share/licenses/d630-gentoo/wireless-regdb"
+          cp "$firmware_root/WIRELESS-REGDB-LICENSE.txt" \
+            "$stage/usr/share/licenses/d630-gentoo/wireless-regdb/LICENSE"
           cp "$out/FIRMWARE-SOURCES.txt" "$stage/usr/share/licenses/d630-gentoo/FIRMWARE-SOURCES.txt"
 
           tar --zstd -cf "$out/d630-firmware.tar.zst" -C "$stage" .
