@@ -43,6 +43,24 @@ grep -Fq 'LLVM_TARGETS: -AArch64 -AMDGPU' config/portage/profile/package.use.for
 grep -Fq 'profile/package.use.force/zz-d630-llvm' .github/workflows/gentoo-interactive-build.yml
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
+test -s config/portage/package.use/60-d630-firmware
+test -s config/portage/savedconfig/sys-kernel/linux-firmware
+grep -Fxq 'iwlwifi-3945-2.ucode' config/portage/savedconfig/sys-kernel/linux-firmware
+grep -Fxq 'CONFIG_STATIC=y' d630-gentoo/config/busybox/d630-static.config
+grep -Fxq '# CONFIG_STATIC is not set' d630-gentoo/config/busybox/d630-dynamic.config
+for busybox_config in d630-gentoo/config/busybox/d630-static.config d630-gentoo/config/busybox/d630-dynamic.config; do
+    for applet_config in CONFIG_ASH CONFIG_SH_IS_ASH CONFIG_ASH_ECHO CONFIG_ASH_PRINTF CONFIG_ASH_TEST CONFIG_FEATURE_SH_MATH CONFIG_CAT CONFIG_CHMOD CONFIG_CP CONFIG_FIND CONFIG_FEATURE_FIND_TYPE CONFIG_MKDIR CONFIG_MOUNT CONFIG_FEATURE_MOUNT_FLAGS CONFIG_FEATURE_MOUNT_LOOP CONFIG_SWITCH_ROOT CONFIG_UMOUNT CONFIG_WC; do
+        grep -Fxq "${applet_config}=y" "$busybox_config"
+    done
+done
+grep -Fxq 'iwlwifi-3945-2.ucode' d630-gentoo/config/firmware.keep
+grep -Fxq 'intel/iwlwifi/iwlwifi-3945-2.ucode' d630-gentoo/config/firmware.keep
+grep -Fxq 'regulatory.db' d630-gentoo/config/firmware.keep
+grep -Fxq 'regulatory.db.p7s' d630-gentoo/config/firmware.keep
+grep -Fq 'CONFIG_EXTRA_FIRMWARE="regulatory.db regulatory.db.p7s"' kernels/profiles/40-d630-builtin.config
+grep -Fq 'sha512sum --check -' .github/workflows/build-d630-kernel.yml
+grep -Fq 'wireless-regdb $regdb_version' .github/workflows/build-d630-kernel.yml
+grep -Fq 'firmware_keep="$repo_root/d630-gentoo/config/firmware.keep"' d630-gentoo/scripts/build-squashfs.sh
 test -s config/portage/package.use/20-repositories
 test -s config/portage/package.accept_keywords/20-guru
 test -s d630-gentoo/config/runtime/d630-firstboot
