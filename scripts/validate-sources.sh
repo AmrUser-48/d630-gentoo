@@ -5,6 +5,11 @@ test -s README.md
 test -s d630-tiny/README.md
 test -s d630-gentoo/README.md
 test -s kernels/README.md
+test -s kernels/reference/debian-6.1.0-52-amd64.config
+test -s kernels/reference/debian-d630-core2.config
+test -s kernels/profiles/20-d630-base/debian12/6.1.0-52-d630-core2/modules.order
+test -s scripts/strip-gentoo-kernel-savedconfig.py
+python3 -m py_compile scripts/strip-gentoo-kernel-savedconfig.py
 test -s d630-gentoo/config/package.list
 test -s d630-gentoo/config/initramfs-package.list
 test -s d630-gentoo/config/README.md
@@ -83,6 +88,10 @@ test -s config/portage/local-overlay/app-mobilephone/scrcpy/scrcpy-5.0.1.ebuild
 test -s scripts/import-gpkg-release.py
 python3 -m py_compile scripts/import-gpkg-release.py
 grep -Fq 'BUILD_ID' scripts/import-gpkg-release.py
+grep -Fq 'X86_MSR' scripts/strip-gentoo-kernel-savedconfig.py
+grep -Fq 'NTFS3_FS' scripts/strip-gentoo-kernel-savedconfig.py
+grep -Fq 'ZRAM_MULTI_COMP' scripts/strip-gentoo-kernel-savedconfig.py
+grep -Fq 'modules.order' scripts/strip-gentoo-kernel-savedconfig.py
 grep -Fq 'sha256:' scripts/import-gpkg-release.py
 
 grep -Fq 'media-libs/mesa -llvm -vulkan VIDEO_CARDS: -* intel' config/portage/package.use/10-d630-hardware
