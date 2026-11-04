@@ -11,6 +11,11 @@ on:
       - "d630-gentoo/config/runtime/d630-firstboot"
       - "d630-gentoo/config/desktop/**"
       - "config/portage/package.use/10-d630-hardware"
+      - "config/portage/package.use/60-d630-firmware-busybox"
+      - "config/portage/package.license"
+      - "config/portage/savedconfig/**"
+      - "d630-gentoo/config/busybox/**"
+      - "d630-gentoo/config/firmware.keep"
   workflow_dispatch:
     inputs:
       runtime_profile:
