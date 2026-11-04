@@ -77,7 +77,7 @@ jobs:
           tar -xJf "$archive" -C "$RUNNER_TEMP" --no-same-owner
           test -d "$RUNNER_TEMP/linux-$KERNEL_VERSION"
 
-      - name: Download pinned Intel microcode and D630 Wi-Fi firmware
+      - name: Download pinned Intel microcode, 3945ABG firmware and regulatory database
         shell: bash
         run: |
           set -euo pipefail
@@ -116,6 +116,21 @@ jobs:
             exit 1
           }
 
+          # Built-in cfg80211 requires the signed regulatory database before the root is mounted.
+          # Pin the same upstream release used by Gentoo net-wireless/wireless-regdb.
+          regdb_version="2026.09.03"
+          regdb_sha512="625918883b65361081db2d5ede754af5d58892da969500655d6211f163c463bfa8c6ab671d3be17117651fc45c41fb3f960a3544c91236fb314179318c191aa2"
+          regdb_archive="$RUNNER_TEMP/wireless-regdb-$regdb_version.tar.xz"
+          regdb_url="https://mirrors.edge.kernel.org/pub/software/network/wireless-regdb/wireless-regdb-$regdb_version.tar.xz"
+          curl --fail --location --retry 4 --retry-all-errors "$regdb_url" -o "$regdb_archive"
+          printf '%s  %s\n' "$regdb_sha512" "$regdb_archive" | sha512sum --check -
+          tar -xJf "$regdb_archive" -C "$RUNNER_TEMP"
+          regdb_source="$RUNNER_TEMP/wireless-regdb-$regdb_version"
+          cp "$regdb_source/regulatory.db" "$firmware_root/"
+          cp "$regdb_source/regulatory.db.p7s" "$firmware_root/"
+          test -s "$firmware_root/regulatory.db"
+          test -s "$firmware_root/regulatory.db.p7s"
+
           curl --fail --location --retry 4 --retry-all-errors \
             "https://raw.githubusercontent.com/intel/Intel-Linux-Processor-Microcode-Data-Files/$microcode_ref/license" \
             -o "$firmware_root/Intel-Microcode-LICENSE.txt"
@@ -133,11 +148,15 @@ jobs:
             echo "  06-17-06: Penryn/Core 2; source Git blob SHA-1 93a69eb9b1519453f0016ae575f43386c2b806b0"
             echo "Intel Wi-Fi firmware: PRO/Wireless 3945ABG; linux-firmware tag $wifi_ref; version 15.32.2.9"
             echo "Wi-Fi firmware URL: $wifi_url"
+            echo "Wireless regulatory database: wireless-regdb $regdb_version (Gentoo Manifest SHA512 verified)"
+            echo "Regulatory database is embedded through CONFIG_EXTRA_FIRMWARE and included in initramfs and d630-firmware.tar.zst."
             echo "License notices are included in d630-firmware.tar.zst under /usr/share/licenses/d630-gentoo/."
             echo
             sha256sum "$firmware_root/intel-ucode/06-0f-0d" \
               "$firmware_root/intel-ucode/06-17-06" \
-              "$firmware_root/iwlwifi-3945-2.ucode"
+              "$firmware_root/iwlwifi-3945-2.ucode" \
+              "$firmware_root/regulatory.db" \
+              "$firmware_root/regulatory.db.p7s"
           } > "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt"
           tee -a "$GITHUB_STEP_SUMMARY" < "$GITHUB_WORKSPACE/output/FIRMWARE-SOURCES.txt"
 
@@ -157,7 +176,21 @@ jobs:
           scripts/config --file .config --disable DEBUG_KERNEL --disable X86_VERBOSE_BOOTUP
           scripts/config --file .config --enable MICROCODE
           scripts/config --file .config --enable FW_LOADER
+          scripts/config --file .config --set-str EXTRA_FIRMWARE "regulatory.db regulatory.db.p7s"
+          scripts/config --file .config --set-str EXTRA_FIRMWARE_DIR "$RUNNER_TEMP/d630-firmware"
           make ARCH="$ARCH" olddefconfig
+          grep -Fxq 'CONFIG_CFG80211=y' .config || {
+            echo "ERROR: D630 built-in Wi-Fi requires built-in cfg80211." >&2
+            exit 1
+          }
+          grep -Fxq 'CONFIG_EXTRA_FIRMWARE="regulatory.db regulatory.db.p7s"' .config || {
+            echo "ERROR: signed wireless regulatory database is not embedded in the kernel." >&2
+            exit 1
+          }
+          grep -Fxq "CONFIG_EXTRA_FIRMWARE_DIR=\"$RUNNER_TEMP/d630-firmware\"" .config || {
+            echo "ERROR: kernel firmware search directory is not set to the pinned D630 firmware staging directory." >&2
+            exit 1
+          }
           if grep -Fxq 'CONFIG_X86_VERBOSE_BOOTUP=y' .config; then
             echo "ERROR: x86 decompressor progress output is enabled." >&2
             exit 1
@@ -172,6 +205,7 @@ jobs:
             CONFIG_IKCONFIG_PROC
             CONFIG_MICROCODE
             CONFIG_FW_LOADER
+            CONFIG_CFG80211
             CONFIG_MODULES
             CONFIG_IWLEGACY
             CONFIG_BLK_DEV_INITRD
@@ -220,7 +254,8 @@ jobs:
 
           {
             echo "Effective D630 kernel options:"
-            grep -E '^(CONFIG_(X86_64|X86_MSR|PROC_FS|IKCONFIG|IKCONFIG_PROC|MICROCODE|FW_LOADER|MODULES|IWLEGACY|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
+            grep -E '^(CONFIG_(X86_64|X86_MSR|PROC_FS|IKCONFIG|IKCONFIG_PROC|MICROCODE|FW_LOADER|CFG80211|MODULES|IWLEGACY|BLK_DEV_INITRD|BLK_DEV_LOOP|OVERLAY_FS|SQUASHFS|SQUASHFS_ZSTD|DEVTMPFS|TMPFS|EXT4_FS|BTRFS_FS|NTFS3_FS|EXFAT_FS|VFAT_FS|DRM_I915|IWL3945|USB_STORAGE|USB_NET_RNDIS_HOST|USB_NET_CDCETHER|BT|BT_HCIBTUSB|ZRAM|CPU_FREQ_DEFAULT_GOV_SCHEDUTIL|LOCALVERSION)=|# CONFIG_(TIGON3|EFI|EFI_STUB) is not set)' .config
+            grep '^CONFIG_EXTRA_FIRMWARE' .config
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Compile kernel image and modules
@@ -301,6 +336,8 @@ jobs:
           cp d630-gentoo/initramfs/init "$root/init"
           chmod 0755 "$root/init"
           cp "$firmware_root/iwlwifi-3945-2.ucode" "$root/lib/firmware/"
+          cp "$firmware_root/regulatory.db" "$root/lib/firmware/"
+          cp "$firmware_root/regulatory.db.p7s" "$root/lib/firmware/"
           cp "$firmware_root/intel-ucode/"* "$root/lib/firmware/intel-ucode/"
 
           # Fail the build if any shell/applet link escapes the archive or is dangling.
@@ -330,6 +367,8 @@ jobs:
           cpio -it < <(gzip -dc "$out/initramfs-main.gz") > "$out/initramfs-file-list.txt"
           grep -Exq '(\./)?init' "$out/initramfs-file-list.txt"
           grep -Fq 'lib/firmware/iwlwifi-3945-2.ucode' "$out/initramfs-file-list.txt"
+          grep -Fq 'lib/firmware/regulatory.db' "$out/initramfs-file-list.txt"
+          grep -Fq 'lib/firmware/regulatory.db.p7s' "$out/initramfs-file-list.txt"
 
           # Linux early microcode loading expects an uncompressed newc archive
           # before the ordinary (here gzip-compressed) initramfs archive.
@@ -364,6 +403,8 @@ jobs:
           mkdir -p "$stage/lib/firmware/intel-ucode" "$stage/usr/share/licenses/d630-gentoo"
 
           cp "$firmware_root/iwlwifi-3945-2.ucode" "$stage/lib/firmware/"
+          cp "$firmware_root/regulatory.db" "$stage/lib/firmware/"
+          cp "$firmware_root/regulatory.db.p7s" "$stage/lib/firmware/"
           cp "$firmware_root/intel-ucode/"* "$stage/lib/firmware/intel-ucode/"
           cp "$firmware_root/Intel-Microcode-LICENSE.txt" \
             "$stage/usr/share/licenses/d630-gentoo/Intel-Microcode-LICENSE.txt"
@@ -389,6 +430,7 @@ jobs:
           Boot files: kernel + external initramfs
           Early CPU microcode: Intel signatures 06-0f-0d (Merom) and 06-17-06 (Penryn), supplied in the early cpio archive prepended to initramfs
           Wi-Fi firmware: Intel PRO/Wireless 3945ABG; iwlwifi-3945-2.ucode version 15.32.2.9, available in the initramfs and the separate firmware archive
+          Wireless regulatory database: signed regulatory.db and regulatory.db.p7s from wireless-regdb 2026.09.03; embedded in the kernel and included in initramfs and firmware archive
           Kernel modules: modules-$kernel_release.tar.zst, installed under /lib/modules/$kernel_release
           Firmware archive: d630-firmware.tar.zst, contains /lib/firmware files and required license notices
           Root discovery: initramfs tries NTFS3, exFAT, VFAT, ext4 and Btrfs on block devices for /d630-gentoo/squashfs
