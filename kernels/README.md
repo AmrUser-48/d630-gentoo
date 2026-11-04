@@ -6,6 +6,8 @@ This directory defines three separate Linux kernel targets for the Dell Latitude
 
 The design goal is hardware accuracy, not the smallest possible configuration at any cost. Keep the D630's confirmed devices and declared peripherals; remove unrelated hardware families; retain only deliberate expansion support. Kconfig's resolved output, not the text of a fragment, is the final authority.
 
+**Filesystem invariant:** all three kernel profiles keep `CONFIG_EXT4_FS=y`. Ext4 remains built into the kernel in every target; it is never modular or disabled. Check this in the resolved `.config` after Kconfig processing.
+
 ## Status
 
 | Profile | Target | Current state |
