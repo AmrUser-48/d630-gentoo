@@ -409,17 +409,27 @@ jobs:
 
           after="$report/executable-permissions-after.json"
           audit_executables "$after" "$report/permission-repair-atoms-after.txt"
-          remaining_owned="$(python3 - "$after" <<'PY'
+          read -r remaining_owned remaining_unowned < <(python3 - "$after" <<'PY'
           import json, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))
-          print(sum(bool(item["owners"]) for item in data["issues"]))
+          issues = data["issues"]
+          print(
+              sum(bool(item["owners"]) for item in issues),
+              sum(not item["owners"] for item in issues),
+          )
           PY
-          )"
+          )
           if (( remaining_owned > 0 )); then
             echo "Package-owned executable permission anomalies remain after reinstall." >&2
             exit 1
           fi
-          echo "Package-owned executable permissions are clean." | tee -a "$GITHUB_STEP_SUMMARY"
+          if (( remaining_unowned > 0 )); then
+            echo "WARNING: $remaining_unowned unowned/custom executable anomalies remain; inspect the JSON audit before using those commands." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Executable permissions are clean in the checked system binary directories." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
           echo "Full before/after audit is saved in the restore diagnostics artifact." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Install single manual state-save command
