@@ -408,7 +408,8 @@ jobs:
         run: |
           set -euo pipefail
           start_epoch="${JOB_START_EPOCH:?JOB_START_EPOCH was not recorded}"
-          elapsed_seconds=$(( $(date +%s) - start_epoch ))
+          now=$(date +%s)
+          elapsed_seconds=$((now - start_epoch))
           available_seconds=$((345 * 60 - elapsed_seconds))
           requested_seconds=$((SESSION_MINUTES * 60))
           (( available_seconds > 0 )) || {
@@ -420,12 +421,12 @@ jobs:
           else
             session_seconds=$available_seconds
           fi
-          session_deadline=$(( $(date +%s) + session_seconds ))
+          session_deadline=$((now + session_seconds))
           echo "Requested SSH session cap: $SESSION_MINUTES minutes."
           echo "Actual SSH session: $((session_seconds / 60)) minutes and $((session_seconds % 60)) seconds."
           echo "The session will end 15 minutes before the 360-minute job timeout."
           while (( $(date +%s) < session_deadline )); do
             remaining=$((session_deadline - $(date +%s)))
-            (( remaining > 60 )) && remaining=60
+            if (( remaining > 60 )); then remaining=60; fi
             sleep "$remaining"
           done
