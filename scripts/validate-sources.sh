@@ -52,6 +52,8 @@ grep -Fq 'profile/package.use.force/zz-d630-llvm' .github/workflows/gentoo-inter
 test -s config/portage/package.use/00-core2-cpu
 test -s config/portage/package.use/10-d630-hardware
 test -s config/portage/package.use/60-d630-firmware
+test -s config/portage/package.use/70-d630-kernel
+grep -Fxq 'sys-kernel/gentoo-kernel savedconfig strip modules-compress' config/portage/package.use/70-d630-kernel
 test -s config/portage/savedconfig/sys-kernel/linux-firmware
 grep -Fxq 'iwlwifi-3945-2.ucode' config/portage/savedconfig/sys-kernel/linux-firmware
 grep -Fxq 'CONFIG_STATIC=y' d630-gentoo/config/busybox/d630-static.config
