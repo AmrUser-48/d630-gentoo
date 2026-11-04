@@ -905,8 +905,13 @@ if [[ -n "$LOCAL_RELEASE_ASSETS_DIR" ]]; then
     [[ "$(tr -d '\r\n' < "$REL_FILE")" == "$MOD_REL" ]] || die "module release mismatch"
   fi
   tar --use-compress-program=unzstd -xf "$MOD_ARCHIVE" -C "$ROOT"
-  [[ ! -f "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" ]] ||
-    tar --use-compress-program=unzstd -xf "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" -C "$ROOT"
+  [[ -s "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" ]] ||
+    die "prepared assets are missing d630-firmware.tar.zst; rebuild the D630 kernel workflow"
+  tar --use-compress-program=unzstd -xf "$LOCAL_RELEASE_ASSETS_DIR/d630-firmware.tar.zst" -C "$ROOT"
+  for firmware_file in iwlwifi-3945-2.ucode regulatory.db regulatory.db.p7s intel-ucode/06-0f-0d intel-ucode/06-17-06; do
+    [[ -s "$ROOT/lib/firmware/$firmware_file" ]] ||
+      die "kernel firmware bundle is incomplete: $firmware_file; rebuild the D630 kernel workflow"
+  done
   printf 'Source: recovered Actions artifact\nKernel release: %s\nModules: %s\n' "$MOD_REL" "$(basename "$MOD_ARCHIVE")" > "$OUT/KERNEL-MODULES.txt"
 elif [[ -n "$KERNEL_BUNDLE_TAG" ]]; then
   mkdir -p "$WORK/kernel"
@@ -918,11 +923,12 @@ with open(sys.argv[1],encoding="utf-8") as f:r=json.load(f)
 assets=r.get("assets",[])
 sums=[a for a in assets if a.get("name")=="SHA256SUMS"]
 mods=[a for a in assets if re.fullmatch(r"modules-[A-Za-z0-9._+-]+\.tar\.zst",a.get("name",""))]
-extra=[a for a in assets if a.get("name") in ("d630-firmware.tar.zst","KERNELRELEASE.txt","kernel-release.txt","kernel","initramfs","BUILD-MANIFEST.txt","d630-6.18.56.config")]
-if not sums or len(mods)!=1: raise SystemExit("Kernel release must contain SHA256SUMS and exactly one modules-*.tar.zst")
+firmware=[a for a in assets if a.get("name")=="d630-firmware.tar.zst"]
+extra=[a for a in assets if a.get("name") in ("KERNELRELEASE.txt","kernel-release.txt","kernel","initramfs","BUILD-MANIFEST.txt","d630-6.18.56.config")]
+if not sums or len(mods)!=1 or len(firmware)!=1: raise SystemExit("Kernel release must contain SHA256SUMS, exactly one modules archive, and d630-firmware.tar.zst; rebuild the D630 kernel workflow")
 with open(sys.argv[2],"w",encoding="utf-8") as f:
  f.write("SHA256SUMS\t"+sums[0]["browser_download_url"]+"\n")
- for a in mods+extra:f.write(a["name"]+"\t"+a["browser_download_url"]+"\n")
+ for a in mods+firmware+extra:f.write(a["name"]+"\t"+a["browser_download_url"]+"\n")
 PY
   SUMS_URL="$(awk -F '\t' '$1=="SHA256SUMS"{print $2;exit}' "$WORK/kernel/assets.tsv")"
   curl -fsSL --retry 3 "$SUMS_URL" -o "$WORK/kernel/SHA256SUMS"
@@ -939,7 +945,11 @@ PY
   [[ -s "$REL_FILE" ]] || REL_FILE="$WORK/kernel/kernel-release.txt"
   if [[ -s "$REL_FILE" ]]; then [[ "$(tr -d '\r\n' < "$REL_FILE")" == "$MOD_REL" ]] || die "module release mismatch"; fi
   tar --use-compress-program=unzstd -xf "$MOD_ARCHIVE" -C "$ROOT"
-  [[ ! -f "$WORK/kernel/d630-firmware.tar.zst" ]] || tar --use-compress-program=unzstd -xf "$WORK/kernel/d630-firmware.tar.zst" -C "$ROOT"
+  tar --use-compress-program=unzstd -xf "$WORK/kernel/d630-firmware.tar.zst" -C "$ROOT"
+  for firmware_file in iwlwifi-3945-2.ucode regulatory.db regulatory.db.p7s intel-ucode/06-0f-0d intel-ucode/06-17-06; do
+    [[ -s "$ROOT/lib/firmware/$firmware_file" ]] ||
+      die "kernel firmware bundle is incomplete: $firmware_file; rebuild the D630 kernel workflow"
+  done
   for BOOT_FILE in kernel initramfs; do
     [[ -s "$WORK/kernel/$BOOT_FILE" ]] || die "kernel release is missing required boot asset: $BOOT_FILE"
     cp -p "$WORK/kernel/$BOOT_FILE" "$OUT/$BOOT_FILE"
