@@ -12,17 +12,19 @@ The design goal is hardware accuracy, not the smallest possible configuration at
 
 | Profile | Target | Current state |
 |---|---|---|
-| [20-d630-base.config](profiles/20-d630-base.config) | Conventional installed Gentoo | Standard Gentoo distribution-kernel overlay; D630 device drivers are modular where Kconfig permits. A fresh build must still verify the resolved config. |
+| [20-d630-base.config](profiles/20-d630-base.config) | Conventional installed Gentoo | D630 overlay plus Debian 6.1.0-52 module-inventory pruning; MSR, ext4 and NTFS3 built in, optional D630 device drivers modular. Verify the resolved config after Kconfig. |
 | [30-d630-live.config](profiles/30-d630-live.config) | D630 Tiny | Tinyconfig-derived no-module profile exists. The current Tiny release workflow does not yet build its kernel from this profile. |
 | [40-d630-builtin.config](profiles/40-d630-builtin.config) | Gentoo live SquashFS | Used by the dedicated kernel workflow. It builds the kernel, matching module archive and external initramfs; physical D630 validation remains separate. |
 
-**Profile 20 policy:** the standard installed kernel preserves Gentoo's broad distribution-kernel baseline, with two hardware-specific exclusions: NVMe support and the xHCI USB 3 host-controller stack are disabled because the D630 has neither. Ethernet, media/capture, AMD/NVIDIA, virtual-device and other generic driver families remain inherited from Gentoo's version-specific baseline. Confirmed D630 device drivers are modular wherever Kconfig permits.
+**Profile 20 policy:** start from the released Gentoo 6.18.60 savedconfig, then prune modular options against Debian's `config-6.1.0-52-amd64`, the D630 `d630-core2.config` overlay, and the matching Debian `modules.order`. Remove Gentoo-only modules; retain D630 hardware, deliberate Debian module coverage, and the explicit D630 profile. `CONFIG_X86_MSR`, ext4 and NTFS3 are built in. xHCI, NVMe, EFI, unrelated buses, DVB/radio/SDR/test media and non-Intel discrete GPUs are disabled.
 
 Profile 40 explicitly disables xHCI and the media/DVB stack, but currently has no complete explicit NVMe exclusion. Its resolved config must be checked before claiming that the SFS kernel contains no NVMe support. Profile 30 starts from tinyconfig, but its final resolved config must still be checked for disabled NVMe and xHCI symbols.
 
 ## Layout
 
-- [Profile 20 Debian reference inventory](profiles/20-d630-base/README.md) — text-only Debian hardware, module, configuration and firmware inventory used to refine the base overlay.
+- [Profile 20 Debian reference inventory](profiles/20-d630-base/README.md) — hardware and module inventory from the Debian D630 build.
+- [Debian baseline config](reference/debian-6.1.0-52-amd64.config) and [D630 Debian policy overlay](reference/debian-d630-core2.config) — versioned reference inputs for savedconfig pruning.
+- [Debian modules.order](profiles/20-d630-base/debian12/6.1.0-52-d630-core2/modules.order) — actual modules built for the Debian D630 kernel.
 
 - [profiles/20-d630-base.config](profiles/20-d630-base.config) — modular overlay for Gentoo's distribution-kernel build.
 - [profiles/30-d630-live.config](profiles/30-d630-live.config) — hardware and feature fragment for the standalone Tiny kernel.
@@ -74,7 +76,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | CPU, MSR, CPUID, ACPI and CPU frequency | Keep the required architecture/core infrastructure built in; ACPI device functions and the ACPI cpufreq driver are modules. |
 | Root storage | AHCI, SCSI disk support and ext4 remain built in so the ordinary root filesystem does not depend on loading a storage module first. |
 | IDE/ATAPI optical drive | ATA PIIX and optical-device support are modules. |
-| Btrfs, NTFS3, exFAT, VFAT, ISO9660, UDF, FUSE and SquashFS | Modules. |
+| ext4 and NTFS3 | Built in. Btrfs, exFAT, VFAT, ISO9660, UDF, FUSE and SquashFS remain modular where Kconfig permits. |
 | GM965 / GMA X3100 | DRM core and i915 are modules; AGP and framebuffer/console foundations remain built in; Intel AGP driver is modular where supported. |
 | Intel 3945ABG | cfg80211, mac80211, iwlegacy and iwl3945 are modules; the matching firmware is supplied separately. |
 | ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |\n| USB 3 / xHCI | Disabled; the D630 has only USB 2.0 UHCI/EHCI controllers. |\n| NVMe | Host, fabrics and target support disabled; the D630 has SATA/AHCI and ATA storage only. |
@@ -83,9 +85,9 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA frameworks remain built in; HDA controller/codec and Bluetooth USB transport are modules. |
 | Dell platform, battery, fan and sensors | ACPI and Dell platform selector remain built in; ACPI/WMI, SMBIOS/DCDBAS and Dell device drivers are modules where Kconfig permits. Thermal, hwmon and I2C frameworks remain built in; sensor and SMBus-controller drivers are modules. |
 | ZRAM | Built in; all compression backends and optional ZRAM features enabled; LZO is the Kconfig default. Runtime selects 40% LZO at 4 GiB RAM or less, and 30% ZSTD level 3 above 4 GiB. |
-| Other hardware families | Leave Gentoo's standard distribution-kernel defaults intact. Profile 20 does not prune hardware unrelated to the D630. |
+| Other hardware families | Prune Gentoo-only modules using the Debian D630 config and module inventory; do not retain broad unrelated hardware families just because Gentoo enables them by default. |
 
-The current inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. It does not currently identify an Ethernet controller, xHCI controller or Bluetooth adapter. Profile 20 still leaves generic support for those device families to Gentoo's distribution baseline; absence from this laptop's inventory is not a reason to disable them in the standard kernel. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
+The current inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. Wired Ethernet and xHCI are out of scope; USB RNDIS remains for Android tethering. Bluetooth core/USB transport is retained as optional support because the adapter remains unconfirmed. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
 
 A module set to =m is not loaded into memory merely because it exists on disk. Modules are appropriate for optional USB devices, audio and removable filesystems in the installed Gentoo profile. Tiny is different: with module support disabled, every needed driver must be built in.
 
@@ -120,7 +122,7 @@ Use hardware discovery to form the candidate driver set, not as the only source 
 
 Use the kernel's merge_config.sh to apply fragments and review its override/dependency warnings. After make olddefconfig, inspect the resolved .config. Use scripts/diffconfig -m to generate a maintainable fragment from a known baseline and a validated final config. A requested CONFIG_FOO=n line in a fragment is not proof that the final kernel has disabled it.
 
-Apply this broad pruning policy only to profiles that intentionally strip hardware support (Profiles 30 and 40). Profile 20 preserves Gentoo's standard hardware coverage except for its two explicit D630 hardware exclusions: NVMe and xHCI USB 3.
+Profile 20 now uses the Debian D630 build as its module reference too. The helper prunes only `=m` entries: it keeps modular symbols present in the Debian config and actual `modules.order`, plus modules explicitly selected by the D630 profile. Unmapped Debian module names are retained conservatively rather than guessed away. Built-in options are preserved except for explicit legacy-BIOS and D630 exclusions.
 
 - NVMe: CONFIG_BLK_DEV_NVME, CONFIG_NVME_CORE, NVMe fabrics/transports and CONFIG_NVME_TARGET.
 - USB 3: CONFIG_USB_XHCI_HCD and its dependent host/controller options.
@@ -149,9 +151,31 @@ ls -l /etc/kernel/config.d/
 emerge --ask --verbose --buildpkgonly sys-kernel/gentoo-kernel
 ~~~
 
-Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that the D630 device drivers resolve to modules where Kconfig permits, that the AHCI/ext4 root path remains built in, and that Gentoo's unrelated driver coverage remains inherited. Do not infer success from the source fragment or package installation alone.
+Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that MSR, ext4 and NTFS3 resolve to `=y`, ZRAM keeps all backends and optional features, and only the intended D630/ Debian-reference modules remain. Do not infer success from the source fragment or package installation alone.
 
-### Module stripping and compression for Profile 20
+### Debian-referenced savedconfig pruning for Profile 20
+
+The released Gentoo kernel config is the starting point. From a checkout of this repository on the Gentoo runner, prune the existing savedconfig with the Debian baseline and the actual D630 module inventory:
+
+~~~bash
+python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60
+~~~
+
+This creates a sibling `.stripped` file and report without changing the original. Review the report, then apply it with the script's backup-protected write mode:
+
+~~~bash
+python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 --write
+~~~
+
+The original is preserved as `.pre-debian-prune`. The helper uses the full Debian amd64 config, the D630 Debian overlay and the matching `modules.order`. It removes Gentoo-only `=m` choices; built-in options are retained except for explicit D630/legacy-BIOS overrides. It forces `CONFIG_X86_MSR=y`, `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`; ZRAM remains built in with every backend, writeback, age tracking, memory tracking and multi-compression enabled. The script does not run Kconfig or compile the kernel.
+
+Rebuild from the updated savedconfig:
+
+~~~bash
+emerge --ask --verbose --oneshot --usepkg=n --reinstall=always --buildpkg sys-kernel/gentoo-kernel
+~~~
+
+After the build, inspect the resolved `.config`; Kconfig may adjust options because of version-specific dependencies. Do not release the package until the required symbols and resulting module tree have been checked.
 
 Gentoo's `sys-kernel/gentoo-kernel` package enables `USE=strip` by default. Its kernel build passes `INSTALL_MOD_STRIP=--strip-unneeded` to `modules_install`, stripping unneeded symbols from modules before installation. This does not remove entire driver families.
 
