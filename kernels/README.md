@@ -6,7 +6,7 @@ This directory defines three separate Linux kernel targets for the Dell Latitude
 
 The design goal is hardware accuracy, not the smallest possible configuration at any cost. Keep the D630's confirmed devices and declared peripherals; remove unrelated hardware families; retain only deliberate expansion support. Kconfig's resolved output, not the text of a fragment, is the final authority.
 
-**Filesystem invariant:** all three kernel profiles keep `CONFIG_EXT4_FS=y`. Ext4 remains built into the kernel in every target; it is never modular or disabled. Check this in the resolved `.config` after Kconfig processing.
+**Filesystem invariant:** all three kernel profiles keep `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`. Both filesystems remain built into the kernel; neither is modular or disabled. Check them in the resolved `.config` after Kconfig processing.
 
 ## Status
 
@@ -55,7 +55,7 @@ Use a generic x86-64 kernel ISA baseline. Kernel builds may use KCFLAGS=-mtune=c
 
 | Profile | Baseline | Modules | Root model |
 |---|---|---|---|
-| 20 — Gentoo installed | Version-specific Gentoo distribution-kernel config | Yes; D630 device drivers are modules where Kconfig permits; generic distro coverage is retained | Ordinary installed root; SATA/AHCI and ext4 root path built in |
+| 20 — Gentoo installed | Gentoo 6.18.60 savedconfig trimmed against Debian D630 references | Yes; only Debian-inventory and explicit D630 modules retained; D630 filesystems/MSR built in | Ordinary installed root; AHCI, ext4 and NTFS3 built in |
 | 30 — Tiny | Upstream make tinyconfig, expanded with required platform foundations and D630 hardware | No; CONFIG_MODULES=n and all required drivers built in | External initramfs only; no Gentoo root, SquashFS or loop device |
 | 40 — Gentoo live | x86_64_defconfig plus the D630 fragment | Module support remains enabled; early boot and root-discovery drivers are built in | External initramfs discovers and mounts the Gentoo SquashFS root, then uses OverlayFS |
 
@@ -63,7 +63,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 
 ### Configuration strategy
 
-**Profile 20 — use Gentoo's baseline, not tinyconfig.** The Gentoo distribution-kernel ebuild selects a version-specific upstream distribution configuration and Gentoo's common configuration. Its kernel-build integration then merges user snippets from /etc/kernel/config.d/*.config in lexical order, after the distribution config and any savedconfig input. A config.d fragment is an overlay, not a replacement full .config. Avoid USE=savedconfig for this design unless deliberately replacing the distribution baseline with a saved full configuration.
+**Profile 20 — use the released Gentoo savedconfig, not tinyconfig.** The 6.18.60 release asset is the full Gentoo kernel `.config`. The pruning helper uses that file as input, removes module options outside the Debian D630 config/module inventory, then applies required D630 built-ins and exclusions. Keep `USE=savedconfig` enabled for `sys-kernel/gentoo-kernel`. The `/etc/kernel/config.d/20-d630-base.config` file remains a later overlay; it is not a replacement full `.config`.
 
 **Profile 30 — start with make tinyconfig.** A bare tinyconfig is not a usable laptop kernel: it also disables parent infrastructure such as PCI, the block layer, USB, networking and input. Kconfig does not automatically enable a symbol's unmet depends-on prerequisites just because the leaf driver is requested; merge_config.sh is a fragment merger, not a dependency-closure solver. Use the fragment only while developing the first working config: enable subsystem foundations first, resolve with olddefconfig, then enable the dependent D630 drivers in a second pass. Use menuconfig's / search on any symbol that refuses to resolve to inspect its direct and recursive dependencies. Once the complete config is correct, save it with make savedefconfig as a dedicated d630-tiny_defconfig and use that defconfig as the reproducible build input. This avoids re-solving the same dependency chain on every build. On kernel upgrades, carry the previous resolved config forward with olddefconfig, inspect scripts/diffconfig output and re-run the required-symbol checks. Every driver required by Tiny must resolve to =y. With CONFIG_MODULES=n there must be no =m entries and no /lib/modules dependency. The current repository profile is still a tinyconfig-derived fragment; the dedicated Tiny kernel build workflow/defconfig has not yet been added.
 
@@ -143,12 +143,13 @@ Firmware is separate from kernel configuration:
 
 ### Profile 20 — Gentoo distribution kernel
 
-From a checkout of this repository on the Gentoo build system, install only the Profile 20 overlay:
+From a checkout of this repository on the Gentoo build system, install the Profile 20 overlay and prune the released savedconfig before rebuilding:
 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
 ls -l /etc/kernel/config.d/
-emerge --ask --verbose --buildpkgonly sys-kernel/gentoo-kernel
+python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 --write
+emerge --ask --verbose --oneshot --usepkg=n --reinstall=always --buildpkg sys-kernel/gentoo-kernel
 ~~~
 
 Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that MSR, ext4 and NTFS3 resolve to `=y`, ZRAM keeps all backends and optional features, and only the intended D630/ Debian-reference modules remain. Do not infer success from the source fragment or package installation alone.
@@ -167,7 +168,7 @@ This creates a sibling `.stripped` file and report without changing the original
 python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 --write
 ~~~
 
-The original is preserved as `.pre-debian-prune`. The helper uses the full Debian amd64 config, the D630 Debian overlay and the matching `modules.order`. It removes Gentoo-only `=m` choices; built-in options are retained except for explicit D630/legacy-BIOS overrides. It forces `CONFIG_X86_MSR=y`, `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`; ZRAM remains built in with every backend, writeback, age tracking, memory tracking and multi-compression enabled. The script does not run Kconfig or compile the kernel.
+The original is preserved as `.pre-debian-prune`. The helper uses the full Debian amd64 config, the D630 Debian overlay and the matching `modules.order`. It removes Gentoo-only `=m` choices; built-in options are retained except for explicit D630/legacy-BIOS overrides. It forces `CONFIG_X86_MSR=y`, `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`; ZRAM remains built in with every backend, writeback, age tracking, memory tracking and multi-compression enabled. The script does not run Kconfig or compile the kernel. The ebuild must resolve the result with its 6.18.60 Kconfig before the package is accepted.
 
 Rebuild from the updated savedconfig:
 
