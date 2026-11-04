@@ -12,6 +12,6 @@ The runtime builder installs the static savedconfig at `/etc/portage/savedconfig
 
 [firmware.keep](firmware.keep) is the final SquashFS allowlist, with paths relative to `/lib/firmware`. The build removes every other regular file and symlink from the **staging copy only**; the restored Gentoo root and binary-package cache are not modified.
 
-The allowlist retains Intel 3945ABG firmware, the wireless regulatory database and signature, and the two Core 2 microcode blobs supplied by the matching kernel bundle. Gentoo's `linux-firmware` savedconfig selects the three package-provided files before packaging. The kernel workflow independently embeds the iwlwifi blob in the initramfs and prepends Intel microcode in the early cpio archive.
+The allowlist retains Intel 3945ABG firmware, the wireless regulatory database and signature, and the two Core 2 microcode blobs supplied by the matching kernel bundle. Gentoo's `linux-firmware` savedconfig selects the root-level `iwlwifi-3945-2.ucode` alias; Gentoo's firmware-copy patch also includes its nested `intel/iwlwifi/iwlwifi-3945-2.ucode` target. The existing runtime package set selects `net-wireless/wireless-regdb`, which installs `regulatory.db` and `regulatory.db.p7s`. The kernel workflow independently embeds the iwlwifi blob in the initramfs and prepends Intel microcode in the early cpio archive.
 
 The D630 GM965/GMA X3100 uses the in-kernel `i915` driver and does not need newer Intel graphics firmware. No Bluetooth firmware is selected because the D630 adapter has not yet been identified.
