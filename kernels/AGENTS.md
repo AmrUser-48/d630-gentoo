@@ -19,3 +19,8 @@ Profile 20 is the standard installed Gentoo kernel overlay, not a stripped kerne
 Use a generic x86-64 ISA baseline with `KCFLAGS=-mtune=core2`. Do not add `CONFIG_MCORE2` or compile kernel code with `-march=core2`. Keep built-in the dependencies needed before the live SquashFS root is mounted: loop, SquashFS-Zstd, OverlayFS, host filesystem and D630 boot-critical drivers.
 
 Run profile/config validators, then compile and inspect the generated configuration and artifacts, verify matching modules/firmware, and test QEMU separately. Static fragment validation is not a kernel build or boot test.
+
+
+## Embedded configuration policy
+
+Keep `CONFIG_IKCONFIG=y` and `CONFIG_IKCONFIG_PROC=y` enabled in kernel profiles by default, together with `CONFIG_PROC_FS=y`. This allows the running kernel to expose its exact embedded configuration at `/proc/config.gz`. Treat this as the normal policy for general-purpose and diagnostic kernels. Disable it only for an intentionally minimal or size-constrained target, with an explicit documented reason. A Debian or upstream reference config that omits IKCONFIG is evidence about that build, not a reason to omit it from D630 profiles.
