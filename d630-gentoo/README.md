@@ -45,6 +45,13 @@ Current direct-folder mode is volatile. The optional ext4 `gentoo-data.img` belo
 Wi-Fi credentials remain outside the SquashFS. Start from [wifi.nmconnection.example](config/wifi/wifi.nmconnection.example) and place the completed NetworkManager keyfile at `/d630-gentoo/wifi.nmconnection` on the host partition; the first-boot service imports it with root ownership and mode `0600` only when NetworkManager is installed.
 
 The currently published Core 2 binpkg set does not contain a complete NetworkManager plus `wpa_supplicant` binary-package closure. Consequently, the binpkg-only Openbox image does not enable Wi-Fi auto-connect. The external profile remains available for a later image built after those packages are published. `dhcpcd` remains available for wired networking.
+
+### Adaptive ZRAM swap
+
+The image enables the shared [OpenRC ZRAM service](../config/openrc/d630-zram) at boot. It reads `MemTotal` and configures 40% of RAM with LZO at 4 GiB or less, or 30% with Zstandard level 3 above 4 GiB. The LZO path registers ZSTD level 3 as a secondary compressor for manual idle-page recompression; it is not a background task.
+
+All ZRAM compressor backends and optional kernel features are enabled. Writeback support is compiled in, but no `backing_dev` is configured, so ZRAM does not write swap pages to SSD by default. The service sets swap priority 100, `vm.swappiness=180` and `vm.page-cluster=0`.
+
 ### Boot methods
 
 | Method | Files and GRUB entry | Status |
