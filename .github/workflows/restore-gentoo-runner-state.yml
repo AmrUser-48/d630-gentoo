@@ -1,5 +1,5 @@
 name: Gentoo — Restore saved runner state
-run-name: "Gentoo restored runner • ${{ inputs.state_tag || 'latest state' }} • ${{ inputs.session_minutes || 240 }} min"
+run-name: "Gentoo restored runner • ${{ inputs.state_tag || 'latest state' }} • ${{ inputs.session_minutes || 300 }} min"
 
 on:
   workflow_dispatch:
