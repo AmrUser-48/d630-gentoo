@@ -8,9 +8,9 @@
 sys-apps/busybox
 sys-apps/msr-tools
 
-# Use config/busybox/d630-static.config for this early userspace.
-# The dynamic profile is linked against libc and is not suitable for a
-# standalone early initramfs shell.
+# Optional Gentoo BusyBox source-build profile: config/busybox/d630-static.config.
+# The current kernel workflow uses the runner's busybox-static package instead;
+# these fragments are not injected into that package or build.
 #
 # Applets used by initramfs/init:
 # ash/sh, cat, chmod, cp, echo, find (-type), mkdir, mount (flags + loop),
