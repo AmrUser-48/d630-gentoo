@@ -288,6 +288,9 @@ jobs:
       - name: Audit and repair restored executable permissions
         shell: bash
         run: |
+          # The restore tar uses --same-permissions: it faithfully restores archived modes.
+          # Audit the resulting executables and repair through Portage package ownership;
+          # never apply recursive chmod or change umask on the restored root.
           set -euo pipefail
           report="$RUNNER_TEMP/gentoo-state"
           mkdir -p "$report"
