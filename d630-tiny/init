@@ -15,12 +15,14 @@ mount -t devtmpfs -o mode=0755 devtmpfs /dev 2>/dev/null || :
 mkdir -p /dev/pts /dev/shm /proc /sys /run /tmp /root
 mount -t proc proc /proc 2>/dev/null || :
 mount -t sysfs sysfs /sys 2>/dev/null || :
+mkdir -p /sys/kernel/debug
+mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || :
 mount -t devpts devpts /dev/pts 2>/dev/null || :
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || :
 mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || :
 
-# Initialize built-in ZRAM as swap. The logical device size is half of
-# detected RAM; physical memory is allocated lazily as pages are compressed.
+# Initialize built-in ZRAM as 40% LZO swap. ZSTD level 3 is registered as a
+# secondary compressor for optional idle/huge-page recompression.
 setup_zram() {
     if [ ! -b /dev/zram0 ] || [ ! -w /sys/block/zram0/disksize ]; then
         printf '[d630-tiny] Built-in ZRAM is unavailable; continuing without compressed swap.\n'
@@ -42,7 +44,17 @@ setup_zram() {
             ;;
     esac
 
-    zram_bytes=$((mem_kb * 4096 * 40 / 100))
+    if ! printf '%s\n' lzo > /sys/block/zram0/comp_algorithm; then
+        printf '[d630-tiny] Could not select LZO; continuing without compressed swap.\n'
+        return
+    fi
+    if [ -w /sys/block/zram0/recomp_algorithm ]; then
+        printf '%s\n' 'algo=zstd priority=1' > /sys/block/zram0/recomp_algorithm 2>/dev/null || :
+        printf '%s\n' 'priority=1 level=3' > /sys/block/zram0/algorithm_params 2>/dev/null || :
+    fi
+
+    # MemTotal is KiB: convert to bytes with 1024, not 4096.
+    zram_bytes=$((mem_kb * 1024 * 40 / 100))
     if ! printf '%s\n' "$zram_bytes" > /sys/block/zram0/disksize; then
         printf '[d630-tiny] Could not set ZRAM size; continuing without compressed swap.\n'
         return
@@ -56,7 +68,9 @@ setup_zram() {
         return
     fi
 
-    printf '[d630-tiny] ZRAM swap enabled: %s MiB.\n' "$((zram_bytes / 1048576))"
+    [ ! -w /proc/sys/vm/swappiness ] || printf '%s\n' 180 > /proc/sys/vm/swappiness
+    [ ! -w /proc/sys/vm/page-cluster ] || printf '%s\n' 0 > /proc/sys/vm/page-cluster
+    printf '[d630-tiny] ZRAM swap enabled: %s MiB (LZO, 40%% RAM).\n' "$((zram_bytes / 1048576))"
 }
 
 setup_zram
