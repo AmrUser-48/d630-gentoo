@@ -401,7 +401,7 @@ jobs:
             # no recursive chmod or umask changes are performed.
             sudo chroot "$GENTOO_ROOT" /bin/bash -lc '
               set -euo pipefail
-              emerge --ignore-default-opts --ask=n --oneshot --nodeps --usepkg=y --getbinpkg "$@"
+              emerge --ignore-default-opts --ask=n --oneshot --reinstall=always --nodeps --usepkg=y --getbinpkg "$@"
             ' gentoo-permission-repair "${repair_atoms[@]}" |& tee "$report/permission-repair.log"
           else
             echo "No package-owned executable permission repairs were needed."
