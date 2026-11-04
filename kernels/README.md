@@ -143,13 +143,11 @@ Firmware is separate from kernel configuration:
 
 ### Profile 20 — Gentoo distribution kernel
 
-From a checkout of this repository on the Gentoo build system, install the Profile 20 overlay and prune the released savedconfig before rebuilding:
+From a checkout of this repository on the Gentoo build system, install the Profile 20 overlay:
 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
 ls -l /etc/kernel/config.d/
-python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 --write
-emerge --ask --verbose --oneshot --usepkg=n --reinstall=always --buildpkg sys-kernel/gentoo-kernel
 ~~~
 
 Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that MSR, ext4 and NTFS3 resolve to `=y`, ZRAM keeps all backends and optional features, and only the intended D630/ Debian-reference modules remain. Do not infer success from the source fragment or package installation alone.
