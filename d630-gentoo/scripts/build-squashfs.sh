@@ -17,6 +17,8 @@ command -v mksquashfs >/dev/null || { echo "Required command missing: mksquashfs
 
 src="$(realpath "$1")"
 output="$(realpath -m "$2")"
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+firmware_keep="$repo_root/d630-gentoo/config/firmware.keep"
 [[ -d "$src/etc" && -d "$src/usr" ]] || {
   echo "Input does not look like a Linux rootfs: $src" >&2
   exit 1
@@ -68,6 +70,41 @@ rsync -aHAX --numeric-ids --one-file-system --delete \
   --exclude='/usr/lib/debug/***' \
   --exclude='/usr/lib64/debug/***' \
   "$src/" "$stage/"
+
+# Keep firmware attribution and license texts even though general package docs are excluded.
+for firmware_docdir in "$src"/usr/share/doc/linux-firmware-*; do
+  [[ -d "$firmware_docdir" ]] || continue
+  if [[ -d "$firmware_docdir/LICENSES" ]]; then
+    mkdir -p "$stage/usr/share/licenses/d630-gentoo/linux-firmware"
+    cp -a "$firmware_docdir/LICENSES/." "$stage/usr/share/licenses/d630-gentoo/linux-firmware/"
+  fi
+  if [[ -s "$firmware_docdir/WHENCE" ]]; then
+    mkdir -p "$stage/usr/share/licenses/d630-gentoo/linux-firmware"
+    install -m 0644 "$firmware_docdir/WHENCE" "$stage/usr/share/licenses/d630-gentoo/linux-firmware/WHENCE"
+  fi
+done
+
+# Retain only firmware for identified D630 hardware. Resolve /lib first because
+# some layouts make it a symlink to /usr/lib.
+if [[ -d "$stage/lib/firmware" ]]; then
+  [[ -s "$firmware_keep" ]] || {
+    echo "D630 firmware allowlist is missing: $firmware_keep" >&2
+    exit 1
+  }
+  firmware_dir="$(realpath "$stage/lib/firmware")"
+  [[ "$firmware_dir" == "$stage/"* ]] || {
+    echo "Resolved firmware directory escapes the staging root: $firmware_dir" >&2
+    exit 1
+  }
+  while IFS= read -r -d '' firmware_file; do
+    relative="${firmware_file#"$firmware_dir"/}"
+    if ! grep -Fqx -- "$relative" "$firmware_keep"; then
+      rm -f -- "$firmware_file"
+    fi
+  done < <(find "$firmware_dir" \\( -type f -o -type l \\) -print0)
+  find "$firmware_dir" -depth -type d -empty -delete
+  echo "Applied D630 firmware allowlist: $firmware_keep"
+fi
 
 if awk -F: '$3 == 1000 { found = 1 } END { exit !found }' "$stage/etc/passwd"; then
   echo "UID 1000 is assigned in the runtime root; refusing to normalize host-owned files." >&2
