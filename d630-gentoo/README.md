@@ -23,6 +23,7 @@ Expected boot partition:
 - `boot/grub/three-file.cfg`: preferred direct-file GRUB entry.
 - `boot/grub/gui.cfg`: graphical boot entry.
 - `config/package-sets/`: console, desktop, Openbox and other runtime sets.
+- `config/busybox/` and `config/firmware.keep`: BusyBox profiles and the final firmware allowlist; see [boot userspace and firmware configuration](config/README.md).
 - `config/desktop/`: curated Xresources, Openbox and MPD user skeletons.
 - `config/wifi/`: external NetworkManager profile template; credentials are not embedded in the image.
 - `config/xorg/`: D630 input configuration and optional graphics-driver test profiles.
