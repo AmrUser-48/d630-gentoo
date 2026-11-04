@@ -1,4 +1,2 @@
-# Paths relative to /lib/firmware. Keep only confirmed D630 requirements.
+# Paths relative to /lib/firmware. The root-level alias pulls in its nested target.
 iwlwifi-3945-2.ucode
-regulatory.db
-regulatory.db.p7s
