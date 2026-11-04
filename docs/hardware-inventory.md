@@ -39,7 +39,7 @@ Status labels: **Known** means explicitly established for this target; **identif
 | FireWire / modem / WWAN / webcam | **Not confirmed** | Do not include by default without inventory evidence or an explicit requirement. |
 | Display, keyboard, touchpad, pointing stick | **Confirmed:** AT keyboard via i8042/serio; AlpsPS/2 ALPS DualPoint Stick and DualPoint TouchPad; external USB mouse `0000:3821` | Keep `i8042`, serio, `atkbd`, `psmouse`, evdev/libinput and USB HID. Keep ACPI video/hotkey input support. |
 | Power management | ACPI laptop | Keep ACPI, battery, thermal and fan-related platform support; validate suspend/resume and thermal reporting on real hardware. |
-| Memory compression | **Confirmed:** current kernel has `CONFIG_ZRAM=y`; system has `zram0` 1.5 GiB | Keep ZRAM built in; select one or a small set of supported fast compressors after checking the target kernel's config and runtime availability. |
+| Memory compression | **Confirmed:** current kernel has `CONFIG_ZRAM=y`; system has `zram0` 1.5 GiB | Keep ZRAM built in with all compression backends and optional features. Runtime policy: 40% LZO at 4 GiB RAM or less; 30% ZSTD level 3 above 4 GiB. Writeback support is compiled but no backing disk is configured by default. |
 
 ## Confirmed platform details
 
