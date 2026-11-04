@@ -80,7 +80,7 @@ PORTAGE_GID="$(awk -F: '$1 == "portage" { print $3; exit }' "$ROOT/etc/group")"
 log "Install Core 2 Portage configuration"
 mkdir -p "$ROOT/etc/portage/package-sets" "$ROOT/etc/portage/profile/package.use.force" \
   "$ROOT/etc/portage/binrepos.conf" "$ROOT/etc/portage/repos.conf" \
-  "$ROOT/etc/portage/savedconfig/sys-apps" "$ROOT/etc/portage/savedconfig/sys-kernel" \
+  "$ROOT/etc/portage/savedconfig/sys-kernel" \
   "$ROOT/etc/bash/bashrc.d" "$ROOT/etc/env.d" "$ROOT/etc/X11/xorg.conf.d" \
   "$ROOT/usr/local/sbin" "$ROOT/var/cache/binpkgs" "$ROOT/var/log/portage" \
   "$ROOT/var/tmp/portage" "$ROOT/dev" "$ROOT/proc" "$ROOT/sys" "$ROOT/run"
