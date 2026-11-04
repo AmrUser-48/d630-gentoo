@@ -1,5 +1,5 @@
 name: Gentoo — Restore saved runner state
-run-name: "Gentoo restored runner • ${{ inputs.state_tag || 'latest state' }} • ${{ inputs.session_minutes || 300 }} min"
+run-name: "Gentoo restored runner • ${{ inputs.state_tag || 'latest state' }} • ${{ inputs.session_minutes || 345 }} min"
 
 on:
   workflow_dispatch:
@@ -10,10 +10,10 @@ on:
         type: string
         default: ""
       session_minutes:
-        description: "SSH session duration after restore (1–300 minutes)"
+        description: "Maximum SSH session duration after restore (1–345 minutes)"
         required: true
         type: number
-        default: 240
+        default: 345
       runner_label:
         description: "Runner label; use a runner with enough disk space for the restored Gentoo root"
         required: true
@@ -46,12 +46,13 @@ jobs:
           STATE_TAG_INPUT: ${{ inputs.state_tag }}
         run: |
           set -euo pipefail
+          printf 'JOB_START_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
           [[ -n "${TAILSCALE_AUTHKEY:-}" ]] || { echo "Missing repository secret TAILSCALE_AUTHKEY." >&2; exit 1; }
           [[ -n "${SSH_PUBLIC_KEY:-}" ]] || { echo "Missing repository secret SSH_PUBLIC_KEY." >&2; exit 1; }
 
           [[ "${SESSION_MINUTES:-}" =~ ^[0-9]+$ ]] || { echo "session_minutes must be an integer." >&2; exit 1; }
-          (( SESSION_MINUTES >= 1 && SESSION_MINUTES <= 300 )) || {
-            echo "session_minutes must be between 1 and 300." >&2
+          (( SESSION_MINUTES >= 1 && SESSION_MINUTES <= 345 )) || {
+            echo "session_minutes must be between 1 and 345." >&2
             exit 1
           }
 
@@ -406,19 +407,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          remaining=$((SESSION_MINUTES * 60))
-          echo "Keeping the restored Gentoo environment available for $SESSION_MINUTES minutes."
-          while (( remaining > 0 )); do
-            sleep 60
-            remaining=$((remaining - 60))
+          start_epoch="${JOB_START_EPOCH:?JOB_START_EPOCH was not recorded}"
+          elapsed_seconds=$(( $(date +%s) - start_epoch ))
+          available_seconds=$((345 * 60 - elapsed_seconds))
+          requested_seconds=$((SESSION_MINUTES * 60))
+          (( available_seconds > 0 )) || {
+            echo "The 15-minute shutdown buffer has already been consumed; refusing to start SSH keepalive." >&2
+            exit 1
+          }
+          if (( requested_seconds < available_seconds )); then
+            session_seconds=$requested_seconds
+          else
+            session_seconds=$available_seconds
+          fi
+          session_deadline=$(( $(date +%s) + session_seconds ))
+          echo "Requested SSH session cap: $SESSION_MINUTES minutes."
+          echo "Actual SSH session: $((session_seconds / 60)) minutes and $((session_seconds % 60)) seconds."
+          echo "The session will end 15 minutes before the 360-minute job timeout."
+          while (( $(date +%s) < session_deadline )); do
+            remaining=$((session_deadline - $(date +%s)))
+            (( remaining > 60 )) && remaining=60
+            sleep "$remaining"
           done
-
-      - name: Upload restore diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gentoo-state-restore-run-${{ github.run_id }}
-          path: ${{ runner.temp }}/gentoo-state/
-          if-no-files-found: warn
-          retention-days: 7
-          compression-level: 0
