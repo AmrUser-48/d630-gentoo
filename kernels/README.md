@@ -75,7 +75,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | Intel 3945ABG | cfg80211, mac80211, iwlegacy and iwl3945 are modules; the matching firmware is supplied separately. |
 | ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |
 | Android tethering | CDC Ethernet and RNDIS host drivers are modules. |
-| Keyboard, touchpad, TrackPoint and joystick | Input, serio, PS/2, HID and evdev drivers are modules; Kconfig boolean protocol options remain enabled. |
+| Keyboard, touchpad, TrackPoint and joystick | Input and HID framework cores remain built in; evdev, serio, PS/2, generic HID and joystick drivers are modules. Boolean protocol options remain enabled. |
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA, HDA codec and Bluetooth USB transport are modules. |
 | Dell platform, battery, fan and sensors | ACPI core remains built in; Dell platform, ACPI device, hwmon and SMBus drivers are modules. |
 | ZRAM | Loadable module with LZ4 selected as the default compressor. |
@@ -117,10 +117,10 @@ From a checkout of this repository on the Gentoo build system, install only the 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
 ls -l /etc/kernel/config.d/
-emerge --ask --verbose --reinstall-atoms =sys-kernel/gentoo-kernel-6.18.57 --buildpkgonly =sys-kernel/gentoo-kernel-6.18.57
+emerge --ask --verbose --buildpkgonly sys-kernel/gentoo-kernel
 ~~~
 
-Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Check the merge output and verify that the intended exclusions resolved to disabled symbols. Do not infer success from the source fragment or package installation alone.
+Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that the D630 device drivers resolve to modules where Kconfig permits, that the AHCI/ext4 root path remains built in, and that Gentoo's unrelated driver coverage remains inherited. Do not infer success from the source fragment or package installation alone.
 
 ### Profile 30 — Tiny kernel
 
