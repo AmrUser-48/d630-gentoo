@@ -2,11 +2,19 @@
 
 ## BusyBox
 
-The early userspace uses the static profile in [busybox/d630-static.config](busybox/d630-static.config). It covers the commands used by [initramfs/init](../initramfs/init): `ash`, `cat`, `chmod`, `cp`, `find -type`, `mkdir`, `mount` with loop and mount flags, `switch_root`, `umount`, and `wc`. Shell built-ins provide `case`, `read`, `printf`, tests, and arithmetic`.
+The files in `busybox/` are Kconfig **allnoconfig fragments**, not complete Gentoo savedconfig files. The static fragment enables only the applets used by [initramfs/init](../initramfs/init): `ash`, `cat`, `chmod`, `cp`, `find -type`, `mkdir`, `mount` with loop and mount flags, `switch_root`, `umount`, and `wc`. Shell built-ins provide `case`, `read`, `printf`, tests, and arithmetic.
 
-The dynamic alternative is [busybox/d630-dynamic.config](busybox/d630-dynamic.config). It uses the same applet set but links against the target libc; it is not suitable for a standalone early initramfs. Gentoo's BusyBox ebuild also controls linkage through the package-local `static` USE flag. The active Portage profile enables `static`.
+Generate a complete configuration from the BusyBox source tree matching the selected Gentoo ebuild version:
 
-The runtime builder installs the static savedconfig at `/etc/portage/savedconfig/sys-apps/busybox`. To test the dynamic profile, replace that savedconfig with `d630-dynamic.config` and change `sys-apps/busybox savedconfig static make-symlinks` to `sys-apps/busybox savedconfig -static make-symlinks` in `config/portage/package.use/60-d630-firmware-busybox`.
+```sh
+KCONFIG_ALLCONFIG=/path/to/d630-static.config make allnoconfig
+```
+
+Then install the generated `.config` as `/etc/portage/savedconfig/sys-apps/busybox` and build with Gentoo USE flags `savedconfig static make-symlinks`. Do not copy the fragment directly into the savedconfig path: Gentoo's ebuild runs `oldconfig` on a complete config, and missing symbols may otherwise receive upstream defaults.
+
+[busybox/d630-dynamic.config](busybox/d630-dynamic.config) has the same applet set with static linking disabled. Generate it the same way, save the resulting full `.config`, and build with `savedconfig make-symlinks -static`. Dynamic BusyBox depends on the target libc and is not suitable as a standalone initramfs shell.
+
+The current kernel/initramfs workflow uses the runner's `busybox-static` package, not Gentoo's BusyBox ebuild; these fragments are ready for a future Portage-built initramfs and do not change that workflow.
 
 ## Firmware selection and stripping
 
