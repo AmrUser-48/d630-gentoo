@@ -59,6 +59,15 @@ MODULE_ALIASES = {
     "SND_HDA_INTEL": {"snd-hda-intel"},
     "USB_EHCI_HCD": {"ehci-hcd", "ehci-pci"},
     "USB_HID": {"usbhid"},
+    "USB_NET_CDC_NCM": {"cdc_ncm"},
+    "ACPI_WMI": {"wmi"},
+    "BT": {"bluetooth"},
+    "CPU_FREQ_GOV_POWERSAVE": {"cpufreq-powersave", "cpufreq_powersave"},
+    "CPU_FREQ_GOV_ONDEMAND": {"cpufreq-ondemand", "cpufreq_ondemand"},
+    "CPU_FREQ_GOV_CONSERVATIVE": {"cpufreq-conservative", "cpufreq_conservative"},
+    "CPU_FREQ_GOV_USERSPACE": {"cpufreq-userspace", "cpufreq_userspace"},
+    "DELL_PC": {"dell-pc", "dell_pc"},
+    "INPUT_JOYSTICK": {"joydev"},
     "USB_NET_CDCETHER": {"cdc_ether"},
     "USB_NET_RNDIS_HOST": {"rndis_host"},
     "USB_STORAGE": {"usb-storage"},
@@ -225,12 +234,13 @@ def module_names(order_path: Path) -> set[str]:
     return names
 
 
-def expected_module_names(symbol: str) -> set[str] | None:
+def expected_module_names(symbol: str, available: set[str]) -> set[str] | None:
     if symbol in MODULE_ALIASES:
         return MODULE_ALIASES[symbol]
-    # This is the common Kbuild convention. None means an uncommon module name
-    # that is not safe to decide by basename alone.
-    return {symbol.lower().replace("_", "-")}
+    # Only trust the normalised Kconfig/module-name convention when the
+    # corresponding object is actually present in Debian's modules.order.
+    candidate = symbol.lower().replace("_", "-")
+    return {candidate} if candidate in available else None
 
 
 def main() -> int:
@@ -287,21 +297,26 @@ def main() -> int:
             kept_policy += 1
             continue
 
+        expected = expected_module_names(symbol, modules)
         if debian.get(symbol) != "m":
-            updates[symbol] = "n"
-            removed += 1
+            # A path in modules.order is authoritative even if this Kconfig
+            # symbol was renamed or absent from the older Debian config.
+            if expected is not None and not expected.isdisjoint(modules):
+                kept_debian += 1
+            else:
+                updates[symbol] = "n"
+                removed += 1
             continue
 
-        expected = expected_module_names(symbol)
         if expected is None:
+            # Some Debian modules have a Kconfig name that differs from the
+            # .ko basename. Preserve these conservatively rather than guessing.
             kept_debian += 1
             ambiguous += 1
             continue
 
         known_name_checked += 1
         if expected.isdisjoint(modules):
-            # Config symbol is modular in the Debian config, but the actual
-            # Debian D630 modules.order contains no corresponding module.
             updates[symbol] = "n"
             removed += 1
         else:
