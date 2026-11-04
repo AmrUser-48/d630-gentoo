@@ -43,7 +43,7 @@ The target is a Dell Latitude D630 with:
 - i8042 keyboard and Alps DualPoint touchpad/TrackPoint.
 - ACPI laptop battery, thermal, fan and Dell platform support.
 
-Use a generic x86-64 kernel ISA baseline. Kernel builds may use KCFLAGS=-mtune=core2; do not use -march=core2 or -march=native for the kernel, and do not add CONFIG_MCORE2. Userland compiler flags are a separate policy. CONFIG_X86_MSR=y and CONFIG_X86_CPUID=y are required and are present in all three current profile fragments. All three profiles also enable CONFIG_PROC_FS, CONFIG_IKCONFIG and CONFIG_IKCONFIG_PROC so the running kernel exposes its exact embedded configuration at /proc/config.gz.
+Use a generic x86-64 kernel ISA baseline. Kernel builds may use KCFLAGS=-mtune=core2; do not use -march=core2 or -march=native for the kernel, and do not add CONFIG_MCORE2. Userland compiler flags are a separate policy. CONFIG_X86_MSR=y and CONFIG_X86_CPUID=y are required and are present in all three current profile fragments. Keep CONFIG_PROC_FS=y, CONFIG_IKCONFIG=y and CONFIG_IKCONFIG_PROC=y enabled by default in nearly all kernels so the running kernel exposes its exact embedded configuration at /proc/config.gz. Disable IKCONFIG only for an intentionally minimal or size-constrained target with a documented reason; a reference distribution config omitting it is not a reason to omit it from D630 profiles.
 
 ## Use
 
