@@ -63,7 +63,7 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 
 ### Configuration strategy
 
-**Profile 20 — use the released Gentoo savedconfig, not tinyconfig.** The 6.18.60 release asset is the full Gentoo kernel `.config`. The pruning helper uses that file as input, removes module options outside the Debian D630 config/module inventory, then applies required D630 built-ins and exclusions. Keep `USE=savedconfig` enabled for `sys-kernel/gentoo-kernel`. The `/etc/kernel/config.d/20-d630-base.config` file remains a later overlay; it is not a replacement full `.config`.
+**Profile 20 — use the released Gentoo savedconfig, not tinyconfig.** The 6.18.60 release asset is the full Gentoo kernel `.config`. The pruning helper uses that file as input, removes module options outside the Debian D630 config/module inventory, then applies required D630 built-ins and exclusions. Enable `USE=savedconfig` and `USE=modules-compress` for `sys-kernel/gentoo-kernel`; the repository supplies both in `config/portage/package.use/70-d630-kernel`. The `/etc/kernel/config.d/20-d630-base.config` file remains a later overlay; it is not a replacement full `.config`.
 
 **Profile 30 — start with make tinyconfig.** A bare tinyconfig is not a usable laptop kernel: it also disables parent infrastructure such as PCI, the block layer, USB, networking and input. Kconfig does not automatically enable a symbol's unmet depends-on prerequisites just because the leaf driver is requested; merge_config.sh is a fragment merger, not a dependency-closure solver. Use the fragment only while developing the first working config: enable subsystem foundations first, resolve with olddefconfig, then enable the dependent D630 drivers in a second pass. Use menuconfig's / search on any symbol that refuses to resolve to inspect its direct and recursive dependencies. Once the complete config is correct, save it with make savedefconfig as a dedicated d630-tiny_defconfig and use that defconfig as the reproducible build input. This avoids re-solving the same dependency chain on every build. On kernel upgrades, carry the previous resolved config forward with olddefconfig, inspect scripts/diffconfig output and re-run the required-symbol checks. Every driver required by Tiny must resolve to =y. With CONFIG_MODULES=n there must be no =m entries and no /lib/modules dependency. The current repository profile is still a tinyconfig-derived fragment; the dedicated Tiny kernel build workflow/defconfig has not yet been added.
 
@@ -147,6 +147,7 @@ From a checkout of this repository on the Gentoo build system, install the Profi
 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
+install -D -m 0644 config/portage/package.use/70-d630-kernel /etc/portage/package.use/70-d630-kernel
 ls -l /etc/kernel/config.d/
 ~~~
 
