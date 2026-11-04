@@ -124,6 +124,28 @@ emerge --ask --verbose --buildpkgonly sys-kernel/gentoo-kernel
 
 Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that the D630 device drivers resolve to modules where Kconfig permits, that the AHCI/ext4 root path remains built in, and that Gentoo's unrelated driver coverage remains inherited. Do not infer success from the source fragment or package installation alone.
 
+### Module stripping and compression for Profile 20
+
+Gentoo's `sys-kernel/gentoo-kernel` package enables `USE=strip` by default. Its kernel build passes `INSTALL_MOD_STRIP=--strip-unneeded` to `modules_install`, stripping unneeded symbols from modules before installation. This does not remove entire driver families.
+
+For Zstandard-compressed modules, enable Gentoo's `modules-compress` USE flag for `sys-kernel/gentoo-kernel`, keep ZSTD support enabled in `sys-apps/kmod`, and use the Profile 20 settings `CONFIG_MODULE_COMPRESS=y`, `CONFIG_MODULE_COMPRESS_ZSTD=y`, and `CONFIG_MODULE_COMPRESS_ALL=n`. Gentoo's kernel-install integration performs compression at the package-install stage using the selected kernel-config algorithm. Do not set `CONFIG_MODULE_COMPRESS_ALL=y` for this Gentoo build path; that would let Kbuild compress modules during `modules_install` instead of leaving them for Gentoo's post-install processing.
+
+Enable and inspect the package flags before building:
+
+~~~bash
+echo 'sys-kernel/gentoo-kernel strip modules-compress' >> /etc/portage/package.use/gentoo-kernel
+emerge --pretend --verbose sys-kernel/gentoo-kernel sys-apps/kmod
+~~~
+
+The Gentoo `kmod` package currently defaults to ZSTD support. If the pretend output shows `-zstd`, enable it explicitly:
+
+~~~bash
+echo 'sys-apps/kmod zstd' >> /etc/portage/package.use/kmod
+emerge --ask --oneshot sys-apps/kmod
+~~~
+
+After installation, modules should have the `.ko.zst` suffix. ZSTD compression reduces their on-disk footprint; it does not reduce the number of drivers compiled into the kernel. Profile 20 deliberately retains Gentoo's broad distribution-driver coverage apart from the documented NVMe and xHCI exclusions. Removing more driver families requires a narrower kernel configuration and is a separate policy change.
+
 ### Profile 30 — Tiny kernel
 
 The Tiny kernel requires its own dedicated build path: initialize an upstream tinyconfig baseline, enable required platform foundations, merge Profile 30, resolve dependencies, and reject the result if CONFIG_MODULES is enabled, any =m setting remains, or a required D630 driver did not resolve to =y. Compile the kernel image only; there is no modules_install stage. The current Tiny initramfs workflow does not yet perform this kernel build.
