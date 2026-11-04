@@ -308,6 +308,7 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: d630-kernel-${{ github.run_id }}
           use-cache: "true"
 
       - name: Configure key-only SSH into the Gentoo kernel builder
@@ -370,8 +371,10 @@ jobs:
 
           {
             echo "## Interactive kernel builder ready"
+            echo "Tailscale hostname: d630-kernel-$GITHUB_RUN_ID"
             echo "Tailscale IPv4: $tailnet_ip"
             echo "SSH: ssh -tt gentoo@$tailnet_ip"
+            echo "Local lookup: tailscale status | awk '\$2 == \"d630-kernel-$GITHUB_RUN_ID\" {print \$1; exit}'"
             echo "The SSH key is restricted to Tailnet sources; password login and forwarding are disabled."
             echo "SSH opens a root shell inside /opt/gentoo, not the Ubuntu host."
             echo "Selected profile: $KERNEL_PROFILE"
