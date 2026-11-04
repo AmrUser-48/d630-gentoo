@@ -353,6 +353,8 @@ jobs:
                   scanned += 1
                   mode = stat.S_IMODE(st.st_mode)
                   problems = []
+                  if st.st_uid != 0:
+                      problems.append("not root-owned")
                   if mode & 0o005 != 0o005:
                       problems.append("missing world read/execute")
                   if mode & 0o022:
