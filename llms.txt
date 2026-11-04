@@ -44,5 +44,6 @@ Gentoo userland flags: `-O2 -pipe -march=core2 -mtune=core2`. Kernel: generic x8
 - `./scripts/validate-sources.sh`: static source/layout/README checks.
 - `bash scripts/validate-kernel-profiles.sh` and `bash scripts/validate-kernel-config.sh`: static kernel config checks.
 - `.github/workflows/`: kernel, Tiny, Gentoo runtime, runner save/restore and QEMU workflows.
+- `.github/workflows/30-gentoo-interactive-runner.yml`: restore the encrypted Gentoo root, audit/repair package-owned executable modes, then provide private SSH access.
 
 Static validation is not compilation, image creation, QEMU boot, graphics verification or physical D630 testing.
