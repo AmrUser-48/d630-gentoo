@@ -157,33 +157,15 @@ GENTOO_MODULE_OVERRIDES = {
     "MODULE_COMPRESS_ALL": "n",
 }
 
-# Explicit exclusions for hardware or buses absent from this legacy-BIOS D630.
+# Explicit exclusions for hardware absent from this legacy-BIOS D630.
+# Profile 20 otherwise preserves Gentoo's generic hardware-family baseline.
 D630_EXCLUSIONS = {
     "USB_XHCI_HCD": "n",
-    "NVME_CORE": "n",
     "BLK_DEV_NVME": "n",
-    "NVME_FABRICS": "n",
     "NVME_RDMA": "n",
     "NVME_FC": "n",
     "NVME_TCP": "n",
     "NVME_TARGET": "n",
-    "CAN": "n",
-    "ISDN": "n",
-    "INFINIBAND": "n",
-    "FIREWIRE": "n",
-    "NFC": "n",
-    "WIMAX": "n",
-    "IEEE802154": "n",
-    "6LOWPAN": "n",
-    "USB_GADGET": "n",
-    "ETHERNET": "n",
-    "MTD": "n",
-    "MEDIA_DIGITAL_TV_SUPPORT": "n",
-    "MEDIA_RADIO_SUPPORT": "n",
-    "MEDIA_SDR_SUPPORT": "n",
-    "MEDIA_TEST_SUPPORT": "n",
-    "DVB_CORE": "n",
-    "RADIO_ADAPTERS": "n",
 }
 
 
@@ -289,13 +271,12 @@ def main() -> int:
         if value != "m":
             continue
 
-        # Gentoo profile has final say over the Debian D630 overlay.
+        # Explicit D630 module selections are retained when present.
+        # A disabled value in a profile fragment must not prune unrelated
+        # Gentoo distribution modules: Profile 20 preserves the release
+        # baseline except for the narrow exclusions applied below.
         profile_value = gentoo_policy.get(symbol)
         overlay_value = debian_policy.get(symbol)
-        if profile_value == "n" or overlay_value == "n":
-            updates[symbol] = "n"
-            removed += 1
-            continue
         if profile_value in {"m", "y"} or overlay_value in {"m", "y"}:
             kept_policy += 1
             continue
