@@ -1,0 +1,4 @@
+# Paths relative to /lib/firmware. Keep only confirmed D630 requirements.
+iwlwifi-3945-2.ucode
+regulatory.db
+regulatory.db.p7s
