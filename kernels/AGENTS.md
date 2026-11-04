@@ -24,3 +24,7 @@ Run profile/config validators, then compile and inspect the generated configurat
 ## Embedded configuration policy
 
 Keep `CONFIG_IKCONFIG=y` and `CONFIG_IKCONFIG_PROC=y` enabled in kernel profiles by default, together with `CONFIG_PROC_FS=y`. This allows the running kernel to expose its exact embedded configuration at `/proc/config.gz`. Treat this as the normal policy for general-purpose and diagnostic kernels. Disable it only for an intentionally minimal or size-constrained target, with an explicit documented reason. A Debian or upstream reference config that omits IKCONFIG is evidence about that build, not a reason to omit it from D630 profiles.
+## Native ext4 filesystem invariant
+
+All three profiles must keep `CONFIG_EXT4_FS=y`. Ext4 is a native in-tree Linux filesystem; never make it a module or disable it. Validate the resolved `.config` after `olddefconfig`/Portage Kconfig processing as well as the source fragment.
+
