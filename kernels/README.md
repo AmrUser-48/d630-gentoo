@@ -20,6 +20,8 @@ Profile 40 explicitly disables xHCI and the media/DVB stack, but currently has n
 
 ## Layout
 
+- [Profile 20 Debian reference inventory](profiles/20-d630-base/README.md) — text-only Debian hardware, module, configuration and firmware inventory used to refine the base overlay.
+
 - [profiles/20-d630-base.config](profiles/20-d630-base.config) — modular overlay for Gentoo's distribution-kernel build.
 - [profiles/30-d630-live.config](profiles/30-d630-live.config) — hardware and feature fragment for the standalone Tiny kernel.
 - [profiles/40-d630-builtin.config](profiles/40-d630-builtin.config) — D630 hardware and early-root fragment for the Gentoo live SquashFS kernel.
