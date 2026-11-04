@@ -102,6 +102,15 @@ In the LZO branch, ZSTD level 3 is registered as a secondary compressor (priorit
 
 `CONFIG_ZRAM_WRITEBACK=y` enables the feature, but the shipped service does not set `backing_dev`; no swap pages are written to SSD by default. The service uses swap priority 100, `vm.swappiness=180` and `vm.page-cluster=0`. Debugfs is mounted for ZRAM memory-tracking diagnostics.
 
+For a conventional installed Gentoo/OpenRC system using Profile 20, install and enable the same service after installing the kernel:
+
+~~~bash
+install -D -m 0755 config/openrc/d630-zram /etc/init.d/d630-zram
+rc-update add d630-zram boot
+rc-service d630-zram start
+~~~
+
+
 
 ### Pruning and firmware rules
 
