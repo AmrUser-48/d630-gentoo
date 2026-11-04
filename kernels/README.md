@@ -80,12 +80,28 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | Keyboard, touchpad, TrackPoint and joystick | Input core, AT keyboard and serio/i8042 foundations remain built in; evdev, PS/2 mouse, HID, generic HID, joystick and uinput drivers are modules. Boolean PS/2 protocol options remain enabled. |
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA frameworks remain built in; HDA controller/codec and Bluetooth USB transport are modules. |
 | Dell platform, battery, fan and sensors | ACPI and Dell platform selector remain built in; ACPI/WMI, SMBIOS/DCDBAS and Dell device drivers are modules where Kconfig permits. Thermal, hwmon and I2C frameworks remain built in; sensor and SMBus-controller drivers are modules. |
-| ZRAM | Built in with LZ4 selected as the default compressor; the compressor/backend Kconfig choices require this built-in exception. |
+| ZRAM | Built in; all compression backends and optional ZRAM features enabled; LZO is the Kconfig default. Runtime selects 40% LZO at 4 GiB RAM or less, and 30% ZSTD level 3 above 4 GiB. |
 | Other hardware families | Leave Gentoo's standard distribution-kernel defaults intact. Profile 20 does not prune hardware unrelated to the D630. |
 
 The current inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. It does not currently identify an Ethernet controller, xHCI controller or Bluetooth adapter. Profile 20 still leaves generic support for those device families to Gentoo's distribution baseline; absence from this laptop's inventory is not a reason to disable them in the standard kernel. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
 
 A module set to =m is not loaded into memory merely because it exists on disk. Modules are appropriate for optional USB devices, audio and removable filesystems in the installed Gentoo profile. Tiny is different: with module support disabled, every needed driver must be built in.
+
+### ZRAM configuration and runtime policy
+
+All three D630 profiles build ZRAM in and enable the LZO, LZ4, LZ4HC, ZSTD, DEFLATE and 842 backends. They also enable ZRAM age tracking, memory tracking, multi-compressor/recompression, ZSMalloc statistics and the writeback interface. LZO is the default compressor in the resolved kernel config; userspace selects the active algorithm before setting `disksize`.
+
+The shared [OpenRC ZRAM service](../config/openrc/d630-zram) and the Tiny `/init` implement the same policy:
+
+| Detected physical RAM | Logical ZRAM size | Primary compressor | Parameters |
+|---|---:|---|---|
+| 4 GiB or less | 40% of RAM | LZO | No LZO compression-level parameter |
+| More than 4 GiB | 30% of RAM | ZSTD | Level 3 |
+
+In the LZO branch, ZSTD level 3 is registered as a secondary compressor (priority 1). Multi-compression is a capability, not a background job: cold/idle-page recompression is manual unless a separate userspace scheduler is configured. For example, after marking pages idle, `echo "type=idle priority=1" > /sys/block/zram0/recompress` recompresses eligible idle pages with the secondary ZSTD algorithm. ZRAM's algorithm and parameters must be selected before setting `disksize`. See the [upstream ZRAM documentation](https://www.kernel.org/doc/html/v7.2/admin-guide/blockdev/zram.html) for the sysfs interface and recompression behavior.
+
+`CONFIG_ZRAM_WRITEBACK=y` enables the feature, but the shipped service does not set `backing_dev`; no swap pages are written to SSD by default. The service uses swap priority 100, `vm.swappiness=180` and `vm.page-cluster=0`. Debugfs is mounted for ZRAM memory-tracking diagnostics.
+
 
 ### Pruning and firmware rules
 
