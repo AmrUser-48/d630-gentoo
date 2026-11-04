@@ -14,10 +14,10 @@ on:
           - 40-d630-builtin
         default: 20-d630-base
       session_minutes:
-        description: "SSH session duration (1–300 minutes)."
+        description: "Maximum SSH session duration (1–345 minutes; actual time is reduced by bootstrap duration)."
         required: true
         type: number
-        default: 240
+        default: 345
 
 permissions:
   contents: read
@@ -39,6 +39,12 @@ jobs:
       SESSION_MINUTES: ${{ inputs.session_minutes }}
 
     steps:
+      - name: Record workflow start time
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'JOB_START_EPOCH=%s\\n' "$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Check out D630 kernel profiles and Portage configuration
         uses: actions/checkout@v4
 
@@ -60,8 +66,8 @@ jobs:
             echo "session_minutes must be an integer." >&2
             exit 2
           fi
-          if (( session < 1 || session > 300 )); then
-            echo "session_minutes must be between 1 and 300." >&2
+          if (( session < 1 || session > 345 )); then
+            echo "session_minutes must be between 1 and 345." >&2
             exit 2
           fi
           profile="$GITHUB_WORKSPACE/kernels/profiles/$KERNEL_PROFILE.config"
@@ -185,6 +191,14 @@ jobs:
             sudo mount --make-rslave "$root/$mountpoint"
           done
 
+          sudo chroot "$root" /bin/bash -c 'set -euo pipefail; locale-gen; env-update'
+          sudo chroot "$root" /bin/bash --login -c '
+            set -euo pipefail
+            [[ "${LANG:-}" == "en_US.UTF-8" ]]
+            locale -a | grep -Eiq "^en_US\\.(utf8|UTF-8)$"
+            locale
+          ' | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Install the selected D630 kernel profile
         shell: bash
         run: |
@@ -218,7 +232,11 @@ jobs:
           sudo tee "$root/etc/profile.d/50-d630-kernel-profile.sh" >/dev/null <<EOF
           export D630_KERNEL_PROFILE="$KERNEL_PROFILE"
           export D630_KERNEL_CONFIG="$config_path"
+          export ARCH="x86_64"
           export KCFLAGS="-mtune=core2"
+          export KBUILD_BUILD_USER="d630"
+          export KBUILD_BUILD_HOST="github-actions"
+          export KBUILD_BUILD_VERSION="1"
           EOF
 
           {
@@ -228,7 +246,9 @@ jobs:
             echo "Profile purpose: $profile_purpose"
             echo "Login environment: D630_KERNEL_PROFILE=$KERNEL_PROFILE"
             echo "Login environment: D630_KERNEL_CONFIG=$config_path"
-            echo "Kernel compiler tuning: KCFLAGS=-mtune=core2; keep generic x86-64 ISA baseline."
+            echo "Kernel build flags: ARCH=x86_64 KCFLAGS=-mtune=core2"
+            echo "Kernel build identity: KBUILD_BUILD_USER=d630 KBUILD_BUILD_HOST=github-actions KBUILD_BUILD_VERSION=1"
+            echo "Kernel ISA: generic x86-64; no -march=core2 or -march=native."
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Tune Portage parallelism to runner resources
@@ -356,17 +376,39 @@ jobs:
             echo "SSH opens a root shell inside /opt/gentoo, not the Ubuntu host."
             echo "Selected profile: $KERNEL_PROFILE"
             echo "Selected config: /etc/kernel/config.d/$KERNEL_PROFILE.config"
-            echo "Session duration: $SESSION_MINUTES minutes."
+            echo "Requested SSH session cap: $SESSION_MINUTES minutes; actual duration is calculated after bootstrap."
+            echo "Kernel build environment: ARCH=x86_64 KCFLAGS=-mtune=core2."
+            echo "Gentoo locale: en_US.UTF-8 (generated and verified)."
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the interactive kernel builder alive
         shell: bash
-        timeout-minutes: 310
         run: |
           set -euo pipefail
-          end_epoch=$(( $(date +%s) + SESSION_MINUTES * 60 ))
+          start_epoch="${JOB_START_EPOCH:?JOB_START_EPOCH was not recorded}"
+          now="$(date +%s)"
+          elapsed_seconds=$((now - start_epoch))
+          available_seconds=$((345 * 60 - elapsed_seconds))
+          requested_seconds=$((SESSION_MINUTES * 60))
+          (( available_seconds > 0 )) || {
+            echo "The 15-minute shutdown buffer has already been consumed; refusing to start SSH keepalive." >&2
+            exit 1
+          }
+          session_seconds="$requested_seconds"
+          if (( session_seconds > available_seconds )); then
+            session_seconds="$available_seconds"
+          fi
+          end_epoch=$((now + session_seconds))
+          actual_minutes=$((session_seconds / 60))
+          actual_seconds=$((session_seconds % 60))
+          {
+            echo "Requested SSH session cap: $SESSION_MINUTES minutes."
+            echo "Actual SSH session: $actual_minutes minutes $actual_seconds seconds."
+            echo "Bootstrap/setup elapsed: $((elapsed_seconds / 60)) minutes $((elapsed_seconds % 60)) seconds."
+            echo "Reserved shutdown buffer: 15 minutes before the 360-minute job timeout."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
           while :; do
-            remaining=$(( end_epoch - $(date +%s) ))
+            remaining=$((end_epoch - $(date +%s)))
             (( remaining > 0 )) || break
             sleep_seconds=60
             (( remaining < sleep_seconds )) && sleep_seconds="$remaining"
