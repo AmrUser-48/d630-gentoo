@@ -80,6 +80,7 @@ PORTAGE_GID="$(awk -F: '$1 == "portage" { print $3; exit }' "$ROOT/etc/group")"
 log "Install Core 2 Portage configuration"
 mkdir -p "$ROOT/etc/portage/package-sets" "$ROOT/etc/portage/profile/package.use.force" \
   "$ROOT/etc/portage/binrepos.conf" "$ROOT/etc/portage/repos.conf" \
+  "$ROOT/etc/portage/savedconfig/sys-apps" "$ROOT/etc/portage/savedconfig/sys-kernel" \
   "$ROOT/etc/bash/bashrc.d" "$ROOT/etc/env.d" "$ROOT/etc/X11/xorg.conf.d" \
   "$ROOT/usr/local/sbin" "$ROOT/var/cache/binpkgs" "$ROOT/var/log/portage" \
   "$ROOT/var/tmp/portage" "$ROOT/dev" "$ROOT/proc" "$ROOT/sys" "$ROOT/run"
@@ -97,6 +98,9 @@ rm -rf "$ROOT/etc/portage/package.accept_keywords" "$ROOT/etc/portage/package.ke
 mkdir -p "$ROOT/etc/portage/package.accept_keywords"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.accept_keywords/." "$ROOT/etc/portage/package.accept_keywords/"
 cp -a "$GITHUB_WORKSPACE/config/portage/package.use/." "$ROOT/etc/portage/package.use/"
+install -m 0644 "$GITHUB_WORKSPACE/d630-gentoo/config/busybox/d630-static.config" "$ROOT/etc/portage/savedconfig/sys-apps/busybox"
+install -m 0644 "$GITHUB_WORKSPACE/config/portage/savedconfig/sys-kernel/linux-firmware" "$ROOT/etc/portage/savedconfig/sys-kernel/linux-firmware"
+install -m 0644 "$GITHUB_WORKSPACE/config/portage/package.license" "$ROOT/etc/portage/package.license"
 mkdir -p "$ROOT/etc/portage/env"
 install -m 0644 "$GITHUB_WORKSPACE/config/portage/package.env" "$ROOT/etc/portage/package.env"
 cp -a "$GITHUB_WORKSPACE/config/portage/env/." "$ROOT/etc/portage/env/"
