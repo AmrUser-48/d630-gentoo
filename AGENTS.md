@@ -156,6 +156,10 @@ For 64-bit Linux kernels, retain the generic x86-64 ISA baseline and use `KCFLAG
 
 The userspace `-march=core2` policy must not be copied into kernel builds. Keep this policy consistent in kernel workflows, profile documentation and diagnostics. Distinguish compiler optimization from Kconfig architecture selection.
 
+### Native ext4 filesystem invariant
+
+Keep `CONFIG_EXT4_FS=y` in every D630 kernel profile: Profile 20 (installed Gentoo), Profile 30 (Tiny), and Profile 40 (Gentoo live/SquashFS). Ext4 is a native in-tree Linux filesystem and must always be built into the kernel, never modular or disabled. This applies even when ext4 is not the initial root filesystem; mounting ext4 storage must not depend on loading a filesystem module. Check the resolved kernel `.config` after Kconfig processing, not only the source fragment.
+
 ### Embedded kernel configuration
 
 Enable `CONFIG_IKCONFIG=y` and `CONFIG_IKCONFIG_PROC=y` by default in general-purpose, distribution, workstation, server and diagnostic kernels. Together with `CONFIG_PROC_FS=y`, these expose the exact configuration embedded in the running kernel at `/proc/config.gz`. This is valuable for support, reproducibility and post-build verification.
