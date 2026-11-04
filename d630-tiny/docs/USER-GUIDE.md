@@ -187,7 +187,7 @@ The result should be `0`. Type `exit` to leave the root shell and return to `gmi
 
 ### Compressed RAM swap
 
-Tiny enables ZRAM swap automatically during boot when the kernel provides `/dev/zram0`. The device's logical capacity is set to 40% of detected RAM; `/init` formats it with `mkswap` and activates it with `swapon`. The kernel profile selects LZ4 compression. The device is volatile and is recreated at every boot.
+Tiny enables ZRAM automatically during boot. At 4 GiB RAM or less it uses 40% of RAM with LZO; above 4 GiB it uses 30% with Zstandard level 3. On the LZO path, ZSTD level 3 is also registered as a secondary compressor for optional idle-page recompression. The device is volatile and is recreated at every boot.
 
 Check that swap is active:
 
@@ -197,7 +197,7 @@ cat /sys/block/zram0/comp_algorithm
 cat /sys/block/zram0/mm_stat
 ```
 
-The active compressor is shown in square brackets in `comp_algorithm`, for example `[lz4]`. ZRAM uses physical RAM for its compressed pages; the configured capacity is a logical limit, not memory reserved in advance. If the kernel has no ZRAM support or initialization fails, Tiny prints a warning and continues booting without compressed swap.
+The active compressor is shown in square brackets in `comp_algorithm`, for example `[lzo]`. ZRAM uses physical RAM for compressed pages; the configured capacity is a logical limit, not memory reserved in advance. In the LZO branch, optional idle-page recompression can be requested as root after marking pages idle: `echo all > /sys/block/zram0/idle`, then `echo 'type=idle priority=1' > /sys/block/zram0/recompress`. It is not run automatically. If initialization fails, Tiny prints a warning and continues without compressed swap.
 
 ### Open another virtual console
 
