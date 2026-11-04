@@ -1,6 +1,12 @@
 # Paths relative to /lib/firmware; all other firmware is removed from SquashFS staging.
+# linux-firmware installs this public alias and its nested Intel source blob.
 iwlwifi-3945-2.ucode
+intel/iwlwifi/iwlwifi-3945-2.ucode
+
+# net-wireless/wireless-regdb installs the regulatory database and signature.
 regulatory.db
 regulatory.db.p7s
+
+# Supplied by the matching D630 kernel bundle (Merom and Penryn signatures).
 intel-ucode/06-0f-0d
 intel-ucode/06-17-06
