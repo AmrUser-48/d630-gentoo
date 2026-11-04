@@ -143,31 +143,30 @@ Firmware is separate from kernel configuration:
 
 ### Profile 20 — Gentoo distribution kernel
 
-From a checkout of this repository on the Gentoo build system, install the Profile 20 overlay:
+From a checkout of this repository on the Gentoo build system, install the Profile 20 overlay, package USE settings and complete 6.18.60 savedconfig:
 
 ~~~bash
 install -D -m 0644 kernels/profiles/20-d630-base.config /etc/kernel/config.d/20-d630-base.config
 install -D -m 0644 config/portage/package.use/70-d630-kernel /etc/portage/package.use/70-d630-kernel
-ls -l /etc/kernel/config.d/
+install -D -m 0644 config/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60
+ls -l /etc/kernel/config.d/ /etc/portage/savedconfig/sys-kernel/
 ~~~
 
 Before building, check that no stale D630 or experimental fragments are also active in /etc/kernel/config.d/. After the build, inspect the effective config saved with the built kernel under /usr/src/linux-<kernel-release>/.config and the Portage work directory. Verify that MSR, ext4 and NTFS3 resolve to `=y`, ZRAM keeps all backends and optional features, and only the intended D630/ Debian-reference modules remain. Do not infer success from the source fragment or package installation alone.
 
 ### Debian-referenced savedconfig pruning for Profile 20
 
-The released Gentoo kernel config is the starting point. From a checkout of this repository on the Gentoo runner, prune the existing savedconfig with the Debian baseline and the actual D630 module inventory:
+The untouched Gentoo release config is tracked at `kernels/reference/gentoo-kernel-6.18.60`. The complete Debian-referenced Profile 20 savedconfig is tracked at `config/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60` and installed at the matching `/etc/portage/savedconfig/sys-kernel/` path by the command above.
+
+To regenerate the savedconfig from the untouched release source, run the helper with an explicit output path:
 
 ~~~bash
-python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60
+python3 scripts/strip-gentoo-kernel-savedconfig.py \
+  kernels/reference/gentoo-kernel-6.18.60 \
+  --output config/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60
 ~~~
 
-This creates a sibling `.stripped` file and report without changing the original. Review the report, then apply it with the script's backup-protected write mode:
-
-~~~bash
-python3 scripts/strip-gentoo-kernel-savedconfig.py /etc/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60 --write
-~~~
-
-The original is preserved as `.pre-debian-prune`. The helper uses the full Debian amd64 config, the D630 Debian overlay and the matching `modules.order`. It removes Gentoo-only `=m` choices; built-in options are retained except for explicit D630/legacy-BIOS overrides. It forces `CONFIG_X86_MSR=y`, `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`; ZRAM remains built in with every backend, writeback, age tracking, memory tracking and multi-compression enabled. The script does not run Kconfig or compile the kernel. The ebuild must resolve the result with its 6.18.60 Kconfig before the package is accepted.
+Review the generated report at `config/portage/savedconfig/sys-kernel/gentoo-kernel-6.18.60.report.txt`. The helper uses the full Debian amd64 config, the D630 Debian overlay and the matching `modules.order`. It prunes only `=m` options outside the Debian module inventory, while retaining D630-selected modules and ambiguous mappings conservatively. It preserves Gentoo's generic hardware-family baseline, except for the D630's absent NVMe/xHCI hardware, and disables EFI for legacy BIOS. It forces `CONFIG_X86_MSR=y`, `CONFIG_EXT4_FS=y` and `CONFIG_NTFS3_FS=y`; ZRAM remains built in with every backend, writeback, age tracking, memory tracking and multi-compression enabled. The script does not run Kconfig or compile the kernel. The ebuild must resolve the result with its 6.18.60 Kconfig before the package is accepted.
 
 Rebuild from the updated savedconfig:
 
