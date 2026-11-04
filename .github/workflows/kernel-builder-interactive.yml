@@ -43,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf 'JOB_START_EPOCH=%s\\n' "$(date +%s)" >> "$GITHUB_ENV"
+          printf 'JOB_START_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Check out D630 kernel profiles and Portage configuration
         uses: actions/checkout@v4
@@ -195,7 +195,7 @@ jobs:
           sudo chroot "$root" /bin/bash --login -c '
             set -euo pipefail
             [[ "${LANG:-}" == "en_US.UTF-8" ]]
-            locale -a | grep -Eiq "^en_US\\.(utf8|UTF-8)$"
+            locale -a | grep -Fxiq "en_US.utf8"
             locale
           ' | tee -a "$GITHUB_STEP_SUMMARY"
 
