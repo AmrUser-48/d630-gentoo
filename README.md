@@ -54,6 +54,7 @@ Use the workflow for the target component:
 - [Tiny initramfs](.github/workflows/build-d630-tiny-initramfs.yml).
 - [Gentoo runtime SquashFS](.github/workflows/build-d630-runtime-squashfs.yml).
 - [Gentoo interactive builder](.github/workflows/gentoo-interactive-build.yml) — package builds and runner sessions.
+- [Gentoo interactive runner](.github/workflows/30-gentoo-interactive-runner.yml) — restores the encrypted full-root state, audits executable modes and opens a private SSH session.
 
 ## Releases
 
