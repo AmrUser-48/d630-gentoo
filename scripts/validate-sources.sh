@@ -60,6 +60,14 @@ grep -Fxq 'regulatory.db.p7s' d630-gentoo/config/firmware.keep
 grep -Fq 'CONFIG_EXTRA_FIRMWARE="regulatory.db regulatory.db.p7s"' kernels/profiles/40-d630-builtin.config
 grep -Fq 'sha512sum --check -' .github/workflows/build-d630-kernel.yml
 grep -Fq 'wireless-regdb $regdb_version' .github/workflows/build-d630-kernel.yml
+test -s config/portage/package.license
+grep -Fq 'linux-fw-redistributable' config/portage/package.license
+grep -Fq 'CONFIG_EXTRA_FIRMWARE_DIR' .github/workflows/build-d630-kernel.yml
+grep -Fq 'regdb_version="2026.05.30"' .github/workflows/build-d630-kernel.yml
+grep -Fq 'd630-firmware.tar.zst' d630-gentoo/scripts/build-runtime-squashfs.sh
+grep -Fq 'kernel firmware bundle is incomplete' d630-gentoo/scripts/build-runtime-squashfs.sh
+bash -n d630-gentoo/scripts/build-runtime-squashfs.sh
+bash -n d630-gentoo/scripts/build-squashfs.sh
 grep -Fq 'firmware_keep="$repo_root/d630-gentoo/config/firmware.keep"' d630-gentoo/scripts/build-squashfs.sh
 test -s config/portage/package.use/20-repositories
 test -s config/portage/package.accept_keywords/20-guru
