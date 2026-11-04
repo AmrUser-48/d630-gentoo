@@ -73,14 +73,14 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | Root storage | AHCI, SCSI disk support and ext4 remain built in so the ordinary root filesystem does not depend on loading a storage module first. |
 | IDE/ATAPI optical drive | ATA PIIX and optical-device support are modules. |
 | Btrfs, NTFS3, exFAT, VFAT, ISO9660, UDF, FUSE and SquashFS | Modules. |
-| GM965 / GMA X3100 | DRM core and Intel i915/AGP drivers are modules; framebuffer and console foundations remain built in. |
+| GM965 / GMA X3100 | DRM core and i915 are modules; AGP and framebuffer/console foundations remain built in; Intel AGP driver is modular where supported. |
 | Intel 3945ABG | cfg80211, mac80211, iwlegacy and iwl3945 are modules; the matching firmware is supplied separately. |
 | ICH8 USB 2.0 | USB core, UHCI/EHCI host drivers, storage, HID and USB networking are modules. |\n| USB 3 / xHCI | Disabled; the D630 has only USB 2.0 UHCI/EHCI controllers. |\n| NVMe | Host, fabrics and target support disabled; the D630 has SATA/AHCI and ATA storage only. |
 | Android tethering | CDC Ethernet and RNDIS host drivers are modules. |
-| Keyboard, touchpad, TrackPoint and joystick | Input and HID cores, evdev, serio, PS/2, generic HID and joystick drivers are modules. Boolean protocol options remain enabled inside their parent drivers. |
-| SigmaTel HDA audio and Bluetooth | Sound/ALSA, HDA codec and Bluetooth USB transport are modules. |
-| Dell platform, battery, fan and sensors | ACPI core remains built in; Dell platform, ACPI device, hwmon and SMBus drivers are modules. |
-| ZRAM | Loadable module with LZ4 selected as the default compressor. |
+| Keyboard, touchpad, TrackPoint and joystick | Input core, AT keyboard and serio/i8042 foundations remain built in; evdev, PS/2 mouse, HID, generic HID, joystick and uinput drivers are modules. Boolean PS/2 protocol options remain enabled. |
+| SigmaTel HDA audio and Bluetooth | Sound/ALSA frameworks remain built in; HDA controller/codec and Bluetooth USB transport are modules. |
+| Dell platform, battery, fan and sensors | ACPI and Dell platform selector remain built in; ACPI/WMI, SMBIOS/DCDBAS and Dell device drivers are modules where Kconfig permits. Thermal, hwmon and I2C frameworks remain built in; sensor and SMBus-controller drivers are modules. |
+| ZRAM | Built in with LZ4 selected as the default compressor; the compressor/backend Kconfig choices require this built-in exception. |
 | Other hardware families | Leave Gentoo's standard distribution-kernel defaults intact. Profile 20 does not prune hardware unrelated to the D630. |
 
 The current inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. It does not currently identify an Ethernet controller, xHCI controller or Bluetooth adapter. Profile 20 still leaves generic support for those device families to Gentoo's distribution baseline; absence from this laptop's inventory is not a reason to disable them in the standard kernel. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
