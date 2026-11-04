@@ -307,6 +307,7 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: d630-gentoo-${{ github.run_id }}
           use-cache: "true"
 
       - name: Configure key-only SSH into restored Gentoo
@@ -397,6 +398,7 @@ jobs:
           {
             echo "### Restored Gentoo SSH session ready"
             echo
+            echo "- Tailscale hostname: d630-gentoo-$GITHUB_RUN_ID"
             echo "- Address: $tailnet_ip"
             echo "- Connect command: ssh -tt -i ~/.ssh/id_ed25519_macos_runner -o IdentitiesOnly=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no gentoo@$tailnet_ip"
             echo "- SSH accepts the configured public key only and is filtered to Tailscale IPv4 peers."
