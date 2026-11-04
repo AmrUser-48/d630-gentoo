@@ -16,7 +16,7 @@ The design goal is hardware accuracy, not the smallest possible configuration at
 | [30-d630-live.config](profiles/30-d630-live.config) | D630 Tiny | Tinyconfig-derived no-module profile exists. The current Tiny release workflow does not yet build its kernel from this profile. |
 | [40-d630-builtin.config](profiles/40-d630-builtin.config) | Gentoo live SquashFS | Used by the dedicated kernel workflow. It builds the kernel, matching module archive and external initramfs; physical D630 validation remains separate. |
 
-**Profile 20 policy:** start from the released Gentoo 6.18.60 savedconfig, then prune modular options against Debian's `config-6.1.0-52-amd64`, the D630 `d630-core2.config` overlay, and the matching Debian `modules.order`. Remove Gentoo-only modules; retain D630 hardware, deliberate Debian module coverage, and the explicit D630 profile. `CONFIG_X86_MSR`, ext4 and NTFS3 are built in. xHCI, NVMe, EFI, unrelated buses, DVB/radio/SDR/test media and non-Intel discrete GPUs are disabled.
+**Profile 20 policy:** start from the released Gentoo 6.18.60 savedconfig, then prune modular options against Debian's `config-6.1.0-52-amd64`, the D630 `d630-core2.config` overlay, and the matching Debian `modules.order`. Keep D630 device modules and Debian module-inventory coverage. `CONFIG_X86_MSR`, ext4 and NTFS3 are built in. Only the absent NVMe/xHCI controllers are excluded; EFI is disabled for the D630's legacy-BIOS boot path. Other Gentoo hardware families remain available.
 
 Profile 40 explicitly disables xHCI and the media/DVB stack, but currently has no complete explicit NVMe exclusion. Its resolved config must be checked before claiming that the SFS kernel contains no NVMe support. Profile 30 starts from tinyconfig, but its final resolved config must still be checked for disabled NVMe and xHCI symbols.
 
@@ -85,9 +85,9 @@ Never merge all three profiles. Gentoo's /etc/kernel/config.d directory is globa
 | SigmaTel HDA audio and Bluetooth | Sound/ALSA frameworks remain built in; HDA controller/codec and Bluetooth USB transport are modules. |
 | Dell platform, battery, fan and sensors | ACPI and Dell platform selector remain built in; ACPI/WMI, SMBIOS/DCDBAS and Dell device drivers are modules where Kconfig permits. Thermal, hwmon and I2C frameworks remain built in; sensor and SMBus-controller drivers are modules. |
 | ZRAM | Built in; all compression backends and optional ZRAM features enabled; LZO is the Kconfig default. Runtime selects 40% LZO at 4 GiB RAM or less, and 30% ZSTD level 3 above 4 GiB. |
-| Other hardware families | Prune Gentoo-only modules using the Debian D630 config and module inventory; do not retain broad unrelated hardware families just because Gentoo enables them by default. |
+| Other hardware families | Preserve Gentoo's general-purpose driver baseline. Prune only modular options absent from the Debian config and actual D630 `modules.order`; retain ambiguous module-name mappings conservatively. |
 
-The current inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. Wired Ethernet and xHCI are out of scope; USB RNDIS remains for Android tethering. Bluetooth core/USB transport is retained as optional support because the adapter remains unconfirmed. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
+The observed D630 inventory confirms AHCI, ATA PIIX, Intel graphics, Intel Wi-Fi, HDA, ICH8 USB and SMBus. USB RNDIS remains for Android tethering; Bluetooth core/USB transport is retained as optional support because the adapter remains unconfirmed. Profile 20 still preserves general-purpose Ethernet, media/capture, CAN, MTD, AMD/NVIDIA and virtualization families rather than treating their absence from this machine's current inventory as grounds to remove them. Update [the hardware inventory](../docs/hardware-inventory.md) when a device is identified.
 
 A module set to =m is not loaded into memory merely because it exists on disk. Modules are appropriate for optional USB devices, audio and removable filesystems in the installed Gentoo profile. Tiny is different: with module support disabled, every needed driver must be built in.
 
@@ -122,13 +122,13 @@ Use hardware discovery to form the candidate driver set, not as the only source 
 
 Use the kernel's merge_config.sh to apply fragments and review its override/dependency warnings. After make olddefconfig, inspect the resolved .config. Use scripts/diffconfig -m to generate a maintainable fragment from a known baseline and a validated final config. A requested CONFIG_FOO=n line in a fragment is not proof that the final kernel has disabled it.
 
-Profile 20 now uses the Debian D630 build as its module reference too. The helper prunes only `=m` entries: it keeps modular symbols present in the Debian config and actual `modules.order`, plus modules explicitly selected by the D630 profile. Unmapped Debian module names are retained conservatively rather than guessed away. Built-in options are preserved except for explicit legacy-BIOS and D630 exclusions.
+Profile 20 uses the Debian D630 build as its module reference. The helper prunes only `=m` entries: it keeps modular symbols present in the Debian config and actual `modules.order`, plus modules explicitly selected by the D630 profile. Unmapped Debian module names are retained conservatively rather than guessed away. Built-in options are preserved except for explicit legacy-BIOS, NVMe and xHCI settings.
 
-- NVMe: CONFIG_BLK_DEV_NVME, CONFIG_NVME_CORE, NVMe fabrics/transports and CONFIG_NVME_TARGET.
-- USB 3: CONFIG_USB_XHCI_HCD and its dependent host/controller options.
-- TV/capture: CONFIG_MEDIA_SUPPORT, CONFIG_DVB_CORE and CONFIG_VIDEO_DEV.
-- Unused GPU families: AMD, NVIDIA and virtual display drivers.
-- Unused wired network drivers and peripheral buses.
+- NVMe: `CONFIG_BLK_DEV_NVME`, NVMe transports and `CONFIG_NVME_TARGET`.
+- USB 3: `CONFIG_USB_XHCI_HCD` and its dependent host/controller options.
+- EFI: EFI boot/runtime support is disabled for this legacy-BIOS machine.
+
+Media/capture, Ethernet, CAN, MTD, AMD/NVIDIA, virtualization and other generic driver families remain part of the Gentoo baseline.
 
 Do not confuse NVMEM with NVMe. CONFIG_NVMEM and CONFIG_RTC_NVMEM are non-volatile-memory infrastructure symbols and are unrelated to PCI NVMe disk support.
 
