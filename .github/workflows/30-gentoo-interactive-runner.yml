@@ -295,7 +295,7 @@ jobs:
           audit_executables() {
             local output="$1"
             local atoms="$2"
-            python3 - "$GENTOO_ROOT" "$output" "$atoms" <<'PY'
+            sudo python3 - "$GENTOO_ROOT" "$output" "$atoms" <<'PY'
           import glob
           import json
           import os
