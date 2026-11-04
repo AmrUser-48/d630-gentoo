@@ -1,5 +1,2 @@
-# D630 early userspace: static BusyBox with only the applets used by initramfs/init.
-sys-apps/busybox savedconfig static make-symlinks
-
 # Install only the firmware selected in savedconfig/sys-kernel/linux-firmware.
 sys-kernel/linux-firmware savedconfig bindist redistributable
