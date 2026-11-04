@@ -1,0 +1,85 @@
+#!/sbin/openrc-run
+description="Adaptive D630 compressed RAM swap"
+
+depend() {
+  before localmount
+}
+
+start() {
+  if [ ! -b /dev/zram0 ] || [ ! -w /sys/block/zram0/disksize ]; then
+    eerror "Built-in zram device is missing; expected CONFIG_ZRAM=y"
+    return 1
+  fi
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    return 0
+  fi
+
+  mem_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
+  case "$mem_kib" in
+    ''|*[!0-9]*) eerror "Could not determine physical RAM from /proc/meminfo"; return 1 ;;
+  esac
+
+  if [ "$mem_kib" -le 4194304 ]; then
+    percent=40
+    algorithm=lzo
+    primary_parameters=
+    secondary_algorithm='algo=zstd priority=1'
+    secondary_parameters='priority=1 level=3'
+  else
+    percent=30
+    algorithm=zstd
+    primary_parameters='algo=zstd level=3'
+    secondary_algorithm=
+    secondary_parameters=
+  fi
+
+  # /proc/meminfo reports KiB, so convert using 1024 bytes per KiB.
+  zram_bytes=$((mem_kib * 1024 * percent / 100))
+  zram_mib=$((zram_bytes / 1048576))
+  ebegin "Activating ${percent}% RAM ZRAM swap (${algorithm}, ${zram_mib} MiB)"
+
+  current_size="$(cat /sys/block/zram0/disksize)" || { eend 1; return 1; }
+  if [ "$current_size" -eq 0 ]; then
+    # Compression and all algorithm parameters must be selected before disksize.
+    printf '%s\n' "$algorithm" > /sys/block/zram0/comp_algorithm || { eend 1; return 1; }
+    if [ -n "$primary_parameters" ]; then
+      printf '%s\n' "$primary_parameters" > /sys/block/zram0/algorithm_params || { eend 1; return 1; }
+    fi
+    if [ -n "$secondary_algorithm" ]; then
+      if [ -w /sys/block/zram0/recomp_algorithm ] && [ -w /sys/block/zram0/algorithm_params ]; then
+        printf '%s\n' "$secondary_algorithm" > /sys/block/zram0/recomp_algorithm || { eend 1; return 1; }
+        printf '%s\n' "$secondary_parameters" > /sys/block/zram0/algorithm_params || { eend 1; return 1; }
+      else
+        ewarn "ZRAM multi-compression sysfs controls are unavailable; primary LZO swap will still be used"
+      fi
+    fi
+    printf '%s\n' "$zram_bytes" > /sys/block/zram0/disksize || { eend 1; return 1; }
+  elif [ "$current_size" -ne "$zram_bytes" ]; then
+    eerror "zram0 is initialized with ${current_size} bytes; expected ${zram_bytes}"
+    eend 1
+    return 1
+  fi
+
+  mkswap -L d630-zram /dev/zram0 >/dev/null || { eend 1; return 1; }
+
+  # ZRAM diagnostics are available through debugfs. Writeback is compiled in,
+  # but no backing_dev is configured, so swap pages are not written to disk.
+  mkdir -p /sys/kernel/debug
+  if ! grep -qs ' /sys/kernel/debug debugfs ' /proc/mounts; then
+    mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true
+  fi
+  [ ! -w /proc/sys/vm/swappiness ] || printf '%s\n' 180 > /proc/sys/vm/swappiness
+  [ ! -w /proc/sys/vm/page-cluster ] || printf '%s\n' 0 > /proc/sys/vm/page-cluster
+
+  swapon -p 100 /dev/zram0
+  result=$?
+  eend "$result"
+  return "$result"
+}
+
+stop() {
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq /dev/zram0; then
+    swapoff /dev/zram0 || return 1
+  fi
+  echo 1 > /sys/block/zram0/reset
+}
