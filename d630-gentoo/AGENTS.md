@@ -6,13 +6,15 @@ Follow the repository-root [AGENTS.md](../AGENTS.md).
 
 This directory implements the Gentoo/OpenRC live OS: runtime package sets, external early userspace, SquashFS builders, GRUB entries and optional ISO packaging.
 
+For every SquashFS build or runtime-image change, also read [rules-sfs.rst](rules-sfs.rst). It defines the restored-runner workflow, the strict image-size ceiling, runtime package requirements, pruning boundaries and SFS acceptance tests.
+
 ## Runtime invariants
 
-- The preferred tested path is direct GRUB loading of `/d630-gentoo/kernel`, `initramfs` and `squashfs` from an ordinary partition.
+- The preferred tested path is direct GRUB loading of /d630-gentoo/kernel, initramfs and squashfs from an ordinary partition.
 - SquashFS is read-only; the current OverlayFS upper layer is volatile RAM.
 - Preserve restored build roots and binary-package caches. Runtime pruning must operate on a staging copy.
-- ISO is an active optional packaging/distribution target, not obsolete. ISO-specific `d630.iso_*` early userspace and end-to-end boot/persistence testing remain incomplete.
-- Writable `gentoo-data.img` belongs beside the ISO on writable host storage, never inside the ISO.
+- ISO is an active optional packaging/distribution target, not obsolete. ISO-specific d630.iso_* early userspace and end-to-end boot/persistence testing remain incomplete.
+- Writable gentoo-data.img belongs beside the ISO on writable host storage, never inside the ISO.
 
 ## Build and validation
 
